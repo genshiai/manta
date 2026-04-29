@@ -1,114 +1,125 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
 import type {
-  ChartHistoryEntry,
+  ChartVersion,
   LabResultEntry,
-  PrescriptionTimelineGroup,
+  PrescriptionTimelineEntry,
 } from '../../types/workflow';
 
 type PastChartItemProps = {
-  entry: ChartHistoryEntry;
-  prescriptions?: PrescriptionTimelineGroup[];
+  version: ChartVersion;
+  /** その日の受診情報 (科・タイトル) - chartHistory から関連付け */
+  visit?: { department: string; title?: string };
+  prescriptions?: PrescriptionTimelineEntry[];
   labResults?: LabResultEntry[];
 };
 
-/**
- * 過去カルテ 1 件の表示。
- * 主情報 (常時表示): 受診日 + タイトル + 記述本文サマリ
- * 副情報 (折り畳み・デフォルト閉じ): 薬剤・検査・PMDA 等
- *
- * 設計指針: frontend/CHART-DESIGN.md セクション 4
- */
-export const PastChartItem = ({ entry, prescriptions, labResults }: PastChartItemProps) => {
-  const [expanded, setExpanded] = useState(false);
-
-  const subInfoCounts: string[] = [];
-  if (prescriptions && prescriptions.length > 0) {
-    const total = prescriptions.reduce((sum, g) => sum + g.items.length, 0);
-    subInfoCounts.push(`処方 ${total}剤`);
-  }
-  if (labResults && labResults.length > 0) {
-    const abnormal = labResults.filter((r) => r.flag === 'high').length;
-    subInfoCounts.push(`検査 ${labResults.length}件${abnormal > 0 ? ` (異常${abnormal})` : ''}`);
-  }
-
-  return (
-    <article className="border-b border-border py-5">
-      {/* 主情報 */}
-      <header className="mb-2 flex items-baseline gap-3">
-        <time className="text-[14px] font-bold text-text-primary">{entry.date}</time>
-        <span className="text-[12px] text-text-tertiary">{entry.department}</span>
-      </header>
-      <h3 className="mb-2 text-[16px] font-bold leading-snug text-text-primary">{entry.title}</h3>
-      <p className="text-[14px] leading-normal text-text-secondary">{entry.summary}</p>
-
-      {/* 副情報トグル (折り畳み) */}
-      {subInfoCounts.length > 0 ? (
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 rounded text-[13px] font-medium text-text-tertiary hover:text-text-primary"
-            aria-expanded={expanded}
-          >
-            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {subInfoCounts.join(' / ')}
-          </button>
-
-          {expanded ? (
-            <div className="mt-2 space-y-3 rounded-md bg-surface-subtle p-3">
-              {prescriptions && prescriptions.length > 0 ? (
-                <section>
-                  <h4 className="mb-2 text-[11px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
-                    処方
-                  </h4>
-                  <ul className="space-y-1">
-                    {prescriptions.flatMap((group) =>
-                      group.items.map((item, idx) => (
-                        <li
-                          // biome-ignore lint/suspicious/noArrayIndexKey: prescription items in a group are append-only with stable order
-                          key={`${group.date}-${item.drugName}-${item.dosage}-${idx}`}
-                          className="flex items-baseline justify-between gap-2 text-[13px]"
-                        >
-                          <span className="text-text-primary">{item.drugName}</span>
-                          <span className="text-text-tertiary">
-                            {item.dosage} ・ {item.days}
-                          </span>
-                        </li>
-                      )),
-                    )}
-                  </ul>
-                </section>
-              ) : null}
-
-              {labResults && labResults.length > 0 ? (
-                <section>
-                  <h4 className="mb-2 text-[11px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
-                    検査結果
-                  </h4>
-                  <ul className="space-y-1">
-                    {labResults.map((lab) => (
-                      <li
-                        key={lab.item}
-                        className="flex items-baseline justify-between gap-2 text-[13px]"
-                      >
-                        <span className="text-text-primary">{lab.item}</span>
-                        <span
-                          className={
-                            lab.flag === 'high' ? 'font-bold text-warning' : 'text-text-tertiary'
-                          }
-                        >
-                          {lab.result}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
-  );
+const formatDateHeader = (savedAt: string): string => {
+  // savedAt 例: "2026/04/12 14:30:00" or ISO
+  const datePart = savedAt.includes('T') ? savedAt.split('T')[0] : savedAt.split(' ')[0];
+  if (!datePart) return savedAt;
+  // YYYY/MM/DD or YYYY-MM-DD → 2026年4月12日
+  const m = datePart.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (!m) return datePart;
+  const [, y, mo, d] = m;
+  const date = new Date(Number(y), Number(mo) - 1, Number(d));
+  const dow = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+  return `${y}年${Number(mo)}月${Number(d)}日（${dow}）`;
 };
+
+const SoapSection = ({ label, title, content }: { label: string; title: string; content: string }) =>
+  content.trim().length === 0 ? null : (
+    <section className="mt-4 first:mt-0">
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+          {label}
+        </span>
+        <span className="text-[11px] text-text-tertiary">{title}</span>
+      </div>
+      <p className="whitespace-pre-wrap text-[14px] leading-[1.7] text-text-primary">{content}</p>
+    </section>
+  );
+
+/**
+ * 過去カルテ 1 件のブロック表示。
+ * 主表示: 日付ヘッダー + S/O/A/P + 処方 + 検査 (すべて常時可視)
+ * Notion ドキュメントの段組みのように、ブロック間は十分な余白で区切る。
+ *
+ * 設計指針: frontend/CHART-DESIGN.md セクション 4 / memory: feedback_chart_block_view
+ */
+export const PastChartItem = ({
+  version,
+  visit,
+  prescriptions,
+  labResults,
+}: PastChartItemProps) => (
+  <article className="border-b border-border py-10 last:border-b-0">
+    {/* 日付ヘッダー */}
+    <header className="mb-6 flex items-baseline gap-3">
+      <h3 className="text-[20px] font-bold leading-snug text-text-primary">
+        {formatDateHeader(version.savedAt)}
+      </h3>
+      {visit?.department ? (
+        <span className="text-[13px] text-text-tertiary">{visit.department}</span>
+      ) : null}
+      <span className="ml-auto text-[12px] text-text-tertiary">
+        v{version.version} ・ {version.savedBy}
+      </span>
+    </header>
+
+    {/* SOAP 本文 */}
+    <div>
+      <SoapSection label="S" title="主訴・自覚症状" content={version.subjective} />
+      <SoapSection label="O" title="所見・バイタル・検査" content={version.objective} />
+      <SoapSection label="A" title="アセスメント" content={version.assessment} />
+      <SoapSection label="P" title="プラン" content={version.plan} />
+    </div>
+
+    {/* 処方 (主表示) */}
+    {prescriptions && prescriptions.length > 0 ? (
+      <section className="mt-6">
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+          処方
+        </h4>
+        <ul className="divide-y divide-border/60 rounded-lg border border-border">
+          {prescriptions.map((item, idx) => (
+            <li
+              // biome-ignore lint/suspicious/noArrayIndexKey: prescription items are append-only with stable order
+              key={`${item.drugName}-${item.dosage}-${idx}`}
+              className="flex items-baseline justify-between gap-3 px-4 py-2.5"
+            >
+              <span className="text-[14px] text-text-primary">{item.drugName}</span>
+              <span className="text-[13px] text-text-tertiary">
+                {item.dosage} ・ {item.days}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null}
+
+    {/* 検査 (主表示) */}
+    {labResults && labResults.length > 0 ? (
+      <section className="mt-6">
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+          検査結果
+        </h4>
+        <ul className="divide-y divide-border/60 rounded-lg border border-border">
+          {labResults.map((lab) => (
+            <li
+              key={lab.item}
+              className="flex items-baseline justify-between gap-3 px-4 py-2.5"
+            >
+              <span className="text-[14px] text-text-primary">{lab.item}</span>
+              <span
+                className={`text-[14px] tabular-nums ${
+                  lab.flag === 'high' ? 'font-bold text-warning' : 'text-text-secondary'
+                }`}
+              >
+                {lab.result}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null}
+  </article>
+);

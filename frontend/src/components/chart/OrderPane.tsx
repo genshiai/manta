@@ -1,23 +1,27 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { useMemo, useState } from 'react';
+import { ExternalLink, Plus, Search, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { buildPmdaDrugInfoUrl } from '../../lib/pmda';
 import type {
   ChartOrderConfig,
   ImagingOrderEntry,
+  PrescriptionCatalogItem,
   PrescriptionEntry,
+  PrescriptionSetItem,
+  PrescriptionSetMaster,
   ProcedureOrderEntry,
 } from '../../types/workflow';
 
 type OrderTab = 'prescription' | 'lab' | 'imaging' | 'procedure';
 
 type LabOrderRow = {
-  status: string;
-  scheduledAt?: string;
-  testName?: string;
-  result?: string;
-  reportedAt?: string;
+  category: string;
+  status: 'done' | 'pending';
+  urgency?: '通常' | '至急';
+  items: string[];
+  createdAt?: string;
 };
 
 type OrderPaneProps = {
@@ -32,16 +36,15 @@ type OrderPaneProps = {
   onAddLab: (setId: string, urgency: '通常' | '至急') => void;
   onAddImaging: (entry: ImagingOrderEntry) => void;
   onAddProcedure: (entry: ProcedureOrderEntry) => void;
+  onAddPrescriptionsBatch?: (items: PrescriptionSetItem[]) => Promise<void>;
 };
 
 /**
  * 右ペイン (DO・次の行動)
  *
  * - 上端: 4 タブ sticky (処方/検査/画像/処置)
- * - 各タブ: 入力フォーム (上) + キュー (下、独立スクロール)
- * - タブ切替はカテゴリ排他なので OK
- *
- * 設計指針: frontend/CHART-DESIGN.md セクション 2.3
+ * - 各タブ: 入力フォーム (上) + キュー (下)
+ * - 処方タブは薬剤検索・セット展開プレビュー・PMDA リンク内蔵
  */
 export const OrderPane = ({
   orderConfig,
@@ -55,6 +58,7 @@ export const OrderPane = ({
   onAddLab,
   onAddImaging,
   onAddProcedure,
+  onAddPrescriptionsBatch,
 }: OrderPaneProps) => {
   const [tab, setTab] = useState<OrderTab>('prescription');
 
@@ -65,7 +69,6 @@ export const OrderPane = ({
         onValueChange={(v) => setTab(v as OrderTab)}
         className="flex h-full min-h-0 flex-col"
       >
-        {/* sticky タブヘッダー */}
         <div className="flex-shrink-0 border-b border-border px-3 pt-3">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="prescription">処方</TabsTrigger>
@@ -73,10 +76,11 @@ export const OrderPane = ({
             <TabsTrigger value="imaging">画像</TabsTrigger>
             <TabsTrigger value="procedure">処置</TabsTrigger>
           </TabsList>
-          <p className="mt-2 px-1 text-[11px] text-text-tertiary">{orderMessage}</p>
+          <p className="mt-2 truncate px-1 text-[11px] text-text-tertiary" title={orderMessage}>
+            {orderMessage}
+          </p>
         </div>
 
-        {/* 各タブの中身: ペイン全体スクロール */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           <TabsContent value="prescription" className="m-0 p-3">
             <PrescriptionTab
@@ -84,6 +88,7 @@ export const OrderPane = ({
               prescriptions={prescriptions}
               isMutating={isMutating}
               onAdd={onAddPrescription}
+              onAddBatch={onAddPrescriptionsBatch}
             />
           </TabsContent>
 
@@ -117,76 +122,193 @@ export const OrderPane = ({
   );
 };
 
-// === 個別タブ ===
+// === 処方タブ (薬剤検索・PMDA・セット展開) ===
 
 const PrescriptionTab = ({
   orderConfig,
   prescriptions,
   isMutating,
   onAdd,
+  onAddBatch,
 }: {
   orderConfig: ChartOrderConfig;
   prescriptions: PrescriptionEntry[];
   isMutating: boolean;
   onAdd: (drugId: string, dosage: string, days: string) => void;
+  onAddBatch?: (items: PrescriptionSetItem[]) => Promise<void>;
 }) => {
-  const [drugId, setDrugId] = useState(orderConfig.prescriptionCatalog[0]?.id ?? '');
+  const [query, setQuery] = useState('');
+  const [selectedDrug, setSelectedDrug] = useState<PrescriptionCatalogItem | null>(null);
   const [dosage, setDosage] = useState('');
   const [days, setDays] = useState('14日分');
-  const drug = orderConfig.prescriptionCatalog.find((d) => d.id === drugId);
-  const dosageOptions = drug?.dosageOptions ?? [];
+  const [setPreview, setSetPreview] = useState<PrescriptionSetMaster | null>(null);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q === '') return [] as PrescriptionCatalogItem[];
+    return orderConfig.prescriptionCatalog
+      .filter((d) => {
+        const fields = [d.drugName, d.genericName ?? '', d.nameKana ?? '', ...d.aliases];
+        return fields.some((f) => f.toLowerCase().includes(q));
+      })
+      .slice(0, 12);
+  }, [orderConfig.prescriptionCatalog, query]);
+
+  const dosageOptions = selectedDrug?.dosageOptions ?? [];
   const currentDosage = dosage || dosageOptions[0] || '';
+  const pmdaUrl = selectedDrug?.pmdaInfoUrl ?? buildPmdaDrugInfoUrl(selectedDrug?.yjCode);
+
+  const handleAddSelected = () => {
+    if (!selectedDrug || !currentDosage) return;
+    onAdd(selectedDrug.id, currentDosage, days || selectedDrug.defaultDays || '14日分');
+    setSelectedDrug(null);
+    setQuery('');
+    setDosage('');
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* 薬剤検索 */}
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
-          処方を追加
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+          薬剤を追加
         </h3>
-        <select
-          value={drugId}
-          onChange={(e) => {
-            setDrugId(e.target.value);
-            setDosage('');
-          }}
-          className="h-9 w-full rounded-lg border border-border bg-card px-3 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
-        >
-          {orderConfig.prescriptionCatalog.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.drugName}
-            </option>
-          ))}
-        </select>
-        <select
-          value={currentDosage}
-          onChange={(e) => setDosage(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-card px-3 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
-        >
-          {dosageOptions.length > 0 ? (
-            dosageOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))
-          ) : (
-            <option value="">用量未設定</option>
-          )}
-        </select>
-        <Input value={days} onChange={(e) => setDays(e.target.value)} placeholder="14日分" />
-        <Button
-          variant="default"
-          size="sm"
-          className="w-full"
-          onClick={() => onAdd(drugId, currentDosage, days)}
-          disabled={isMutating || !drugId || !currentDosage}
-        >
-          <Plus size={14} />
-          処方追加
-        </Button>
+        <div className="relative">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="薬剤名 / 一般名 / カナで検索"
+            className="pl-9"
+          />
+        </div>
+        {matches.length > 0 && !selectedDrug ? (
+          <ul className="overflow-hidden rounded-lg border border-border bg-card">
+            {matches.map((d) => (
+              <li key={d.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDrug(d)}
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-subtle"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium text-text-primary">
+                      {d.drugName}
+                    </p>
+                    {d.genericName ? (
+                      <p className="truncate text-[11px] text-text-tertiary">{d.genericName}</p>
+                    ) : null}
+                  </div>
+                  <span className="text-[10px] text-text-tertiary">{d.category}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {selectedDrug ? (
+          <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-text-primary">
+                  {selectedDrug.drugName}
+                </p>
+                {selectedDrug.genericName ? (
+                  <p className="truncate text-[11px] text-text-tertiary">
+                    {selectedDrug.genericName}
+                  </p>
+                ) : null}
+                {selectedDrug.allergyConflictLabel ? (
+                  <p className="mt-1 inline-block rounded bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                    ⚠ {selectedDrug.allergyConflictLabel}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDrug(null)}
+                className="rounded p-0.5 text-text-tertiary hover:bg-surface-subtle"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <select
+              value={currentDosage}
+              onChange={(e) => setDosage(e.target.value)}
+              className="h-9 w-full rounded-md border border-border bg-card px-2 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
+            >
+              {dosageOptions.length > 0 ? (
+                dosageOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))
+              ) : (
+                <option value="">用量未設定</option>
+              )}
+            </select>
+            <Input
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+              placeholder={selectedDrug.defaultDays ?? '14日分'}
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                className="flex-1"
+                onClick={handleAddSelected}
+                disabled={isMutating || !currentDosage}
+              >
+                <Plus size={14} />
+                追加
+              </Button>
+              {pmdaUrl ? (
+                <a
+                  href={pmdaUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] text-text-secondary hover:bg-surface-subtle"
+                  title="PMDA 添付文書を開く"
+                >
+                  <ExternalLink size={12} />
+                  PMDA
+                </a>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </section>
 
+      {/* 処方セット */}
+      {orderConfig.prescriptionSets.length > 0 ? (
+        <section className="space-y-2">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+            処方セット
+          </h3>
+          <ul className="space-y-1">
+            {orderConfig.prescriptionSets.slice(0, 6).map((s) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => setSetPreview(s)}
+                  className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-left text-[13px] transition-colors hover:bg-surface-subtle"
+                >
+                  <span className="truncate text-text-primary">{s.label}</span>
+                  <span className="text-[11px] text-text-tertiary">{s.items.length}剤</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* 現在の処方 */}
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           現在の処方 ({prescriptions.length})
         </h3>
         <ul className="space-y-1.5">
@@ -210,9 +332,115 @@ const PrescriptionTab = ({
           )}
         </ul>
       </section>
+
+      {/* セット展開プレビューモーダル */}
+      {setPreview ? (
+        <SetPreviewSheet
+          set={setPreview}
+          catalog={orderConfig.prescriptionCatalog}
+          isMutating={isMutating}
+          onClose={() => setSetPreview(null)}
+          onConfirm={async () => {
+            if (!onAddBatch) return;
+            await onAddBatch(setPreview.items);
+            setSetPreview(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 };
+
+// === セット展開プレビュー sheet ===
+
+const SetPreviewSheet = ({
+  set,
+  catalog,
+  isMutating,
+  onClose,
+  onConfirm,
+}: {
+  set: PrescriptionSetMaster;
+  catalog: PrescriptionCatalogItem[];
+  isMutating: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) => (
+  <div
+    className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+    onClick={onClose}
+    onKeyDown={(e) => {
+      if (e.key === 'Escape') onClose();
+    }}
+    role="dialog"
+    aria-modal="true"
+    tabIndex={-1}
+  >
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label="閉じる"
+      className="absolute inset-0 cursor-default"
+      onClick={onClose}
+    />
+    <div className="relative w-full max-w-md rounded-t-xl bg-card p-6 shadow-modal sm:rounded-xl">
+      <header className="mb-4 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-[18px] font-bold leading-snug text-text-primary">{set.label}</h3>
+          <p className="text-[12px] text-text-tertiary">
+            {set.department}
+            {set.relatedProblem ? ` ・ ${set.relatedProblem}` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-text-tertiary hover:bg-surface-subtle"
+        >
+          <X size={16} />
+        </button>
+      </header>
+
+      <div className="mb-4">
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+          展開される薬剤 ({set.items.length})
+        </h4>
+        <ul className="divide-y divide-border rounded-lg border border-border">
+          {set.items.map((item) => {
+            const drug = catalog.find((d) => d.id === item.drugId);
+            return (
+              <li key={item.drugId} className="flex items-baseline justify-between gap-2 px-3 py-2">
+                <span className="text-[13px] text-text-primary">
+                  {drug?.drugName ?? item.drugId}
+                </span>
+                <span className="text-[12px] text-text-tertiary">
+                  {item.dosage} ・ {item.days}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {set.note ? (
+        <p className="mb-4 rounded-md bg-surface-subtle p-2 text-[12px] text-text-secondary">
+          {set.note}
+        </p>
+      ) : null}
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          キャンセル
+        </Button>
+        <Button variant="default" size="sm" onClick={onConfirm} disabled={isMutating}>
+          一括追加
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+// === 検査タブ ===
 
 const LabTab = ({
   orderConfig,
@@ -227,17 +455,18 @@ const LabTab = ({
 }) => {
   const [setId, setSetId] = useState(orderConfig.labSetOptions[0]?.id ?? '');
   const [urgency, setUrgency] = useState<'通常' | '至急'>('通常');
+  const set = orderConfig.labSetOptions.find((s) => s.id === setId);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           検査を追加
         </h3>
         <select
           value={setId}
           onChange={(e) => setSetId(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border bg-card px-3 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
+          className="h-9 w-full rounded-md border border-border bg-card px-2 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
         >
           {orderConfig.labSetOptions.map((s) => (
             <option key={s.id} value={s.id}>
@@ -248,11 +477,23 @@ const LabTab = ({
         <select
           value={urgency}
           onChange={(e) => setUrgency(e.target.value as '通常' | '至急')}
-          className="h-9 w-full rounded-lg border border-border bg-card px-3 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
+          className="h-9 w-full rounded-md border border-border bg-card px-2 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
         >
           <option value="通常">通常</option>
           <option value="至急">至急</option>
         </select>
+
+        {set && set.items.length > 0 ? (
+          <div className="rounded-md border border-border bg-surface-subtle p-2">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-text-tertiary">
+              展開項目 ({set.items.length})
+            </p>
+            <p className="text-[12px] leading-relaxed text-text-secondary">
+              {set.items.join('・')}
+            </p>
+          </div>
+        ) : null}
+
         <Button
           variant="default"
           size="sm"
@@ -266,7 +507,7 @@ const LabTab = ({
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           検査キュー ({labOrders.length})
         </h3>
         <ul className="space-y-1.5">
@@ -274,15 +515,22 @@ const LabTab = ({
             labOrders.map((o, idx) => (
               <li
                 // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
-                key={`${o.testName}-${o.scheduledAt ?? ''}-${idx}`}
+                key={`${o.category}-${idx}`}
                 className="rounded-md border border-border bg-card px-3 py-2"
               >
-                <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-bold text-text-primary">{o.testName ?? '検査'}</p>
-                  <span className="text-[11px] text-text-tertiary">{o.status}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[13px] font-bold text-text-primary">{o.category}</p>
+                  <span
+                    className={`text-[11px] ${o.status === 'done' ? 'text-success' : 'text-text-tertiary'}`}
+                  >
+                    {o.status === 'done' ? '完了' : 'オーダ中'}
+                    {o.urgency === '至急' ? ' ・ 至急' : ''}
+                  </span>
                 </div>
-                {o.result ? (
-                  <p className="mt-0.5 text-[12px] text-text-secondary">{o.result}</p>
+                {o.items.length > 0 ? (
+                  <p className="mt-0.5 truncate text-[12px] text-text-tertiary">
+                    {o.items.join('・')}
+                  </p>
                 ) : null}
               </li>
             ))
@@ -296,6 +544,8 @@ const LabTab = ({
     </div>
   );
 };
+
+// === 画像タブ ===
 
 const ImagingTab = ({
   imagingOrders,
@@ -311,9 +561,9 @@ const ImagingTab = ({
   const [note, setNote] = useState('');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           画像オーダ追加
         </h3>
         <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="検査種別" />
@@ -336,7 +586,7 @@ const ImagingTab = ({
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           画像キュー ({imagingOrders.length})
         </h3>
         <ul className="space-y-1.5">
@@ -365,6 +615,8 @@ const ImagingTab = ({
   );
 };
 
+// === 処置タブ ===
+
 const ProcedureTab = ({
   procedureOrders,
   isMutating,
@@ -378,9 +630,9 @@ const ProcedureTab = ({
   const [note, setNote] = useState('');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           処置を追加
         </h3>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="処置名" />
@@ -398,7 +650,7 @@ const ProcedureTab = ({
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[12px] font-medium uppercase tracking-[0.05em] text-text-tertiary">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           処置キュー ({procedureOrders.length})
         </h3>
         <ul className="space-y-1.5">

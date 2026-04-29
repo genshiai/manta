@@ -10,6 +10,7 @@ import {
   getPrescriptionTimeline,
   isUnauthorizedError,
   saveChart,
+  savePatientContext,
 } from '../lib/api';
 import type { PatientRecord, ReceptionStatus } from '../data/chartMock';
 import type {
@@ -17,10 +18,12 @@ import type {
   ChartMeta,
   ChartOrderConfig,
   ChartTemplate,
+  ChartVersion,
   ImagingOrderEntry,
   LabResultEntry,
   PatientProfileEntry,
   PrescriptionEntry,
+  PrescriptionSetItem,
   PrescriptionTimelineGroup,
   ProblemListItem,
   ProcedureOrderEntry,
@@ -104,6 +107,7 @@ export function ChartWorkspace({
   const [problems, setProblems] = useState<IdEntry<ProblemListItem>[]>([]);
   const [visitHistory, setVisitHistory] = useState<VisitHistoryEntry[]>([]);
   const [chartHistory, setChartHistory] = useState<ChartHistoryEntry[]>([]);
+  const [versions, setVersions] = useState<ChartVersion[]>([]);
   const [vitals, setVitals] = useState<VitalEntry[]>([]);
   const [labResults, setLabResults] = useState<LabResultEntry[]>([]);
   const [labOrders, setLabOrders] = useState<LabOrderRow[]>([]);
@@ -158,6 +162,7 @@ export function ChartWorkspace({
       setProblems(withId(workspace.problems));
       setVisitHistory(workspace.visitHistory);
       setChartHistory(workspace.chartHistory);
+      setVersions(workspace.versions);
       setVitals(workspace.vitals);
       setLabResults(workspace.labResults);
       setLabOrders(workspace.labOrders);
@@ -294,6 +299,38 @@ export function ChartWorkspace({
     }
   };
 
+  const handleAddPrescriptionsBatch = async (items: PrescriptionSetItem[]) => {
+    setIsMutating(true);
+    try {
+      for (const item of items) {
+        const drug = orderConfig.prescriptionCatalog.find((d) => d.id === item.drugId);
+        if (!drug) continue;
+        await addPrescription(patient.id, {
+          type: drug.category ?? '内服',
+          days: item.days,
+          drugName: drug.drugName,
+          dosage: item.dosage,
+          actor: currentUser.displayName,
+        });
+      }
+      const refreshed = await getChartWorkspace(patient.id);
+      setPrescriptions(refreshed.prescriptions);
+      setPrescriptionTimeline(await getPrescriptionTimeline(patient.id));
+      setOrderMessage(`セット展開: ${items.length}剤を追加`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(
+        `セット追加に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`,
+      );
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   const handleAddLab = async (setId: string, urgency: '通常' | '至急') => {
     const set = orderConfig.labSetOptions.find((s) => s.id === setId);
     if (!set) return;
@@ -370,6 +407,33 @@ export function ChartWorkspace({
     }
   };
 
+  const handleSaveContext = async (
+    nextProfile: IdEntry<PatientProfileEntry>[],
+    nextProblems: IdEntry<ProblemListItem>[],
+  ) => {
+    setIsMutating(true);
+    try {
+      await savePatientContext(patient.id, {
+        patientProfile: nextProfile.map(({ id: _id, ...rest }) => rest),
+        problems: nextProblems.map(({ id: _id, ...rest }) => rest),
+      });
+      setProfile(nextProfile);
+      setProblems(nextProblems);
+      setOrderMessage('患者情報を保存しました');
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(
+        `患者情報保存に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`,
+      );
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   const handleFinishVisit = async () => {
     if (isDirty) {
       setSaveMessage('保存してから診察終了してください');
@@ -421,15 +485,19 @@ export function ChartWorkspace({
           profile={profile}
           problems={problems}
           visitHistory={visitHistory}
+          isMutating={isMutating}
+          onSaveContext={handleSaveContext}
         />
       }
       center={
         <RecordPane
           draft={draft}
+          isDirty={isDirty}
           vitals={vitals}
           templates={orderConfig.chartTemplates}
           selectedTemplateId={selectedTemplateId}
           isMutating={isMutating}
+          versions={versions}
           chartHistory={chartHistory}
           prescriptionTimeline={prescriptionTimeline}
           labResults={labResults}
@@ -445,12 +513,7 @@ export function ChartWorkspace({
         <OrderPane
           orderConfig={orderConfig}
           prescriptions={prescriptions}
-          labOrders={labOrders.map((o) => ({
-            status: o.status,
-            testName: o.category,
-            scheduledAt: o.createdAt,
-            result: o.items.join(', '),
-          }))}
+          labOrders={labOrders}
           imagingOrders={imagingOrders}
           procedureOrders={procedureOrders}
           isMutating={isMutating}
@@ -459,6 +522,7 @@ export function ChartWorkspace({
           onAddLab={handleAddLab}
           onAddImaging={handleAddImaging}
           onAddProcedure={handleAddProcedure}
+          onAddPrescriptionsBatch={handleAddPrescriptionsBatch}
         />
       }
     />
