@@ -1,0 +1,25 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app/frontend
+
+ARG VITE_API_BASE_URL=
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+WORKDIR /app
+COPY frontend ./frontend
+COPY docs ./docs
+
+WORKDIR /app/frontend
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
+
+EXPOSE 4173
+
+CMD ["nginx", "-g", "daemon off;"]

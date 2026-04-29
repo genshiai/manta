@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manta - 電子カルテ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ========================================
+       Header
+       ======================================== -->
+  <header class="header">
+    <div class="header__left">
+      <h1 class="header__logo">
+        <svg class="header__logo-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="6" fill="#3460FB"/>
+          <text x="14" y="20" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="Noto Sans JP">M</text>
+        </svg>
+        <span>Manta</span>
+      </h1>
+      <nav class="header__nav" aria-label="グローバルナビゲーション">
+        <a href="#" class="header__nav-item">受付</a>
+        <a href="#" class="header__nav-item header__nav-item--active">カルテ</a>
+        <a href="#" class="header__nav-item">予約</a>
+        <a href="#" class="header__nav-item">設定</a>
+      </nav>
+    </div>
+    <div class="header__right">
+      <div class="header__search">
+        <svg class="header__search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="text" class="header__search-input" placeholder="患者ID・氏名で検索..." aria-label="患者検索">
+      </div>
+      <button class="header__icon-btn" aria-label="通知">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="header__badge">3</span>
+      </button>
+      <div class="header__user">
+        <div class="header__avatar">田</div>
+        <span class="header__user-name">田中 太郎</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================
+       Patient Context Bar (2nd level nav)
+       ======================================== -->
+  <div class="patient-context-bar">
+    <div class="patient-context-bar__patient">
+      <span class="patient-context-bar__name">鈴木 花子</span>
+      <span class="patient-context-bar__meta">68歳 女性 / ID: 0009900040</span>
+    </div>
+    <nav class="patient-context-bar__nav" aria-label="患者コンテキストナビゲーション">
+      <a href="#" class="patient-context-bar__tab patient-context-bar__tab--active">カルテ記載</a>
+      <a href="#" class="patient-context-bar__tab">指示歴</a>
+      <a href="#" class="patient-context-bar__tab">検査結果</a>
+      <a href="#" class="patient-context-bar__tab">患者情報</a>
+    </nav>
+    <div class="patient-context-bar__actions">
+      <button class="btn btn--text btn--xs" aria-label="患者を閉じる">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        閉じる
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================
+       Main Layout
+       ======================================== -->
+  <div class="app-layout">
+
+    <!-- ======== Left Sidebar: Patient Info + History ======== -->
+    <aside class="sidebar">
+      <!-- Patient Demographics -->
+      <div class="patient-card">
+        <div class="patient-card__header">
+          <div class="patient-card__avatar">鈴</div>
+          <div class="patient-card__info">
+            <h2 class="patient-card__name">鈴木 花子</h2>
+            <span class="patient-card__id">ID: 0009900040</span>
+          </div>
+          <span class="patient-card__sex patient-card__sex--female">女</span>
+        </div>
+        <div class="patient-card__details">
+          <div class="patient-card__detail-row">
+            <span class="patient-card__label">生年月日</span>
+            <span class="patient-card__value">1958/03/15 (68歳)</span>
+          </div>
+          <div class="patient-card__detail-row">
+            <span class="patient-card__label">血液型</span>
+            <span class="patient-card__value">A型 Rh(+)</span>
+          </div>
+          <div class="patient-card__detail-row">
+            <span class="patient-card__label">身長 / 体重</span>
+            <span class="patient-card__value">155.0cm / 52.3kg</span>
+          </div>
+          <div class="patient-card__detail-row">
+            <span class="patient-card__label">保険</span>
+            <span class="patient-card__value">国民健康保険</span>
+          </div>
+        </div>
+        <div class="patient-card__alerts">
+          <span class="alert-tag alert-tag--danger">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            ペニシリンアレルギー
+          </span>
+          <span class="alert-tag alert-tag--warning">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            糖尿病
+          </span>
+        </div>
+      </div>
+
+      <!-- Visit History -->
+      <div class="sidebar__section">
+        <h3 class="sidebar__section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          受診履歴
+        </h3>
+        <ul class="visit-list">
+          <li class="visit-list__item visit-list__item--active">
+            <div class="visit-list__date">2026/04/13</div>
+            <div class="visit-list__dept">内科</div>
+            <div class="visit-list__summary">定期検診・血糖コントロール</div>
+          </li>
+          <li class="visit-list__item">
+            <div class="visit-list__date">2026/03/16</div>
+            <div class="visit-list__dept">内科</div>
+            <div class="visit-list__summary">HbA1c フォロー</div>
+          </li>
+          <li class="visit-list__item">
+            <div class="visit-list__date">2026/02/10</div>
+            <div class="visit-list__dept">眼科</div>
+            <div class="visit-list__summary">糖尿病性網膜症スクリーニング</div>
+          </li>
+          <li class="visit-list__item">
+            <div class="visit-list__date">2026/01/14</div>
+            <div class="visit-list__dept">内科</div>
+            <div class="visit-list__summary">血糖・脂質検査</div>
+          </li>
+          <li class="visit-list__item">
+            <div class="visit-list__date">2025/12/08</div>
+            <div class="visit-list__dept">整形外科</div>
+            <div class="visit-list__summary">腰痛精査</div>
+          </li>
+          <li class="visit-list__item">
+            <div class="visit-list__date">2025/11/10</div>
+            <div class="visit-list__dept">内科</div>
+            <div class="visit-list__summary">定期検診</div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Problem List -->
+      <div class="sidebar__section">
+        <h3 class="sidebar__section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          プロブレムリスト
+        </h3>
+        <ul class="problem-list">
+          <li class="problem-list__item">
+            <span class="problem-list__status problem-list__status--active"></span>
+            <div>
+              <div class="problem-list__name">#1 2型糖尿病</div>
+              <div class="problem-list__since">2018/05 〜</div>
+            </div>
+          </li>
+          <li class="problem-list__item">
+            <span class="problem-list__status problem-list__status--active"></span>
+            <div>
+              <div class="problem-list__name">#2 高血圧症</div>
+              <div class="problem-list__since">2019/11 〜</div>
+            </div>
+          </li>
+          <li class="problem-list__item">
+            <span class="problem-list__status problem-list__status--active"></span>
+            <div>
+              <div class="problem-list__name">#3 脂質異常症</div>
+              <div class="problem-list__since">2020/02 〜</div>
+            </div>
+          </li>
+          <li class="problem-list__item">
+            <span class="problem-list__status problem-list__status--resolved"></span>
+            <div>
+              <div class="problem-list__name">#4 腰椎椎間板ヘルニア</div>
+              <div class="problem-list__since">2025/12 〜 2026/02 (軽快)</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- ======== Main Content: SOAP Notes ======== -->
+    <main class="main-content">
+      <!-- Current Visit Header -->
+      <div class="visit-header">
+        <div class="visit-header__left">
+          <h2 class="visit-header__title">カルテ記載</h2>
+          <span class="visit-header__date">2026年4月13日（日） 内科</span>
+          <span class="visit-header__doctor">担当: 田中 太郎</span>
+        </div>
+        <div class="visit-header__actions">
+          <button class="btn btn--outline btn--sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            テンプレート
+          </button>
+          <button class="btn btn--outline btn--sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            前回複写
+          </button>
+          <button class="btn btn--primary btn--sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
+            保存
+          </button>
+        </div>
+      </div>
+
+      <!-- SOAP Form -->
+      <div class="soap-form">
+        <!-- S: Subjective -->
+        <div class="soap-section">
+          <div class="soap-section__header">
+            <span class="soap-section__badge soap-section__badge--s">S</span>
+            <h3 class="soap-section__title">主観的情報（Subjective）</h3>
+          </div>
+          <div class="soap-section__body">
+            <textarea class="soap-textarea" rows="4" placeholder="患者の訴え、症状の経過を記載...">特に自覚症状なし。食事療法は継続中。間食を控えるよう努力しているとのこと。
+最近は朝の散歩を始め、30分程度歩いている。
+前回処方のメトホルミンは副作用なく服用できている。</textarea>
+          </div>
+        </div>
+
+        <!-- O: Objective -->
+        <div class="soap-section">
+          <div class="soap-section__header">
+            <span class="soap-section__badge soap-section__badge--o">O</span>
+            <h3 class="soap-section__title">客観的情報（Objective）</h3>
+          </div>
+          <div class="soap-section__body">
+            <!-- Vitals -->
+            <div class="vitals-grid">
+              <div class="vital-item">
+                <span class="vital-item__label">血圧</span>
+                <span class="vital-item__value">
+                  <span class="vital-item__number">132</span>
+                  <span class="vital-item__separator">/</span>
+                  <span class="vital-item__number">78</span>
+                </span>
+                <span class="vital-item__unit">mmHg</span>
+              </div>
+              <div class="vital-item">
+                <span class="vital-item__label">脈拍</span>
+                <span class="vital-item__value">
+                  <span class="vital-item__number">72</span>
+                </span>
+                <span class="vital-item__unit">bpm</span>
+              </div>
+              <div class="vital-item">
+                <span class="vital-item__label">体温</span>
+                <span class="vital-item__value">
+                  <span class="vital-item__number">36.4</span>
+                </span>
+                <span class="vital-item__unit">&deg;C</span>
+              </div>
+              <div class="vital-item">
+                <span class="vital-item__label">SpO2</span>
+                <span class="vital-item__value">
+                  <span class="vital-item__number">98</span>
+                </span>
+                <span class="vital-item__unit">%</span>
+              </div>
+              <div class="vital-item">
+                <span class="vital-item__label">体重</span>
+                <span class="vital-item__value">
+                  <span class="vital-item__number">52.3</span>
+                </span>
+                <span class="vital-item__unit">kg</span>
+              </div>
+              <div class="vital-item">
+                <span class="vital-item__label">BMI</span>
+                <span class="vital-item__value">
+                  <span class="vital-item__number">21.8</span>
+                </span>
+                <span class="vital-item__unit"></span>
+              </div>
+            </div>
+            <textarea class="soap-textarea" rows="3" placeholder="身体所見、検査結果を記載...">身体所見:
+胸部聴診 - 心音整、心雑音なし。呼吸音清。
+腹部 - 平坦・軟、圧痛なし。</textarea>
+
+            <!-- Lab Results -->
+            <div class="lab-results">
+              <div class="lab-results__header">
+                <h4 class="lab-results__title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  検査結果（2026/04/13）
+                </h4>
+                <button class="btn btn--text btn--xs">全検査値を表示</button>
+              </div>
+              <table class="lab-table">
+                <thead>
+                  <tr>
+                    <th>項目</th>
+                    <th>結果</th>
+                    <th>基準値</th>
+                    <th>前回値</th>
+                    <th>判定</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>HbA1c</td>
+                    <td class="lab-table__value lab-table__value--high">7.2%</td>
+                    <td>4.6〜6.2%</td>
+                    <td>7.5%</td>
+                    <td><span class="lab-flag lab-flag--high">H</span></td>
+                  </tr>
+                  <tr>
+                    <td>空腹時血糖</td>
+                    <td class="lab-table__value lab-table__value--high">138 mg/dL</td>
+                    <td>70〜110 mg/dL</td>
+                    <td>145 mg/dL</td>
+                    <td><span class="lab-flag lab-flag--high">H</span></td>
+                  </tr>
+                  <tr>
+                    <td>LDL-C</td>
+                    <td class="lab-table__value">118 mg/dL</td>
+                    <td>70〜139 mg/dL</td>
+                    <td>125 mg/dL</td>
+                    <td><span class="lab-flag lab-flag--normal">N</span></td>
+                  </tr>
+                  <tr>
+                    <td>HDL-C</td>
+                    <td class="lab-table__value">55 mg/dL</td>
+                    <td>40〜77 mg/dL</td>
+                    <td>52 mg/dL</td>
+                    <td><span class="lab-flag lab-flag--normal">N</span></td>
+                  </tr>
+                  <tr>
+                    <td>AST (GOT)</td>
+                    <td class="lab-table__value">24 U/L</td>
+                    <td>13〜33 U/L</td>
+                    <td>22 U/L</td>
+                    <td><span class="lab-flag lab-flag--normal">N</span></td>
+                  </tr>
+                  <tr>
+                    <td>ALT (GPT)</td>
+                    <td class="lab-table__value">28 U/L</td>
+                    <td>8〜42 U/L</td>
+                    <td>25 U/L</td>
+                    <td><span class="lab-flag lab-flag--normal">N</span></td>
+                  </tr>
+                  <tr>
+                    <td>Cr</td>
+                    <td class="lab-table__value">0.72 mg/dL</td>
+                    <td>0.46〜0.79 mg/dL</td>
+                    <td>0.70 mg/dL</td>
+                    <td><span class="lab-flag lab-flag--normal">N</span></td>
+                  </tr>
+                  <tr>
+                    <td>eGFR</td>
+                    <td class="lab-table__value">72.5 mL/min</td>
+                    <td>&ge;60 mL/min</td>
+                    <td>74.1 mL/min</td>
+                    <td><span class="lab-flag lab-flag--normal">N</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- A: Assessment -->
+        <div class="soap-section">
+          <div class="soap-section__header">
+            <span class="soap-section__badge soap-section__badge--a">A</span>
+            <h3 class="soap-section__title">評価（Assessment）</h3>
+          </div>
+          <div class="soap-section__body">
+            <textarea class="soap-textarea" rows="4" placeholder="診断、評価を記載...">#1 2型糖尿病
+  HbA1c 7.2%（前回 7.5%）、空腹時血糖 138 mg/dL。改善傾向。
+  運動療法の開始が奏功していると考える。現行治療を継続。
+
+#2 高血圧症
+  BP 132/78 mmHg。コントロール良好。現行投薬継続。</textarea>
+          </div>
+        </div>
+
+        <!-- P: Plan -->
+        <div class="soap-section">
+          <div class="soap-section__header">
+            <span class="soap-section__badge soap-section__badge--p">P</span>
+            <h3 class="soap-section__title">計画（Plan）</h3>
+          </div>
+          <div class="soap-section__body">
+            <textarea class="soap-textarea" rows="4" placeholder="治療計画を記載...">1. メトホルミン 500mg 1日2回 朝夕食後 継続
+2. アムロジピン 5mg 1日1回 朝食後 継続
+3. 食事療法・運動療法の継続を指導
+4. 次回1ヶ月後に再診、HbA1c・血糖フォロー予定</textarea>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ======== Right Panel: Orders ======== -->
+    <aside class="right-panel">
+      <!-- Tabs -->
+      <div class="panel-tabs">
+        <button class="panel-tabs__tab panel-tabs__tab--active">処方</button>
+        <button class="panel-tabs__tab">検査</button>
+        <button class="panel-tabs__tab">画像</button>
+        <button class="panel-tabs__tab">処置</button>
+      </div>
+
+      <!-- Prescription Orders -->
+      <div class="panel-content">
+        <div class="order-section">
+          <div class="order-section__header">
+            <h4 class="order-section__title">現在の処方</h4>
+            <button class="btn btn--primary btn--xs">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              追加
+            </button>
+          </div>
+
+          <div class="rx-card">
+            <div class="rx-card__header">
+              <span class="rx-card__type rx-card__type--internal">内服</span>
+              <span class="rx-card__days">28日分</span>
+            </div>
+            <div class="rx-card__body">
+              <div class="rx-card__drug">
+                <span class="rx-card__drug-name">メトホルミン塩酸塩錠 500mg</span>
+                <span class="rx-card__dosage">1回1錠 1日2回 朝夕食後</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rx-card">
+            <div class="rx-card__header">
+              <span class="rx-card__type rx-card__type--internal">内服</span>
+              <span class="rx-card__days">28日分</span>
+            </div>
+            <div class="rx-card__body">
+              <div class="rx-card__drug">
+                <span class="rx-card__drug-name">アムロジピンOD錠 5mg</span>
+                <span class="rx-card__dosage">1回1錠 1日1回 朝食後</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rx-card">
+            <div class="rx-card__header">
+              <span class="rx-card__type rx-card__type--internal">内服</span>
+              <span class="rx-card__days">28日分</span>
+            </div>
+            <div class="rx-card__body">
+              <div class="rx-card__drug">
+                <span class="rx-card__drug-name">ロスバスタチン錠 2.5mg</span>
+                <span class="rx-card__dosage">1回1錠 1日1回 朝食後</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lab Orders -->
+        <div class="order-section">
+          <div class="order-section__header">
+            <h4 class="order-section__title">検査オーダー</h4>
+            <button class="btn btn--outline btn--xs">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              追加
+            </button>
+          </div>
+          <div class="lab-order-card">
+            <div class="lab-order-card__header">
+              <span class="lab-order-card__type">血液検査</span>
+              <span class="lab-order-card__status lab-order-card__status--done">結果あり</span>
+            </div>
+            <div class="lab-order-card__items">
+              <span class="lab-order-card__item">HbA1c</span>
+              <span class="lab-order-card__item">血糖</span>
+              <span class="lab-order-card__item">脂質</span>
+              <span class="lab-order-card__item">肝機能</span>
+              <span class="lab-order-card__item">腎機能</span>
+              <span class="lab-order-card__item">CBC</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Next Visit -->
+        <div class="order-section">
+          <div class="order-section__header">
+            <h4 class="order-section__title">次回予約</h4>
+          </div>
+          <div class="next-visit-card">
+            <div class="next-visit-card__date">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              2026/05/11（月）10:00
+            </div>
+            <div class="next-visit-card__dept">内科 - 田中 太郎</div>
+            <div class="next-visit-card__note">HbA1c・血糖フォロー</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ========================================
+       Status Bar
+       ======================================== -->
+  <footer class="status-bar">
+    <div class="status-bar__left">
+      <span class="status-bar__item">
+        <span class="status-bar__dot status-bar__dot--online"></span>
+        接続中
+      </span>
+      <span class="status-bar__item">最終保存: 15:32</span>
+    </div>
+    <div class="status-bar__right">
+      <span class="status-bar__item">鈴木 花子 (ID: 0009900040)</span>
+      <span class="status-bar__item">内科</span>
+    </div>
+  </footer>
+</body>
+</html>

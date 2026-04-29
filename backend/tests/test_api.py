@@ -1,0 +1,788 @@
+from datetime import datetime, timezone
+from copy import deepcopy
+from uuid import uuid4
+
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from app.db import SessionLocal
+from app.main import app
+from app.models import (
+    ChartTemplateMaster,
+    DiagnosisMaster,
+    LabSetMaster,
+    Patient,
+    PrescriptionCatalogMaster,
+    PrescriptionOrder,
+    PrescriptionSetMaster,
+    ReservationSlotMaster,
+    StandardUsageMaster,
+    User,
+)
+from app.seed import PATIENT_WORKSPACE_BY_ID
+
+
+def login(client: TestClient, user_id: str, password: str) -> str:
+    response = client.post(
+        "/api/auth/login",
+        json={"user_id": user_id, "password": password},
+    )
+
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+def cleanup_user(user_id: str) -> None:
+    with SessionLocal() as db:
+        user = db.get(User, user_id)
+        if user is not None:
+            db.delete(user)
+            db.commit()
+
+
+def cleanup_chart_order_masters(
+    prescription_id: str,
+    lab_set_id: str,
+    slot_id: str,
+    template_id: str | None = None,
+    standard_usage_id: str | None = None,
+    prescription_set_id: str | None = None,
+) -> None:
+    with SessionLocal() as db:
+        prescription = db.get(PrescriptionCatalogMaster, prescription_id)
+        if prescription is not None:
+            db.delete(prescription)
+
+        if standard_usage_id is not None:
+            standard_usage = db.get(StandardUsageMaster, standard_usage_id)
+            if standard_usage is not None:
+                db.delete(standard_usage)
+
+        if prescription_set_id is not None:
+            prescription_set = db.get(PrescriptionSetMaster, prescription_set_id)
+            if prescription_set is not None:
+                db.delete(prescription_set)
+
+        lab_set = db.get(LabSetMaster, lab_set_id)
+        if lab_set is not None:
+            db.delete(lab_set)
+
+        slot = db.get(ReservationSlotMaster, slot_id)
+        if slot is not None:
+            db.delete(slot)
+
+        if template_id is not None:
+            template = db.get(ChartTemplateMaster, template_id)
+            if template is not None:
+                db.delete(template)
+
+        db.commit()
+
+
+def cleanup_diagnosis_master(management_number: str) -> None:
+    with SessionLocal() as db:
+        diagnosis = db.get(DiagnosisMaster, management_number)
+        if diagnosis is not None:
+            db.delete(diagnosis)
+            db.commit()
+
+
+def restore_patient_workspace(patient_id: str) -> None:
+    workspace = PATIENT_WORKSPACE_BY_ID[patient_id]
+
+    with SessionLocal() as db:
+        patient = db.get(Patient, patient_id)
+        if patient is None:
+            return
+
+        patient.profile_items = deepcopy(workspace["profile_items"])
+        patient.problems = deepcopy(workspace["problems"])
+        patient.imaging_orders = deepcopy(workspace["imaging_orders"])
+        patient.procedure_orders = deepcopy(workspace["procedure_orders"])
+        db.commit()
+
+
+def cleanup_prescription_orders(patient_id: str, drug_name: str) -> None:
+    with SessionLocal() as db:
+        orders = db.scalars(
+            select(PrescriptionOrder).where(
+                PrescriptionOrder.patient_id == patient_id,
+                PrescriptionOrder.drug_name == drug_name,
+            )
+        ).all()
+        for order in orders:
+            db.delete(order)
+        db.commit()
+
+
+def test_healthcheck() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_login_and_list_patients() -> None:
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        patients_response = client.get(
+            "/api/patients",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        master_response = client.get(
+            "/api/masters/chart-order-config",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        me_response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert patients_response.status_code == 200
+    assert master_response.status_code == 200
+    assert me_response.status_code == 200
+    assert me_response.json()["display_name"] == "田中 太郎"
+    assert len(patients_response.json()) >= 4
+    assert len(master_response.json()["prescription_catalog"]) >= 5
+    assert len(master_response.json()["standard_usage_masters"]) >= 4
+    assert len(master_response.json()["prescription_sets"]) >= 3
+    assert len(master_response.json()["lab_set_options"]) >= 3
+    assert len(master_response.json()["reservation_slots"]) >= 4
+    assert len(master_response.json()["chart_templates"]) >= 3
+
+
+def test_reject_patients_without_token() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/patients")
+
+    assert response.status_code == 401
+
+
+def test_admin_users_requires_admin_role() -> None:
+    with TestClient(app) as client:
+        doctor_token = login(client, "dr.tanaka", "manta-demo")
+        admin_token = login(client, "admin.sato", "manta-admin")
+        forbidden_response = client.get(
+            "/api/admin/users",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        admin_response = client.get(
+            "/api/admin/users",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+    assert forbidden_response.status_code == 403
+    assert admin_response.status_code == 200
+    assert {user["role"] for user in admin_response.json()} == {"医師", "管理者"}
+
+
+def test_admin_can_create_update_and_reset_user() -> None:
+    unique_user_id = f"doctor.{uuid4().hex[:8]}"
+
+    try:
+        with TestClient(app) as client:
+            admin_token = login(client, "admin.sato", "manta-admin")
+            create_response = client.post(
+                "/api/admin/users",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "user_id": unique_user_id,
+                    "password": "TempPass123",
+                    "display_name": "中村 由紀",
+                    "department": "総合診療科",
+                    "role": "医師",
+                    "password_expires_at": "2026-12-31",
+                },
+            )
+            update_response = client.patch(
+                f"/api/admin/users/{unique_user_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "display_name": "中村 由紀",
+                    "department": "地域医療連携室",
+                    "role": "管理者",
+                    "password_expires_at": "2027-03-31",
+                },
+            )
+            reset_response = client.post(
+                f"/api/admin/users/{unique_user_id}/reset-password",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={"password": "NewPass456"},
+            )
+            login_response = client.post(
+                "/api/auth/login",
+                json={"user_id": unique_user_id, "password": "NewPass456"},
+            )
+    finally:
+        cleanup_user(unique_user_id)
+
+    assert create_response.status_code == 201
+    assert create_response.json()["role"] == "医師"
+    assert update_response.status_code == 200
+    assert update_response.json()["role"] == "管理者"
+    assert update_response.json()["department"] == "地域医療連携室"
+    assert reset_response.status_code == 200
+    assert reset_response.json() == {"user_id": unique_user_id, "status": "updated"}
+    assert login_response.status_code == 200
+    assert login_response.json()["user"]["role"] == "管理者"
+
+
+def test_admin_can_manage_chart_order_masters() -> None:
+    unique_suffix = uuid4().hex[:6]
+    prescription_id = f"test-rx-{unique_suffix}"
+    standard_usage_id = f"test-usage-{unique_suffix}"
+    prescription_set_id = f"test-set-{unique_suffix}"
+    lab_set_id = f"test-lab-{unique_suffix}"
+    slot_id = f"2099-12-31-0900-{unique_suffix}"
+    template_id = f"test-template-{unique_suffix}"
+
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            admin_token = login(client, "admin.sato", "manta-admin")
+            create_prescription_response = client.post(
+                "/api/admin/masters/prescription-catalog",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": prescription_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "drug_name": "テスト配合錠",
+                    "category": "内服",
+                    "dosage_options": ["1回1錠 1日1回 朝食後"],
+                    "yj_code": "1234567A1234",
+                    "hot_code": "1234567890123",
+                    "allergy_conflict_label": None,
+                    "related_problem": "#99 テスト病名",
+                },
+            )
+            update_prescription_response = client.patch(
+                f"/api/admin/masters/prescription-catalog/{prescription_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 998,
+                    "is_active": False,
+                    "drug_name": "テスト配合錠 改",
+                    "category": "内服",
+                    "dosage_options": ["1回2錠 1日1回 朝食後"],
+                    "generic_name": "テスト一般名 改",
+                    "name_kana": "テストイッパンメイカイ",
+                    "aliases": ["テスト薬", "改訂版"],
+                    "yj_code": "DEMO-YJ-TEST-RX",
+                    "hot_code": "DEMO-HOT-TEST-RX",
+                    "dosage_form": "錠剤",
+                    "strength": "10mg",
+                    "standard_usage_code": "po-qd-after-breakfast",
+                    "default_days": "28",
+                    "pmda_info_url": "https://example.test/pmda",
+                    "allergy_conflict_label": "テスト禁忌",
+                    "related_problem": "#99 テスト病名",
+                },
+            )
+            create_standard_usage_response = client.post(
+                "/api/admin/masters/standard-usages",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": standard_usage_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "label": "テスト用法",
+                    "category": "内服",
+                    "instruction": "1回1錠 1日2回 朝夕食後",
+                    "default_days": "28",
+                    "note": "テストメモ",
+                },
+            )
+            update_standard_usage_response = client.patch(
+                f"/api/admin/masters/standard-usages/{standard_usage_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 997,
+                    "is_active": False,
+                    "label": "テスト用法改",
+                    "category": "頓服",
+                    "instruction": "疼痛時 1回1錠 1日3回まで",
+                    "default_days": "7",
+                    "note": "更新メモ",
+                },
+            )
+            create_prescription_set_response = client.post(
+                "/api/admin/masters/prescription-sets",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": prescription_set_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "label": "テスト処方セット",
+                    "department": "総合診療科",
+                    "related_problem": "#99 テスト病名",
+                    "note": "セット備考",
+                    "included_set_ids": ["dm-follow-28"],
+                    "items": [
+                        {
+                            "drug_id": "metformin-500",
+                            "dosage": "1回1錠 1日2回 朝夕食後",
+                            "days": "28",
+                            "note": "継続薬",
+                        }
+                    ],
+                },
+            )
+            update_prescription_set_response = client.patch(
+                f"/api/admin/masters/prescription-sets/{prescription_set_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 996,
+                    "is_active": False,
+                    "label": "テスト処方セット改",
+                    "department": "内科",
+                    "related_problem": "#99 テスト病名",
+                    "note": "セット備考更新",
+                    "included_set_ids": ["dm-ht-follow-28"],
+                    "items": [
+                        {
+                            "drug_id": "amlodipine-5",
+                            "dosage": "1回1錠 1日1回 朝食後",
+                            "days": "14",
+                            "note": "降圧薬",
+                        }
+                    ],
+                },
+            )
+            create_lab_set_response = client.post(
+                "/api/admin/masters/lab-sets",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": lab_set_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "label": "テストセット",
+                    "items": ["AST", "ALT"],
+                    "included_set_ids": ["dm-follow"],
+                },
+            )
+            update_lab_set_response = client.patch(
+                f"/api/admin/masters/lab-sets/{lab_set_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 995,
+                    "is_active": False,
+                    "label": "テストセット改",
+                    "items": ["AST", "ALT", "ALP"],
+                    "included_set_ids": ["urine-basic"],
+                },
+            )
+            create_slot_response = client.post(
+                "/api/admin/masters/reservation-slots",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": slot_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "date": "2099/12/31（木）",
+                    "time": "09:00",
+                    "department": "総合診療科",
+                    "doctor": "テスト 医師",
+                    "state": "available",
+                },
+            )
+            update_slot_response = client.patch(
+                f"/api/admin/masters/reservation-slots/{slot_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 990,
+                    "is_active": False,
+                    "date": "2099/12/31（木）",
+                    "time": "09:30",
+                    "department": "総合診療科",
+                    "doctor": "テスト 医師",
+                    "state": "few",
+                },
+            )
+            create_template_response = client.post(
+                "/api/admin/masters/chart-templates",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": template_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "label": "テストテンプレート",
+                    "department": "総合診療科",
+                    "subjective": "S テスト",
+                    "objective": "O テスト",
+                    "assessment": "A テスト",
+                    "plan": "P テスト",
+                },
+            )
+            update_template_response = client.patch(
+                f"/api/admin/masters/chart-templates/{template_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 980,
+                    "is_active": False,
+                    "label": "テストテンプレート改",
+                    "department": "総合診療科",
+                    "subjective": "S テスト改",
+                    "objective": "O テスト改",
+                    "assessment": "A テスト改",
+                    "plan": "P テスト改",
+                },
+            )
+            public_master_response = client.get(
+                "/api/masters/chart-order-config",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+            forbidden_inactive_response = client.get(
+                "/api/masters/chart-order-config?include_inactive=true",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+            admin_inactive_response = client.get(
+                "/api/masters/chart-order-config?include_inactive=true",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            system_audit_response = client.get(
+                "/api/audit-logs?scope=system&limit=100",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+    finally:
+        cleanup_chart_order_masters(
+            prescription_id,
+            lab_set_id,
+            slot_id,
+            template_id,
+            standard_usage_id,
+            prescription_set_id,
+        )
+
+    assert create_prescription_response.status_code == 201
+    assert create_prescription_response.json()["pmda_info_url"] == (
+        "https://www.pmda.go.jp/PmdaSearch/rdSearch/02/1234567A1234?user=1"
+    )
+    assert update_prescription_response.status_code == 200
+    assert update_prescription_response.json()["drug_name"] == "テスト配合錠 改"
+    assert update_prescription_response.json()["sort_order"] == 998
+    assert update_prescription_response.json()["is_active"] is False
+    assert update_prescription_response.json()["generic_name"] == "テスト一般名 改"
+    assert update_prescription_response.json()["standard_usage_code"] == "po-qd-after-breakfast"
+    assert create_standard_usage_response.status_code == 201
+    assert update_standard_usage_response.status_code == 200
+    assert update_standard_usage_response.json()["label"] == "テスト用法改"
+    assert update_standard_usage_response.json()["is_active"] is False
+    assert create_prescription_set_response.status_code == 201
+    assert update_prescription_set_response.status_code == 200
+    assert update_prescription_set_response.json()["label"] == "テスト処方セット改"
+    assert update_prescription_set_response.json()["is_active"] is False
+    assert update_prescription_set_response.json()["items"][0]["drug_id"] == "amlodipine-5"
+    assert update_prescription_set_response.json()["included_set_ids"] == ["dm-ht-follow-28"]
+    assert create_lab_set_response.status_code == 201
+    assert update_lab_set_response.status_code == 200
+    assert update_lab_set_response.json()["label"] == "テストセット改"
+    assert update_lab_set_response.json()["is_active"] is False
+    assert update_lab_set_response.json()["included_set_ids"] == ["urine-basic"]
+    assert create_slot_response.status_code == 201
+    assert update_slot_response.status_code == 200
+    assert update_slot_response.json()["time"] == "09:30"
+    assert update_slot_response.json()["is_active"] is False
+    assert create_template_response.status_code == 201
+    assert update_template_response.status_code == 200
+    assert update_template_response.json()["label"] == "テストテンプレート改"
+    assert update_template_response.json()["is_active"] is False
+    assert public_master_response.status_code == 200
+    assert forbidden_inactive_response.status_code == 403
+    assert admin_inactive_response.status_code == 200
+    assert system_audit_response.status_code == 200
+    assert not any(item["id"] == prescription_id for item in public_master_response.json()["prescription_catalog"])
+    assert not any(item["id"] == standard_usage_id for item in public_master_response.json()["standard_usage_masters"])
+    assert not any(item["id"] == prescription_set_id for item in public_master_response.json()["prescription_sets"])
+    assert not any(item["id"] == lab_set_id for item in public_master_response.json()["lab_set_options"])
+    assert not any(item["id"] == slot_id for item in public_master_response.json()["reservation_slots"])
+    assert not any(item["id"] == template_id for item in public_master_response.json()["chart_templates"])
+    assert any(
+        item["id"] == prescription_id and item["is_active"] is False
+        for item in admin_inactive_response.json()["prescription_catalog"]
+    )
+    assert any(
+        item["id"] == standard_usage_id and item["is_active"] is False
+        for item in admin_inactive_response.json()["standard_usage_masters"]
+    )
+    assert any(
+        item["id"] == prescription_set_id and item["is_active"] is False
+        for item in admin_inactive_response.json()["prescription_sets"]
+    )
+    assert any(
+        item["id"] == lab_set_id and item["is_active"] is False
+        for item in admin_inactive_response.json()["lab_set_options"]
+    )
+    assert any(
+        item["id"] == slot_id and item["is_active"] is False
+        for item in admin_inactive_response.json()["reservation_slots"]
+    )
+    assert any(
+        item["id"] == template_id and item["is_active"] is False
+        for item in admin_inactive_response.json()["chart_templates"]
+    )
+    assert all(item["scope"] == "system" for item in system_audit_response.json())
+    assert any(item["action"] == "処方候補更新" for item in system_audit_response.json())
+    assert any(item["action"] == "標準用法更新" for item in system_audit_response.json())
+    assert any(item["action"] == "処方セット更新" for item in system_audit_response.json())
+    assert any(item["action"] == "検査セット更新" for item in system_audit_response.json())
+    assert any(item["action"] == "予約枠更新" for item in system_audit_response.json())
+    assert any(item["action"] == "カルテテンプレート更新" for item in system_audit_response.json())
+
+
+def test_diagnosis_master_search_requires_auth_and_supports_name_and_code() -> None:
+    with TestClient(app) as client:
+        no_auth_response = client.get("/api/masters/diagnoses/search?q=糖尿病")
+        doctor_token = login(client, "dr.tanaka", "manta-demo")
+        name_search_response = client.get(
+            "/api/masters/diagnoses/search?q=糖尿病",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        code_search_response = client.get(
+            "/api/masters/diagnoses/search?q=E11",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    assert no_auth_response.status_code == 401
+    assert name_search_response.status_code == 200
+    assert code_search_response.status_code == 200
+    assert len(name_search_response.json()) >= 1
+    assert any("糖尿病" in item["disease_name"] for item in name_search_response.json())
+    assert any((item["icd10_code"] or "").startswith("E11") for item in code_search_response.json())
+
+
+def test_doctor_can_update_patient_context() -> None:
+    unique_problem_name = f"#9 テスト病名 {uuid4().hex[:6]}"
+
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            update_response = client.put(
+                "/api/patients/0009900041/context",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "patient_profile": [
+                        {"label": "既往歴", "value": "接触皮膚炎、アレルギー性鼻炎"},
+                        {"label": "生活歴", "value": "夜勤あり。保湿剤は持参。"},
+                    ],
+                    "problems": [
+                        {"name": unique_problem_name, "since": "2026/04 〜", "status": "active"},
+                        {"name": "#2 アトピー性皮膚炎", "since": "小児期〜", "status": "resolved"},
+                    ],
+                },
+            )
+            chart_response = client.get(
+                "/api/patients/0009900041/chart",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+    finally:
+        restore_patient_workspace("0009900041")
+
+    assert update_response.status_code == 200
+    assert chart_response.status_code == 200
+    assert chart_response.json()["patient_profile"][0]["value"] == "接触皮膚炎、アレルギー性鼻炎"
+    assert {problem["name"] for problem in chart_response.json()["problems"]} == {
+        unique_problem_name,
+        "#2 アトピー性皮膚炎",
+    }
+
+
+def test_chart_workspace_includes_db_backed_snapshot_data() -> None:
+    with TestClient(app) as client:
+        doctor_token = login(client, "dr.tanaka", "manta-demo")
+        chart_response = client.get(
+            "/api/patients/0009900040/chart",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    assert chart_response.status_code == 200
+    payload = chart_response.json()
+    assert payload["visit_history"][0]["department"] == "内科"
+    assert payload["visit_history"][0]["active"] is True
+    assert any(vital["label"] == "血圧" for vital in payload["vitals"])
+    assert any(result["item"] == "HbA1c" for result in payload["lab_results"])
+    hba1c = next(result for result in payload["lab_results"] if result["item"] == "HbA1c")
+    assert hba1c["reported_at"] == "2026/04/13"
+    assert len(hba1c["history"]) >= 3
+    assert hba1c["history"][-1]["value"] == "7.2%"
+    assert any(history["title"] == "定期検診" for history in payload["chart_history"])
+    assert len(payload["prescription_history"]) >= 1
+    assert payload["prescription_history"][0]["item_count"] >= 1
+    assert any(order["category"] == "胸部X線" for order in payload["imaging_orders"])
+    assert any(order["title"] == "生活指導" for order in payload["procedure_orders"])
+
+
+def test_lab_trends_endpoint_returns_observation_backed_long_trends() -> None:
+    with TestClient(app) as client:
+        doctor_token = login(client, "dr.tanaka", "manta-demo")
+        response = client.get(
+            "/api/patients/0009900040/lab-trends",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    hba1c = next(item for item in payload if item["item"] == "HbA1c")
+    assert hba1c["point_count"] >= 3
+    assert hba1c["latest_value"] == "7.2 %"
+    assert hba1c["previous_value"] == "7.5 %"
+    assert hba1c["delta_label"] == "-0.3"
+    assert hba1c["abnormal_count"] >= 3
+    assert hba1c["points"][-1]["date"] == "2026/04/13"
+    assert hba1c["points"][-1]["observation_id"]
+
+
+def test_prescription_history_endpoint_returns_grouped_orders() -> None:
+    with TestClient(app) as client:
+        doctor_token = login(client, "dr.tanaka", "manta-demo")
+        response = client.get(
+            "/api/patients/0009900040/prescription-history",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) >= 1
+    assert payload[0]["label"].endswith("処方")
+    assert payload[0]["item_count"] == len(payload[0]["items"])
+    assert any(item["drug_name"] == "メトホルミン塩酸塩錠 500mg" for item in payload[0]["items"])
+
+
+def test_prescription_timeline_and_copy_last_endpoint() -> None:
+    suffix = uuid4().hex[:6]
+    drug_names = [f"テスト前回薬A {suffix}", f"テスト前回薬B {suffix}"]
+    source_date = "2026/03/01"
+
+    try:
+        with SessionLocal() as db:
+            for index, drug_name in enumerate(drug_names):
+                db.add(
+                    PrescriptionOrder(
+                        patient_id="0009900041",
+                        type="内服",
+                        days="14日分",
+                        drug_name=drug_name,
+                        dosage=f"1回1錠 1日{index + 1}回 食後",
+                        created_at=datetime(2026, 3, 1, index, 0, tzinfo=timezone.utc),
+                    )
+                )
+            db.commit()
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            timeline_response = client.get(
+                "/api/patients/0009900041/prescription-timeline",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+            preview_response = client.post(
+                "/api/patients/0009900041/prescriptions/copy-preview",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={"actor": "田中 太郎", "source_date": source_date},
+            )
+            copy_response = client.post(
+                "/api/patients/0009900041/prescriptions/copy-last",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={"actor": "田中 太郎", "source_date": source_date},
+            )
+            duplicate_copy_response = client.post(
+                "/api/patients/0009900041/prescriptions/copy-last",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={"actor": "田中 太郎", "source_date": source_date},
+            )
+
+        assert timeline_response.status_code == 200
+        assert any(group["date"] == source_date for group in timeline_response.json())
+        assert preview_response.status_code == 200
+        assert preview_response.json()["source_date"] == source_date
+        assert preview_response.json()["planned_count"] == 2
+        assert {item["status"] for item in preview_response.json()["diff_items"]} == {"to_copy"}
+        assert copy_response.status_code == 200
+        assert copy_response.json()["source_date"] == source_date
+        assert copy_response.json()["copied_count"] == 2
+        assert {item["drug_name"] for item in copy_response.json()["copied_items"]} == set(drug_names)
+        assert duplicate_copy_response.status_code == 200
+        assert duplicate_copy_response.json()["copied_count"] == 0
+        assert duplicate_copy_response.json()["skipped_count"] == 2
+        assert all("本日すでに" in item["reason"] for item in duplicate_copy_response.json()["skipped_items"])
+    finally:
+        for drug_name in drug_names:
+            cleanup_prescription_orders("0009900041", drug_name)
+
+
+def test_doctor_can_represcribe_same_drug_on_later_day() -> None:
+    drug_name = f"テスト継続薬 {uuid4().hex[:6]}"
+
+    try:
+        with SessionLocal() as db:
+            db.add(
+                PrescriptionOrder(
+                    patient_id="0009900041",
+                    type="内服",
+                    days="14日分",
+                    drug_name=drug_name,
+                    dosage="1回1錠 1日1回 朝食後",
+                    created_at=datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc),
+                )
+            )
+            db.commit()
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            response = client.post(
+                "/api/patients/0009900041/prescriptions",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "type": "内服",
+                    "days": "28日分",
+                    "drug_name": drug_name,
+                    "dosage": "1回1錠 1日1回 朝食後",
+                    "actor": "田中 太郎",
+                },
+            )
+    finally:
+        cleanup_prescription_orders("0009900041", drug_name)
+
+    assert response.status_code == 200
+    assert response.json()["drug_name"] == drug_name
+
+
+def test_doctor_can_add_imaging_and_procedure_orders() -> None:
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            imaging_response = client.post(
+                "/api/patients/0009900041/imaging-orders",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "category": "皮膚エコー",
+                    "status": "draft",
+                    "scheduled_at": "未確定",
+                    "note": "必要時に当日追加予定。",
+                    "actor": "田中 太郎",
+                },
+            )
+            procedure_response = client.post(
+                "/api/patients/0009900041/procedure-orders",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "title": "保湿指導",
+                    "status": "planned",
+                    "note": "入浴後5分以内の塗布を説明予定。",
+                    "actor": "田中 太郎",
+                },
+            )
+            chart_response = client.get(
+                "/api/patients/0009900041/chart",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+    finally:
+        restore_patient_workspace("0009900041")
+
+    assert imaging_response.status_code == 200
+    assert imaging_response.json()["category"] == "皮膚エコー"
+    assert procedure_response.status_code == 200
+    assert procedure_response.json()["title"] == "保湿指導"
+    assert chart_response.status_code == 200
+    assert chart_response.json()["imaging_orders"][0]["category"] == "皮膚エコー"
+    assert chart_response.json()["procedure_orders"][0]["title"] == "保湿指導"

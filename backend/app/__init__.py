@@ -1,0 +1,1 @@
+"""Manta backend application package."""
