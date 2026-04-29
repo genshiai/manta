@@ -1,4 +1,4 @@
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, FlaskConical, Save } from 'lucide-react';
 import { Button } from '../ui/button';
 import type { PatientRecord } from '../../data/chartMock';
 import type { UserSession } from '../../types/workflow';
@@ -11,9 +11,11 @@ type ChartTopBarProps = {
   saveMessage: string;
   lastSavedAt: string | null;
   version: number;
+  abnormalLabCount: number;
   onSave: () => void;
   onReturnReception: () => void;
   onFinishVisit: () => void;
+  onOpenLabs: () => void;
 };
 
 /**
@@ -30,9 +32,11 @@ export const ChartTopBar = ({
   saveMessage,
   lastSavedAt,
   version,
+  abnormalLabCount,
   onSave,
   onReturnReception,
   onFinishVisit,
+  onOpenLabs,
 }: ChartTopBarProps) => (
   <div className="flex items-center gap-4 px-6 py-3">
     <button
@@ -70,6 +74,21 @@ export const ChartTopBar = ({
       >
         {isDirty ? '● 未保存' : saveMessage || '保存済み'}
       </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onOpenLabs}
+        title="検査結果・トレンド"
+        className="relative"
+      >
+        <FlaskConical size={16} />
+        検査結果
+        {abnormalLabCount > 0 ? (
+          <span className="ml-1 inline-flex items-center justify-center rounded-full bg-warning/20 px-1.5 text-[10px] font-bold text-warning">
+            {abnormalLabCount}
+          </span>
+        ) : null}
+      </Button>
       <Button variant="secondary" size="sm" onClick={onSave} disabled={isMutating || !isDirty}>
         <Save size={16} />
         保存

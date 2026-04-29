@@ -7,10 +7,12 @@ import {
   copyLastPrescriptions,
   getChartOrderConfig,
   getChartWorkspace,
+  getLabLongTrends,
   getPrescriptionTimeline,
   isUnauthorizedError,
   saveChart,
   savePatientContext,
+  saveReservation,
 } from '../lib/api';
 import type { PatientRecord, ReceptionStatus } from '../data/chartMock';
 import type {
@@ -20,6 +22,7 @@ import type {
   ChartTemplate,
   ChartVersion,
   ImagingOrderEntry,
+  LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
   PrescriptionEntry,
@@ -27,12 +30,15 @@ import type {
   PrescriptionTimelineGroup,
   ProblemListItem,
   ProcedureOrderEntry,
+  ReservationSlot,
   UserSession,
   VisitHistoryEntry,
   VitalEntry,
 } from '../types/workflow';
 import { ChartShell } from './chart/ChartShell';
 import { ChartTopBar } from './chart/ChartTopBar';
+import { LabsSheet } from './chart/LabsSheet';
+import { NextVisitDialog } from './chart/NextVisitDialog';
 import { OrderPane } from './chart/OrderPane';
 import { PatientPane } from './chart/PatientPane';
 import { RecordPane } from './chart/RecordPane';
@@ -110,6 +116,7 @@ export function ChartWorkspace({
   const [versions, setVersions] = useState<ChartVersion[]>([]);
   const [vitals, setVitals] = useState<VitalEntry[]>([]);
   const [labResults, setLabResults] = useState<LabResultEntry[]>([]);
+  const [labLongTrends, setLabLongTrends] = useState<LabLongTrendItem[]>([]);
   const [labOrders, setLabOrders] = useState<LabOrderRow[]>([]);
   const [imagingOrders, setImagingOrders] = useState<ImagingOrderEntry[]>([]);
   const [procedureOrders, setProcedureOrders] = useState<ProcedureOrderEntry[]>([]);
@@ -132,6 +139,11 @@ export function ChartWorkspace({
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [orderMessage, setOrderMessage] = useState('オーダを追加・確認できます');
 
+  // モーダル
+  const [labsSheetOpen, setLabsSheetOpen] = useState(false);
+  const [reservationDialogOpen, setReservationDialogOpen] = useState(false);
+  const [reservationSlots, setReservationSlots] = useState<ReservationSlot[]>([]);
+
   const initializedPatientIdRef = useRef<string | null>(null);
 
   const isDirty =
@@ -150,11 +162,14 @@ export function ChartWorkspace({
     setWorkspaceError(null);
 
     try {
-      const [workspace, nextOrderConfig, timeline] = await Promise.all([
+      const [workspace, nextOrderConfig, timeline, longTrends] = await Promise.all([
         getChartWorkspace(patient.id),
         getChartOrderConfig(),
         getPrescriptionTimeline(patient.id),
+        getLabLongTrends(patient.id),
       ]);
+      setLabLongTrends(longTrends);
+      setReservationSlots(nextOrderConfig.reservationSlots);
 
       setOrderConfig(nextOrderConfig);
       setSelectedTemplateId(nextOrderConfig.chartTemplates[0]?.id ?? '');
@@ -434,11 +449,15 @@ export function ChartWorkspace({
     }
   };
 
-  const handleFinishVisit = async () => {
+  const handleFinishVisit = () => {
     if (isDirty) {
       setSaveMessage('保存してから診察終了してください');
       return;
     }
+    setReservationDialogOpen(true);
+  };
+
+  const finalizeFinishVisit = async () => {
     setIsMutating(true);
     try {
       await onPatientStatusChange(
@@ -447,6 +466,7 @@ export function ChartWorkspace({
         'カルテ保存後に診察終了へ更新しました。',
       );
       onDataChanged();
+      setReservationDialogOpen(false);
       onReturnReception();
     } catch (error) {
       if (isUnauthorizedError(error)) {
@@ -463,8 +483,43 @@ export function ChartWorkspace({
     }
   };
 
+  const handleSkipReservation = async () => {
+    await finalizeFinishVisit();
+  };
+
+  const handleBookReservation = async (slotId: string, comment: string) => {
+    const slot = reservationSlots.find((s) => s.id === slotId);
+    if (!slot) return;
+    setIsMutating(true);
+    try {
+      await saveReservation(patient.id, {
+        slotId: slot.id,
+        scheduledFor: `${slot.date} ${slot.time}`,
+        department: slot.department,
+        doctor: slot.doctor,
+        note: comment,
+        actor: currentUser.displayName,
+      });
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setSaveMessage(
+        `予約に失敗しました: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`,
+      );
+      setIsMutating(false);
+      return;
+    }
+    await finalizeFinishVisit();
+  };
+
+  const abnormalLabCount = labResults.filter((r) => r.flag === 'high').length;
+
   return (
-    <ChartShell
+    <>
+      <ChartShell
       topBar={
         <ChartTopBar
           patient={patient}
@@ -474,9 +529,11 @@ export function ChartWorkspace({
           saveMessage={saveMessage}
           lastSavedAt={lastSavedAt}
           version={version}
+          abnormalLabCount={abnormalLabCount}
           onSave={handleSave}
           onReturnReception={onReturnReception}
           onFinishVisit={handleFinishVisit}
+          onOpenLabs={() => setLabsSheetOpen(true)}
         />
       }
       left={
@@ -526,5 +583,20 @@ export function ChartWorkspace({
         />
       }
     />
+      <LabsSheet
+        open={labsSheetOpen}
+        onClose={() => setLabsSheetOpen(false)}
+        results={labResults}
+        trends={labLongTrends}
+      />
+      <NextVisitDialog
+        open={reservationDialogOpen}
+        slots={reservationSlots}
+        isMutating={isMutating}
+        onClose={() => setReservationDialogOpen(false)}
+        onSkip={handleSkipReservation}
+        onBook={handleBookReservation}
+      />
+    </>
   );
 }

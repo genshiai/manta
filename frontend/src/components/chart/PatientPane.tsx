@@ -317,7 +317,7 @@ const ProblemsTab = ({
         id: newId(),
         managementNumber: d.managementNumber,
         name: d.diseaseName,
-        since: new Date().toISOString().split('T')[0]!,
+        since: new Date().toISOString().split('T')[0] ?? '',
         status: 'active' as const,
         diagnosisType: 'principal',
         icd10Code: d.icd10Code,
