@@ -353,8 +353,16 @@ function App() {
     );
   }
 
+  // chart 画面はアプリシェル型 (h-screen overflow-hidden)
+  // それ以外 (reception/settings) は従来の min-h-screen
+  const isChartScreen = screen === 'chart' && Boolean(selectedPatient);
+  const rootClassName = isChartScreen
+    ? 'flex h-screen flex-col overflow-hidden bg-surface-page text-text-primary'
+    : 'min-h-screen bg-[#F5F6FA] text-solid-gray-900';
+  const mainSlotClassName = isChartScreen ? 'min-h-0 flex-1 overflow-hidden' : '';
+
   return (
-    <div className='min-h-screen bg-[#F5F6FA] text-solid-gray-900'>
+    <div className={rootClassName}>
       <AppHeader
         currentUser={session}
         onNavigate={setScreen}
@@ -364,44 +372,46 @@ function App() {
         searchQuery={searchQuery}
       />
 
-      {screen === 'settings' ? (
-        <SettingsWorkspace
-          currentUser={session}
-          onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
-        />
-      ) : screen === 'reception' ? (
-        <ReceptionBoard
-          departmentFilter={departmentFilter}
-          errorMessage={patientsError}
-          isLoading={patientsLoading}
-          lastRefreshedAt={lastRefreshedAt}
-          onDepartmentFilterChange={handleDepartmentFilterChange}
-          onOpenChart={handleOpenChart}
-          onSearchChange={handleSearchChange}
-          onSortChange={handleSortChange}
-          onStatusFilterChange={handleStatusFilterChange}
-          patients={patients}
-          searchQuery={searchQuery}
-          sortKey={sortKey}
-          statusFilter={statusFilter}
-        />
-      ) : selectedPatient ? (
-        <ChartWorkspace
-          currentUser={session}
-          onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
-          onDataChanged={() => setRefreshToken((current) => current + 1)}
-          onMetaChange={setChartMeta}
-          onPatientStatusChange={handlePatientStatusChange}
-          onReturnReception={() => setScreen('reception')}
-          patient={selectedPatient}
-        />
-      ) : (
-        <main className='mx-auto max-w-[1600px] px-4 py-8 lg:px-6'>
-          <section className='rounded-8 border border-solid-gray-200 bg-white p-6'>
-            <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>カルテ対象の患者が未選択です。</p>
-          </section>
-        </main>
-      )}
+      <div className={mainSlotClassName}>
+        {screen === 'settings' ? (
+          <SettingsWorkspace
+            currentUser={session}
+            onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+          />
+        ) : screen === 'reception' ? (
+          <ReceptionBoard
+            departmentFilter={departmentFilter}
+            errorMessage={patientsError}
+            isLoading={patientsLoading}
+            lastRefreshedAt={lastRefreshedAt}
+            onDepartmentFilterChange={handleDepartmentFilterChange}
+            onOpenChart={handleOpenChart}
+            onSearchChange={handleSearchChange}
+            onSortChange={handleSortChange}
+            onStatusFilterChange={handleStatusFilterChange}
+            patients={patients}
+            searchQuery={searchQuery}
+            sortKey={sortKey}
+            statusFilter={statusFilter}
+          />
+        ) : selectedPatient ? (
+          <ChartWorkspace
+            currentUser={session}
+            onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+            onDataChanged={() => setRefreshToken((current) => current + 1)}
+            onMetaChange={setChartMeta}
+            onPatientStatusChange={handlePatientStatusChange}
+            onReturnReception={() => setScreen('reception')}
+            patient={selectedPatient}
+          />
+        ) : (
+          <main className='mx-auto max-w-[1600px] px-4 py-8 lg:px-6'>
+            <section className='rounded-8 border border-solid-gray-200 bg-white p-6'>
+              <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>カルテ対象の患者が未選択です。</p>
+            </section>
+          </main>
+        )}
+      </div>
 
       <StatusFooter
         chartMeta={chartMeta}
