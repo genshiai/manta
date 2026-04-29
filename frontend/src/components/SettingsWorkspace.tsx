@@ -1570,7 +1570,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
             <Heading size='28'>
               <HeadingTitle level='h1'>設定 / マスタ管理</HeadingTitle>
             </Heading>
-            <p className='text-oln-16N-100 text-solid-gray-700'>
+            <p className='text-[16px] font-normal leading-none text-solid-gray-700'>
               利用者・処方候補・標準用法・処方セット・検査セット・予約枠・カルテテンプレートを管理します。
             </p>
           </div>
@@ -1585,7 +1585,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
       {!isAdmin ? (
         <div className='mt-6 grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]'>
           <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
-            <p className='text-std-18B-160 text-solid-gray-900'>現在の利用者情報</p>
+            <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>現在の利用者情報</p>
             <dl className='mt-4 grid gap-3'>
               <InfoRow label='利用者 ID' value={currentUser.userId} />
               <InfoRow label='表示名' value={currentUser.displayName} />
@@ -1597,8 +1597,8 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
 
           <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
             <div className='rounded-8 border border-yellow-200 bg-yellow-50 px-4 py-4'>
-              <p className='text-std-18B-160 text-yellow-1000'>管理者権限が必要です</p>
-              <p className='mt-2 text-oln-16N-100 text-solid-gray-700'>
+              <p className='text-[18px] font-bold leading-snug text-yellow-1000'>管理者権限が必要です</p>
+              <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-700'>
                 マスタ編集は管理者ロールのみ許可しています。現在の利用者情報の確認はこの画面で継続できます。
               </p>
             </div>
@@ -1612,7 +1612,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                 <button
                   className={cn(
                     buttonBaseStyle,
-                    'rounded-8 border px-4 py-3 text-oln-16B-100 transition-colors',
+                    'rounded-8 border px-4 py-3 text-[16px] font-bold leading-none transition-colors',
                     managementTab === tab.key
                       ? 'border-blue-900 bg-blue-50 text-blue-900'
                       : 'border-solid-gray-200 bg-white text-solid-gray-700 hover:bg-solid-gray-50 hover:text-solid-gray-900',
@@ -1632,12 +1632,12 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'users' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>利用者一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>利用者一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {users.length}名
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     所属、権限、有効期限、一時パスワードを管理します。
                   </p>
                   {isLoadingUsers ? (
@@ -1659,18 +1659,18 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>{user.displayName}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{user.displayName}</p>
                           <ChipLabel color={roleChipColor(user.role)} variant='filled-outline'>
                             {user.role}
                           </ChipLabel>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{user.userId}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>{user.department}</p>
-                        <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>{user.department}</p>
+                        <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                           有効期限: {user.passwordExpiresAt}
                         </p>
                         {isExpired(user.passwordExpiresAt) ? (
-                          <p className='mt-2 text-oln-14B-100 text-red-900'>期限切れ</p>
+                          <p className='mt-2 text-[14px] font-bold leading-none text-red-900'>期限切れ</p>
                         ) : null}
                       </button>
                     ))}
@@ -1681,15 +1681,15 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'prescription' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>処方候補一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>処方候補一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {orderConfig.prescriptionCatalog.length}件
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     処方候補、用法候補、関連病名を管理します。
                   </p>
-                  <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                     無効化した候補は一覧に残しつつ、カルテ入力候補からは外します。
                   </p>
                   {isLoadingMasters ? (
@@ -1711,7 +1711,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>{item.drugName}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.drugName}</p>
                           <div className='flex flex-wrap items-center gap-2'>
                             <ChipLabel color={masterStatusColor(item.isActive)} variant='filled-outline'>
                               {masterStatusLabel(item.isActive)}
@@ -1722,7 +1722,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                           </div>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>表示順: {item.sortOrder ?? '-'}</p>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>表示順: {item.sortOrder ?? '-'}</p>
                       </button>
                     ))}
                   </div>
@@ -1732,12 +1732,12 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'usage' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>標準用法一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>標準用法一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {orderConfig.standardUsageMasters.length}件
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     既定用法、既定日数、補足メモを管理します。
                   </p>
                   {isLoadingMasters ? <LoadingBanner text='標準用法を読み込み中です。' /> : null}
@@ -1757,7 +1757,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>{item.label}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.label}</p>
                           <div className='flex flex-wrap items-center gap-2'>
                             <ChipLabel color={masterStatusColor(item.isActive)} variant='filled-outline'>
                               {masterStatusLabel(item.isActive)}
@@ -1768,7 +1768,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                           </div>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>{item.instruction}</p>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>{item.instruction}</p>
                       </button>
                     ))}
                   </div>
@@ -1778,12 +1778,12 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'rxset' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>処方セット一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>処方セット一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {orderConfig.prescriptionSets.length}件
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     定期処方や疾患別セットを管理します。
                   </p>
                   {isLoadingMasters ? <LoadingBanner text='処方セットを読み込み中です。' /> : null}
@@ -1803,14 +1803,14 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>{item.label}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.label}</p>
                           <ChipLabel color={masterStatusColor(item.isActive)} variant='filled-outline'>
                             {masterStatusLabel(item.isActive)}
                           </ChipLabel>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>{item.department}</p>
-                        <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{item.items.length}剤</p>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>{item.department}</p>
+                        <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{item.items.length}剤</p>
                       </button>
                     ))}
                   </div>
@@ -1820,15 +1820,15 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'labset' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>検査セット一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>検査セット一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {orderConfig.labSetOptions.length}件
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     セット名と項目リストを管理します。
                   </p>
-                  <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                     無効化したセットは一覧に残しつつ、オーダー候補からは外します。
                   </p>
                   {isLoadingMasters ? (
@@ -1850,13 +1850,13 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>{item.label}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.label}</p>
                           <ChipLabel color={masterStatusColor(item.isActive)} variant='filled-outline'>
                             {masterStatusLabel(item.isActive)}
                           </ChipLabel>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                           {item.items.slice(0, 3).join(' / ')}
                         </p>
                       </button>
@@ -1868,15 +1868,15 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'slot' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>予約枠一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>予約枠一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {orderConfig.reservationSlots.length}件
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     日付、時刻、診療科、担当医、空き状態を管理します。
                   </p>
-                  <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                     無効化した予約枠は再診候補に出さず、履歴確認用に残します。
                   </p>
                   {isLoadingMasters ? (
@@ -1898,7 +1898,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>
                             {item.date} {item.time}
                           </p>
                           <div className='flex flex-wrap items-center gap-2'>
@@ -1911,7 +1911,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                           </div>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                           {item.department} / {item.doctor}
                         </p>
                       </button>
@@ -1923,15 +1923,15 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
               {managementTab === 'template' ? (
                 <section className={cn(surfaceClassName, 'p-5')}>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>カルテテンプレート一覧</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>カルテテンプレート一覧</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {orderConfig.chartTemplates.length}件
                     </ChipLabel>
                   </div>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     SOAP の下書きテンプレートを診療科別に管理します。
                   </p>
-                  <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                     無効化したテンプレートは一覧に残しつつ、カルテ記載画面の候補から外します。
                   </p>
                   {isLoadingMasters ? (
@@ -1953,13 +1953,13 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                         type='button'
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>{item.label}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.label}</p>
                           <ChipLabel color={masterStatusColor(item.isActive)} variant='filled-outline'>
                             {masterStatusLabel(item.isActive)}
                           </ChipLabel>
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
-                        <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>{item.department}</p>
+                        <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>{item.department}</p>
                       </button>
                     ))}
                   </div>
@@ -1977,7 +1977,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
                       : 'border-red-200 bg-red-50 text-red-900',
                   )}
                 >
-                  <p className='text-oln-16B-100'>{flash.text}</p>
+                  <p className='text-[16px] font-bold leading-none'>{flash.text}</p>
                 </section>
               ) : null}
 
@@ -3885,7 +3885,7 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
 
 const Field = ({ children, label }: { children: React.ReactNode; label: string }) => (
   <div className='space-y-2'>
-    <span className='text-oln-14B-100 text-solid-gray-700'>{label}</span>
+    <span className='text-[14px] font-bold leading-none text-solid-gray-700'>{label}</span>
     {children}
   </div>
 );
@@ -3905,32 +3905,32 @@ const ActivationSelect = ({
 
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
   <div className='flex items-start justify-between gap-3'>
-    <dt className='text-oln-14N-100 text-solid-gray-536'>{label}</dt>
-    <dd className='text-right text-oln-16N-100 text-solid-gray-900'>{value}</dd>
+    <dt className='text-[14px] font-normal leading-none text-solid-gray-536'>{label}</dt>
+    <dd className='text-right text-[16px] font-normal leading-none text-solid-gray-900'>{value}</dd>
   </div>
 );
 
 const SummaryTile = ({ label, value }: { label: string; value: string }) => (
   <div className='rounded-8 border border-solid-gray-200 bg-solid-gray-50 px-4 py-3'>
-    <p className='text-oln-14N-100 text-solid-gray-536'>{label}</p>
-    <p className='mt-2 text-std-20B-150 text-solid-gray-900'>{value}</p>
+    <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{label}</p>
+    <p className='mt-2 text-[20px] font-bold leading-snug text-solid-gray-900'>{value}</p>
   </div>
 );
 
 const LoadingBanner = ({ text }: { text: string }) => (
-  <div className='mt-4 rounded-8 border border-blue-100 bg-blue-50 px-4 py-3 text-oln-14N-100 text-blue-900'>
+  <div className='mt-4 rounded-8 border border-blue-100 bg-blue-50 px-4 py-3 text-[14px] font-normal leading-none text-blue-900'>
     {text}
   </div>
 );
 
 const ErrorBanner = ({ text }: { text: string }) => (
-  <div className='mt-4 rounded-8 border border-red-200 bg-red-50 px-4 py-3 text-oln-14N-100 text-red-900'>
+  <div className='mt-4 rounded-8 border border-red-200 bg-red-50 px-4 py-3 text-[14px] font-normal leading-none text-red-900'>
     {text}
   </div>
 );
 
 const EmptyState = ({ text }: { text: string }) => (
-  <p className='mt-4 text-oln-16N-100 text-solid-gray-700'>{text}</p>
+  <p className='mt-4 text-[16px] font-normal leading-none text-solid-gray-700'>{text}</p>
 );
 
 const SectionHeader = ({
@@ -3946,8 +3946,8 @@ const SectionHeader = ({
 }) => (
   <div className='flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between'>
     <div>
-      <p className='text-std-18B-160 text-solid-gray-900'>{title}</p>
-      <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{description}</p>
+      <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>{title}</p>
+      <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{description}</p>
     </div>
     <ChipLabel color={tone} variant='filled-outline'>
       {chip}

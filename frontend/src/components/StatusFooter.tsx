@@ -15,7 +15,7 @@ type StatusFooterProps = {
 
 export const StatusFooter = ({ screen, currentPatient, chartMeta, currentUser }: StatusFooterProps) => (
   <footer className='border-t border-solid-gray-200 bg-white'>
-    <div className='mx-auto flex max-w-[1600px] flex-col gap-2 px-4 py-3 text-oln-14N-100 text-solid-gray-536 lg:flex-row lg:items-center lg:justify-between lg:px-6'>
+    <div className='mx-auto flex max-w-[1600px] flex-col gap-2 px-4 py-3 text-[14px] font-normal leading-none text-solid-gray-536 lg:flex-row lg:items-center lg:justify-between lg:px-6'>
       <div className='flex flex-wrap items-center gap-4'>
         <span className='inline-flex items-center gap-2'>
           <span className='h-2 w-2 rounded-full bg-green-700' />

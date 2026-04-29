@@ -18,8 +18,8 @@ const scopeColorMap = {
 export const AuditPanel = ({ logs, title = '操作ログ' }: AuditPanelProps) => (
   <section className='overflow-hidden rounded-8 border border-solid-gray-200 bg-white'>
     <header className='border-b border-solid-gray-200 bg-white px-4 py-4 lg:px-5'>
-      <p className='text-std-18B-160 text-solid-gray-900'>{title}</p>
-      <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>参照・更新・認証の直近履歴を保持します。</p>
+      <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>{title}</p>
+      <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>参照・更新・認証の直近履歴を保持します。</p>
     </header>
     <div className='divide-y divide-solid-gray-200'>
       {logs.length > 0 ? (
@@ -31,16 +31,16 @@ export const AuditPanel = ({ logs, title = '操作ログ' }: AuditPanelProps) =>
               </ChipLabel>
               <span className='text-mono-14N-150 text-solid-gray-536'>{log.timestamp}</span>
             </div>
-            <p className='mt-2 text-oln-16B-100 text-solid-gray-900'>{log.action}</p>
-            <p className='mt-1 text-oln-16N-100 text-solid-gray-700'>{log.detail}</p>
-            <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+            <p className='mt-2 text-[16px] font-bold leading-none text-solid-gray-900'>{log.action}</p>
+            <p className='mt-1 text-[16px] font-normal leading-none text-solid-gray-700'>{log.detail}</p>
+            <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
               実行者: {log.actor}
               {log.patientName ? ` / 患者: ${log.patientName}` : ''}
             </p>
           </article>
         ))
       ) : (
-        <div className='px-4 py-8 text-center text-oln-16N-100 text-solid-gray-536 lg:px-5'>
+        <div className='px-4 py-8 text-center text-[16px] font-normal leading-none text-solid-gray-536 lg:px-5'>
           まだログはありません。
         </div>
       )}

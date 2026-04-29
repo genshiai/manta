@@ -100,11 +100,11 @@ export const ReceptionBoard = ({
           <Heading size='28'>
             <HeadingTitle level='h1'>受付患者一覧</HeadingTitle>
           </Heading>
-          <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+          <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
             患者をクリックするとカルテが開きます · 更新: {lastRefreshedAt}
           </p>
         </div>
-        <div className='flex items-center gap-4 text-oln-14N-100 text-solid-gray-536'>
+        <div className='flex items-center gap-4 text-[14px] font-normal leading-none text-solid-gray-536'>
           <span>全{patients.length}</span>
           <span className='text-solid-gray-400'>·</span>
           <span>診察待ち {waitingCount}</span>
@@ -183,27 +183,27 @@ export const ReceptionBoard = ({
         </div>
 
         {isLoading ? (
-          <div className='border-b border-solid-gray-200 px-5 py-3 text-oln-14N-100 text-solid-gray-536 lg:px-6'>
+          <div className='border-b border-solid-gray-200 px-5 py-3 text-[14px] font-normal leading-none text-solid-gray-536 lg:px-6'>
             更新中…
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div className='border-b border-red-200 bg-red-50 px-5 py-3 text-oln-14N-100 text-red-900 lg:px-6'>
+          <div className='border-b border-red-200 bg-red-50 px-5 py-3 text-[14px] font-normal leading-none text-red-900 lg:px-6'>
             {errorMessage}
           </div>
         ) : null}
 
         {savedSearches.length > 0 ? (
           <div className='flex flex-wrap items-center gap-2 border-b border-solid-gray-200 px-5 py-3 lg:px-6'>
-            <span className='text-oln-14N-100 text-solid-gray-536'>保存済み</span>
+            <span className='text-[14px] font-normal leading-none text-solid-gray-536'>保存済み</span>
             {savedSearches.map((savedSearch) => (
               <div
                 className='flex items-center gap-1 rounded-8 border border-solid-gray-200 bg-white px-2 py-1'
                 key={savedSearch.id}
               >
                 <button
-                  className='text-oln-14B-100 text-blue-900 hover:underline'
+                  className='text-[14px] font-bold leading-none text-blue-900 hover:underline'
                   onClick={() => handleApplySavedSearch(savedSearch)}
                   type='button'
                 >
@@ -211,7 +211,7 @@ export const ReceptionBoard = ({
                 </button>
                 <button
                   aria-label={`${savedSearch.label} を削除`}
-                  className='px-1 text-oln-14N-100 text-solid-gray-536 hover:text-solid-gray-900'
+                  className='px-1 text-[14px] font-normal leading-none text-solid-gray-536 hover:text-solid-gray-900'
                   onClick={() => handleRemoveSavedSearch(savedSearch.id)}
                   type='button'
                 >
@@ -222,7 +222,7 @@ export const ReceptionBoard = ({
           </div>
         ) : null}
 
-        <div className='hidden grid-cols-[5rem_7rem_1fr_9rem_8rem_7rem] gap-3 border-b border-solid-gray-200 px-5 py-2 text-oln-14N-100 text-solid-gray-536 lg:grid lg:px-6'>
+        <div className='hidden grid-cols-[5rem_7rem_1fr_9rem_8rem_7rem] gap-3 border-b border-solid-gray-200 px-5 py-2 text-[14px] font-normal leading-none text-solid-gray-536 lg:grid lg:px-6'>
           <span>受付</span>
           <span>予約</span>
           <span>患者</span>
@@ -242,14 +242,14 @@ export const ReceptionBoard = ({
               onClick={() => onOpenChart(patient.id)}
               type='button'
             >
-              <div className='text-oln-16B-100 text-solid-gray-900'>#{patient.receptionNumber}</div>
+              <div className='text-[16px] font-bold leading-none text-solid-gray-900'>#{patient.receptionNumber}</div>
               <div>
                 <div className='text-mono-14B-150 text-solid-gray-900'>{patient.reservationTime}</div>
                 <div className='mt-1 text-mono-14N-150 text-solid-gray-536'>{patient.receptionTime}</div>
               </div>
               <div className='min-w-0'>
                 <div className='flex flex-wrap items-center gap-2'>
-                  <span className='text-oln-16B-100 text-solid-gray-900'>{patient.name}</span>
+                  <span className='text-[16px] font-bold leading-none text-solid-gray-900'>{patient.name}</span>
                   <span className='text-mono-14N-150 text-solid-gray-536'>{patient.id}</span>
                   {patient.sameNameDuplicateCount > 1 ? (
                     <ChipLabel color='yellow' variant='filled-outline'>
@@ -267,15 +267,15 @@ export const ReceptionBoard = ({
                   </div>
                 ) : null}
               </div>
-              <div className='text-oln-16N-100 text-solid-gray-700'>{patient.department}</div>
+              <div className='text-[16px] font-normal leading-none text-solid-gray-700'>{patient.department}</div>
               <div>
                 <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
                   {patient.status}
                 </ChipLabel>
               </div>
               <div>
-                <div className='text-oln-16B-100 text-solid-gray-900'>{patient.elapsed}</div>
-                <div className='mt-1 text-oln-14N-100 text-solid-gray-536'>{patient.labProgress}</div>
+                <div className='text-[16px] font-bold leading-none text-solid-gray-900'>{patient.elapsed}</div>
+                <div className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{patient.labProgress}</div>
               </div>
             </button>
           ))}
@@ -283,8 +283,8 @@ export const ReceptionBoard = ({
 
         {patients.length === 0 ? (
           <div className='px-5 py-10 text-center lg:px-6'>
-            <p className='text-std-18B-160 text-solid-gray-900'>該当する患者がいません</p>
-            <p className='mt-2 text-oln-16N-100 text-solid-gray-536'>
+            <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>該当する患者がいません</p>
+            <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-536'>
               検索条件か受付状態を見直してください。
             </p>
           </div>

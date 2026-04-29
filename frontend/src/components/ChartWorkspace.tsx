@@ -154,7 +154,7 @@ const surfaceClassName = 'rounded-8 border border-solid-gray-200 bg-white';
 const tabItemClassName = (active?: boolean) =>
   cn(
     buttonBaseStyle,
-    'border-b-2 px-4 pb-3 pt-2 text-oln-16B-100 transition-colors',
+    'border-b-2 px-4 pb-3 pt-2 text-[16px] font-bold leading-none transition-colors',
     active
       ? 'border-blue-700 text-blue-900'
       : 'border-transparent text-solid-gray-536 hover:text-solid-gray-900',
@@ -1737,7 +1737,7 @@ export const ChartWorkspace = ({
         <div className='mx-auto grid max-w-[1760px] gap-3 px-3 py-3 lg:px-4 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-center'>
           <div className='min-w-0'>
             <div className='flex flex-wrap items-center gap-x-3 gap-y-2'>
-              <p className='text-std-20B-150 text-solid-gray-900'>{patient.name}</p>
+              <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>{patient.name}</p>
               <p className='text-mono-14N-150 text-solid-gray-536'>
                 {patient.age} {patient.sex} / ID: {patient.id}
               </p>
@@ -1791,11 +1791,11 @@ export const ChartWorkspace = ({
         <aside className='flex flex-col gap-3'>
           <section className={cn(surfaceClassName, 'p-4')}>
             <div className='flex items-start gap-3'>
-              <div className='grid h-10 w-10 place-items-center rounded-full bg-blue-50 text-std-20B-150 text-blue-900'>
+              <div className='grid h-10 w-10 place-items-center rounded-full bg-blue-50 text-[20px] font-bold leading-snug text-blue-900'>
                 {patient.name.slice(0, 1)}
               </div>
               <div className='flex-1'>
-                <p className='text-std-18B-160 text-solid-gray-900'>{patient.name}</p>
+                <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>{patient.name}</p>
                 <p className='text-mono-14N-150 text-solid-gray-536'>ID: {patient.id}</p>
               </div>
               <ChipLabel color={patient.sex === '女性' ? 'red' : 'blue'} variant='filled-outline'>
@@ -1806,8 +1806,8 @@ export const ChartWorkspace = ({
             <dl className='mt-3 grid gap-2 border-t border-solid-gray-200 pt-3'>
               {patient.demographics.map((detail) => (
                 <div className='flex items-start justify-between gap-3' key={detail.label}>
-                  <dt className='text-oln-14N-100 text-solid-gray-536'>{detail.label}</dt>
-                  <dd className='text-right text-oln-16N-100 text-solid-gray-900'>{detail.value}</dd>
+                  <dt className='text-[14px] font-normal leading-none text-solid-gray-536'>{detail.label}</dt>
+                  <dd className='text-right text-[16px] font-normal leading-none text-solid-gray-900'>{detail.value}</dd>
                 </div>
               ))}
             </dl>
@@ -1827,7 +1827,7 @@ export const ChartWorkspace = ({
 
           <section className={cn(surfaceClassName, 'p-4')}>
             <div className='mb-3 flex items-center justify-between'>
-              <h2 className='text-std-18B-160 text-solid-gray-900'>過去受診</h2>
+              <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>過去受診</h2>
               <Button onClick={() => setActivePatientTab('history')} size='xs' type='button' variant='text'>
                 全体
               </Button>
@@ -1856,11 +1856,11 @@ export const ChartWorkspace = ({
                         {visit.department}
                       </ChipLabel>
                     </div>
-                    <p className='mt-1 text-oln-14N-100 text-solid-gray-700'>{visit.summary}</p>
+                    <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-700'>{visit.summary}</p>
                   </button>
                 ))
               ) : (
-                <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                   受診履歴はまだ登録されていません。
                 </div>
               )}
@@ -1868,7 +1868,7 @@ export const ChartWorkspace = ({
           </section>
 
           <section className={cn(surfaceClassName, 'p-4')}>
-            <h2 className='mb-3 text-std-18B-160 text-solid-gray-900'>プロブレムリスト</h2>
+            <h2 className='mb-3 text-[18px] font-bold leading-snug text-solid-gray-900'>プロブレムリスト</h2>
             <div className='flex flex-col gap-3'>
               {currentProblems.length > 0 ? (
                 currentProblems.map((problem) => (
@@ -1883,8 +1883,8 @@ export const ChartWorkspace = ({
                       )}
                     />
                     <div>
-                      <p className='text-oln-16B-100 text-solid-gray-900'>{problem.name}</p>
-                      <p className='text-oln-14N-100 text-solid-gray-536'>{problem.since}</p>
+                      <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{problem.name}</p>
+                      <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{problem.since}</p>
                       <div className='mt-2 flex flex-wrap gap-2'>
                         <ChipLabel color={problemTypeColor(problem.diagnosisType)} variant='filled-outline'>
                           {problemTypeLabel(problem.diagnosisType)}
@@ -1899,7 +1899,7 @@ export const ChartWorkspace = ({
                   </div>
                 ))
               ) : (
-                <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                   登録済みのプロブレムはありません。
                 </div>
               )}
@@ -1946,12 +1946,12 @@ export const ChartWorkspace = ({
                     </ChipLabel>
                   ) : null}
                 </div>
-                <p className='text-oln-14N-100 text-solid-gray-536'>
+                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>
                   {saveMessage}
                   {lastSavedAt ? ` / 最終保存 ${lastSavedAt}` : ''}
                 </p>
                 {workspaceError ? (
-                  <p className='text-oln-14N-100 text-red-900'>{workspaceError}</p>
+                  <p className='text-[14px] font-normal leading-none text-red-900'>{workspaceError}</p>
                 ) : null}
               </div>
 
@@ -2016,8 +2016,8 @@ export const ChartWorkspace = ({
                 <section className={cn(surfaceClassName, 'p-4')}>
                   <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
                     <div>
-                      <p className='text-std-18B-160 text-solid-gray-900'>テンプレートプレビュー</p>
-                      <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                      <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>テンプレートプレビュー</p>
+                      <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                         選択したテンプレートを現在の SOAP に追記します。
                       </p>
                     </div>
@@ -2056,13 +2056,13 @@ export const ChartWorkspace = ({
                         className='rounded-8 border border-solid-gray-200 bg-solid-gray-50 px-4 py-4'
                         key={vital.label}
                       >
-                        <p className='text-oln-14N-100 text-solid-gray-536'>{vital.label}</p>
+                        <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{vital.label}</p>
                         <p className='mt-2 text-mono-16B-150 text-solid-gray-900'>{vital.value}</p>
-                        <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{vital.unit}</p>
+                        <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{vital.unit}</p>
                       </div>
                     ))
                   ) : (
-                    <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536 md:col-span-2 xl:col-span-3'>
+                    <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536 md:col-span-2 xl:col-span-3'>
                       バイタルはまだ記録されていません。
                     </div>
                   )}
@@ -2104,8 +2104,8 @@ export const ChartWorkspace = ({
                 <section className='rounded-8 border border-solid-gray-200 bg-solid-gray-50 p-4'>
                   <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
                     <div>
-                      <p className='text-std-18B-160 text-solid-gray-900'>過去カルテの見方</p>
-                      <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                      <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>過去カルテの見方</p>
+                      <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                         新しい受診日から順にスクロールして確認します。各日付には診療サマリ・薬歴・検査オーダの要点だけを表示し、保存版や全期間リストは必要なときだけ開けます。
                       </p>
                     </div>
@@ -2134,8 +2134,8 @@ export const ChartWorkspace = ({
 
                 <section className='space-y-3'>
                   <div className='flex flex-col gap-1'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>時系列</p>
-                    <p className='text-oln-14N-100 text-solid-gray-536'>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>時系列</p>
+                    <p className='text-[14px] font-normal leading-none text-solid-gray-536'>
                       新しい受診日から順に、診療サマリ・薬歴・検査オーダの要点だけを表示します。
                     </p>
                   </div>
@@ -2166,7 +2166,7 @@ export const ChartWorkspace = ({
                                   </ChipLabel>
                                 ) : null}
                               </div>
-                              <p className='mt-2 text-oln-16B-100 text-solid-gray-900'>{visit.summary}</p>
+                              <p className='mt-2 text-[16px] font-bold leading-none text-solid-gray-900'>{visit.summary}</p>
                             </div>
                             <div className='flex flex-wrap gap-2'>
                               <ChipLabel color='blue' variant='filled-outline'>
@@ -2186,18 +2186,18 @@ export const ChartWorkspace = ({
                               {dateChartSummaries.length > 0 ? (
                                 dateChartSummaries.slice(0, 2).map((history) => (
                                   <div key={`${history.date}-${history.title}`}>
-                                    <p className='text-oln-14B-100 text-solid-gray-900'>{history.title}</p>
-                                    <p className='mt-1 text-oln-14N-100 text-solid-gray-700'>{history.summary}</p>
+                                    <p className='text-[14px] font-bold leading-none text-solid-gray-900'>{history.title}</p>
+                                    <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-700'>{history.summary}</p>
                                   </div>
                                 ))
                               ) : (
-                                <p className='text-oln-14N-100 text-solid-gray-536'>診療サマリは未登録です。</p>
+                                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>診療サマリは未登録です。</p>
                               )}
                             </div>
 
                             <div className='space-y-2'>
                               {datePrescriptionGroup?.items.slice(0, 3).map((item) => (
-                                <div className='flex flex-wrap items-center gap-2 text-oln-14N-100' key={`${visit.date}-${item.drugName}-${item.dosage}`}>
+                                <div className='flex flex-wrap items-center gap-2 text-[14px] font-normal leading-none' key={`${visit.date}-${item.drugName}-${item.dosage}`}>
                                   <ChipLabel color='gray' variant='filled-outline'>
                                     {item.type}
                                   </ChipLabel>
@@ -2206,12 +2206,12 @@ export const ChartWorkspace = ({
                                 </div>
                               ))}
                               {dateLabOrders.slice(0, 2).map((order) => (
-                                <div className='text-oln-14N-100 text-solid-gray-700' key={`${visit.date}-${order.category}-${order.createdAt}`}>
+                                <div className='text-[14px] font-normal leading-none text-solid-gray-700' key={`${visit.date}-${order.category}-${order.createdAt}`}>
                                   検査: {order.category}
                                 </div>
                               ))}
                               {!datePrescriptionGroup && dateLabOrders.length === 0 ? (
-                                <p className='text-oln-14N-100 text-solid-gray-536'>薬歴・検査オーダはありません。</p>
+                                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>薬歴・検査オーダはありません。</p>
                               ) : null}
                             </div>
                           </div>
@@ -2222,10 +2222,10 @@ export const ChartWorkspace = ({
                 </section>
 
                 <details className='rounded-8 border border-solid-gray-200 bg-white p-4'>
-                  <summary className='cursor-pointer text-std-18B-160 text-solid-gray-900'>
+                  <summary className='cursor-pointer text-[18px] font-bold leading-snug text-solid-gray-900'>
                     保存版を表示
                   </summary>
-                  <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                     過去に保存した SOAP の版です。押すと現在の記載欄へ読み込みます。保存するまでは確定反映されません。
                   </p>
 
@@ -2238,7 +2238,7 @@ export const ChartWorkspace = ({
                               版数 v{history.version}
                             </ChipLabel>
                             <span className='text-mono-14B-150 text-solid-gray-700'>{history.savedAt}</span>
-                            <span className='text-oln-14N-100 text-solid-gray-536'>{history.savedBy}</span>
+                            <span className='text-[14px] font-normal leading-none text-solid-gray-536'>{history.savedBy}</span>
                           </div>
                           <Button
                             aria-disabled={isMutating}
@@ -2250,7 +2250,7 @@ export const ChartWorkspace = ({
                             この版を記載欄へ読み込む
                           </Button>
                         </div>
-                        <p className='mt-3 whitespace-pre-line text-oln-14N-100 text-solid-gray-700'>
+                        <p className='mt-3 whitespace-pre-line text-[14px] font-normal leading-none text-solid-gray-700'>
                           {history.assessment}
                         </p>
                       </article>
@@ -2259,13 +2259,13 @@ export const ChartWorkspace = ({
                 </details>
 
                 <details className='rounded-8 border border-solid-gray-200 bg-white p-4'>
-                  <summary className='cursor-pointer text-std-18B-160 text-solid-gray-900'>
+                  <summary className='cursor-pointer text-[18px] font-bold leading-snug text-solid-gray-900'>
                     全期間の詳細リストを表示
                   </summary>
                 <div className='mt-4 grid gap-6 xl:grid-cols-2'>
                   <section className='space-y-3'>
                     <div className='flex items-center justify-between gap-3'>
-                      <p className='text-std-18B-160 text-solid-gray-900'>受診履歴</p>
+                      <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>受診履歴</p>
                       <ChipLabel color='gray' variant='filled-outline'>
                         {currentVisitHistory.length}件
                       </ChipLabel>
@@ -2295,11 +2295,11 @@ export const ChartWorkspace = ({
                               </ChipLabel>
                             ) : null}
                           </div>
-                          <p className='mt-3 text-oln-16N-100 text-solid-gray-700'>{history.summary}</p>
+                          <p className='mt-3 text-[16px] font-normal leading-none text-solid-gray-700'>{history.summary}</p>
                         </button>
                       ))
                     ) : (
-                      <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                      <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                         受診履歴はまだありません。
                       </div>
                     )}
@@ -2307,7 +2307,7 @@ export const ChartWorkspace = ({
 
                   <section className='space-y-3'>
                     <div className='flex flex-wrap items-center justify-between gap-3'>
-                      <p className='text-std-18B-160 text-solid-gray-900'>薬歴</p>
+                      <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>薬歴</p>
                       <div className='flex flex-wrap gap-2'>
                         {(['all', '内服', '外用', '頓服'] as const).map((category) => (
                           <button
@@ -2324,7 +2324,7 @@ export const ChartWorkspace = ({
                     {medicationLongTimeline.length > 0 ? (
                       <div className='grid gap-2 rounded-8 border border-blue-100 bg-blue-50 p-3'>
                         <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>薬剤別の長期サマリ</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>薬剤別の長期サマリ</p>
                           <ChipLabel color='blue' variant='filled-outline'>
                             {medicationLongTimeline.length}剤
                           </ChipLabel>
@@ -2337,13 +2337,13 @@ export const ChartWorkspace = ({
                                   <ChipLabel color='gray' variant='filled-outline'>
                                     {item.category}
                                   </ChipLabel>
-                                  <span className='text-oln-14B-100 text-solid-gray-900'>{item.drugName}</span>
+                                  <span className='text-[14px] font-bold leading-none text-solid-gray-900'>{item.drugName}</span>
                                 </div>
                                 <span className='text-mono-14B-150 text-solid-gray-700'>
                                   {item.firstDate} - {item.lastDate}
                                 </span>
                               </div>
-                              <div className='mt-1 flex flex-wrap items-center gap-2 text-oln-14N-100 text-solid-gray-536'>
+                              <div className='mt-1 flex flex-wrap items-center gap-2 text-[14px] font-normal leading-none text-solid-gray-536'>
                                 <span>{item.occurrences}回</span>
                                 <span>{item.latestDosage}</span>
                                 <span>{item.latestDays}</span>
@@ -2367,7 +2367,7 @@ export const ChartWorkspace = ({
                               <ChipLabel color={group.isLatest ? 'blue' : 'gray'} variant='filled-outline'>
                                 {group.label}
                               </ChipLabel>
-                              <span className='text-oln-14N-100 text-solid-gray-536'>{group.items.length}剤</span>
+                              <span className='text-[14px] font-normal leading-none text-solid-gray-536'>{group.items.length}剤</span>
                               {group.isLatest ? (
                                 <ChipLabel color='green' variant='filled-outline'>
                                   最新
@@ -2429,9 +2429,9 @@ export const ChartWorkspace = ({
                                       </Button>
                                     </div>
                                   </div>
-                                  <p className='mt-3 text-oln-16B-100 text-solid-gray-900'>{prescription.drugName}</p>
-                                  <p className='mt-1 text-oln-16N-100 text-solid-gray-700'>{prescription.dosage}</p>
-                                  <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{prescription.days}</p>
+                                  <p className='mt-3 text-[16px] font-bold leading-none text-solid-gray-900'>{prescription.drugName}</p>
+                                  <p className='mt-1 text-[16px] font-normal leading-none text-solid-gray-700'>{prescription.dosage}</p>
+                                  <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{prescription.days}</p>
                                   {prescription.warnings.length > 0 ? (
                                     <div className='mt-3 flex flex-wrap gap-2'>
                                       {prescription.warnings.map((warning) => (
@@ -2448,7 +2448,7 @@ export const ChartWorkspace = ({
                         </article>
                       ))
                     ) : (
-                      <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                      <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                         条件に一致する薬歴はありません。
                       </div>
                     )}
@@ -2458,7 +2458,7 @@ export const ChartWorkspace = ({
 
                 <section className='space-y-3'>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>検査オーダ履歴</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>検査オーダ履歴</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {currentLabOrders.length}件
                     </ChipLabel>
@@ -2483,13 +2483,13 @@ export const ChartWorkspace = ({
                               <span className='text-mono-14B-150 text-solid-gray-700'>{order.createdAt}</span>
                             ) : null}
                           </div>
-                          <p className='mt-3 text-oln-16B-100 text-solid-gray-900'>{order.category}</p>
-                          <p className='mt-2 text-oln-14N-100 text-solid-gray-700'>{order.items.join(' / ')}</p>
+                          <p className='mt-3 text-[16px] font-bold leading-none text-solid-gray-900'>{order.category}</p>
+                          <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-700'>{order.items.join(' / ')}</p>
                         </article>
                       ))}
                     </div>
                   ) : (
-                    <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                    <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                       検査オーダ履歴はまだありません。
                     </div>
                   )}
@@ -2497,7 +2497,7 @@ export const ChartWorkspace = ({
 
                 <section className='space-y-3'>
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-std-18B-160 text-solid-gray-900'>診療サマリ</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>診療サマリ</p>
                     <ChipLabel color='gray' variant='filled-outline'>
                       {currentChartHistory.length}件
                     </ChipLabel>
@@ -2513,8 +2513,8 @@ export const ChartWorkspace = ({
                         </ChipLabel>
                         <span className='text-mono-14B-150 text-solid-gray-700'>{history.date}</span>
                       </div>
-                      <p className='mt-3 text-std-18B-160 text-solid-gray-900'>{history.title}</p>
-                      <p className='mt-2 text-oln-16N-100 text-solid-gray-700'>{history.summary}</p>
+                      <p className='mt-3 text-[18px] font-bold leading-snug text-solid-gray-900'>{history.title}</p>
+                      <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-700'>{history.summary}</p>
                     </article>
                   ))}
                 </section>
@@ -2542,13 +2542,13 @@ export const ChartWorkspace = ({
                   >
                     <button className='w-full text-left' onClick={() => setSelectedLabTrendItem(result.item)} type='button'>
                       <div className='flex flex-wrap items-center justify-between gap-2'>
-                        <p className='text-oln-16B-100 text-solid-gray-900'>{result.item}</p>
+                        <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{result.item}</p>
                         <ChipLabel color={labFlagColor(result.flag)} variant='filled-outline'>
                           {result.flag === 'high' ? '異常' : '基準内'}
                         </ChipLabel>
                       </div>
                       <p className='mt-3 text-mono-16B-150 text-solid-gray-900'>{result.result}</p>
-                      <div className='mt-2 flex flex-wrap items-center gap-3 text-oln-14N-100 text-solid-gray-536'>
+                      <div className='mt-2 flex flex-wrap items-center gap-3 text-[14px] font-normal leading-none text-solid-gray-536'>
                         <span>前回 {result.previous}</span>
                         <span>差分 {result.deltaLabel}</span>
                       </div>
@@ -2570,8 +2570,8 @@ export const ChartWorkspace = ({
               <div className='flex flex-col gap-4'>
                 <div className='flex flex-wrap items-center justify-between gap-3'>
                   <div>
-                    <p className='text-std-18B-160 text-solid-gray-900'>患者プロファイル</p>
-                    <p className='mt-2 text-oln-14N-100 text-solid-gray-536'>{contextMessage}</p>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>患者プロファイル</p>
+                    <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>{contextMessage}</p>
                   </div>
                   <div className='flex flex-wrap gap-2'>
                     <Button aria-disabled={isMutating} onClick={addPatientProfileEntry} size='xs' type='button' variant='outline'>
@@ -2618,8 +2618,8 @@ export const ChartWorkspace = ({
                     <div className='rounded-8 border border-solid-gray-200 bg-solid-gray-50 p-4'>
                       <div className='flex flex-col gap-3'>
                         <div>
-                          <p className='text-oln-16B-100 text-solid-gray-900'>病名ツール</p>
-                          <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{diagnosisSearchMessage}</p>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>病名ツール</p>
+                          <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{diagnosisSearchMessage}</p>
                         </div>
                         <div className='flex flex-col gap-3 sm:flex-row'>
                           <Input
@@ -2653,8 +2653,8 @@ export const ChartWorkspace = ({
                               >
                                 <div className='flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between'>
                                   <div>
-                                    <p className='text-oln-16B-100 text-solid-gray-900'>{item.diseaseName}</p>
-                                    <p className='text-oln-14N-100 text-solid-gray-536'>{item.diseaseNameKana}</p>
+                                    <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.diseaseName}</p>
+                                    <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{item.diseaseNameKana}</p>
                                     <div className='mt-2 flex flex-wrap gap-2'>
                                       {item.icd10Code ? (
                                         <ChipLabel color='gray' variant='filled-outline'>
@@ -2743,7 +2743,7 @@ export const ChartWorkspace = ({
                 </div>
 
                 {currentPatientProfile.length === 0 && currentProblems.length === 0 ? (
-                  <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                  <div className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                     患者プロファイルとプロブレムは未登録です。
                   </div>
                 ) : null}
@@ -2756,8 +2756,8 @@ export const ChartWorkspace = ({
           <section className={cn(surfaceClassName, 'p-4')}>
             <div className='mb-3 flex items-start justify-between gap-3'>
               <div>
-                <h2 className='text-std-18B-160 text-solid-gray-900'>今日の作業キュー</h2>
-                <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>入力中の指示と警告を右側で確認します。</p>
+                <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>今日の作業キュー</h2>
+                <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>入力中の指示と警告を右側で確認します。</p>
               </div>
               <ChipLabel color={workQueueWarningsCount > 0 ? 'orange' : 'green'} variant='filled-outline'>
                 警告 {workQueueWarningsCount}
@@ -2773,7 +2773,7 @@ export const ChartWorkspace = ({
                 onClick={() => setActiveOrderTab('prescription')}
                 type='button'
               >
-                <span className='block text-oln-14N-100 text-solid-gray-536'>処方</span>
+                <span className='block text-[14px] font-normal leading-none text-solid-gray-536'>処方</span>
                 <span className='mt-1 block text-mono-16B-150 text-solid-gray-900'>{currentPrescriptions.length}</span>
               </button>
               <button
@@ -2785,7 +2785,7 @@ export const ChartWorkspace = ({
                 onClick={() => setActiveOrderTab('lab')}
                 type='button'
               >
-                <span className='block text-oln-14N-100 text-solid-gray-536'>検査</span>
+                <span className='block text-[14px] font-normal leading-none text-solid-gray-536'>検査</span>
                 <span className='mt-1 block text-mono-16B-150 text-solid-gray-900'>{currentLabOrders.length}</span>
               </button>
               <button
@@ -2799,7 +2799,7 @@ export const ChartWorkspace = ({
                 onClick={() => setActiveOrderTab('procedure')}
                 type='button'
               >
-                <span className='block text-oln-14N-100 text-solid-gray-536'>処置</span>
+                <span className='block text-[14px] font-normal leading-none text-solid-gray-536'>処置</span>
                 <span className='mt-1 block text-mono-16B-150 text-solid-gray-900'>
                   {procedureComposer.title.trim() ? 1 : 0}
                 </span>
@@ -2825,7 +2825,7 @@ export const ChartWorkspace = ({
           {activeOrderTab === 'prescription' ? (
             <section className={cn(surfaceClassName, 'p-4 lg:p-5')}>
               <div className='mb-4 flex items-center justify-between gap-3'>
-                <h2 className='text-std-18B-160 text-solid-gray-900'>現在の処方</h2>
+                <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>現在の処方</h2>
                 <div className='flex flex-wrap gap-2'>
                   <Button
                     aria-disabled={isMutating || !latestCopyablePrescriptionGroup}
@@ -2867,8 +2867,8 @@ export const ChartWorkspace = ({
                   <div className='rounded-8 border border-yellow-300 bg-yellow-50 p-4'>
                     <div className='flex flex-wrap items-center justify-between gap-3'>
                       <div>
-                        <p className='text-oln-16B-100 text-solid-gray-900'>複写前プレビュー</p>
-                        <p className='mt-1 text-oln-14N-100 text-solid-gray-700'>
+                        <p className='text-[16px] font-bold leading-none text-solid-gray-900'>複写前プレビュー</p>
+                        <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-700'>
                           {prescriptionCopyPreview.sourceDate} 処方 / 追加予定 {prescriptionCopyPreview.plannedCount} 剤 / スキップ {prescriptionCopyPreview.skippedCount} 剤
                         </p>
                       </div>
@@ -2900,9 +2900,9 @@ export const ChartWorkspace = ({
                             <ChipLabel color={item.status === 'skipped' || item.status === 'changed' ? 'yellow' : item.status === 'to_copy' ? 'blue' : 'gray'} variant='filled-outline'>
                               {item.label}
                             </ChipLabel>
-                            <span className='text-oln-14B-100 text-solid-gray-900'>{item.drugName}</span>
+                            <span className='text-[14px] font-bold leading-none text-solid-gray-900'>{item.drugName}</span>
                           </div>
-                          <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                          <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                             {item.sourceDosage ? `前回: ${item.sourceDosage}` : ''}
                             {item.currentDosage ? ` / 今回: ${item.currentDosage}` : ''}
                             {item.reason ? ` / ${item.reason}` : ''}
@@ -2917,8 +2917,8 @@ export const ChartWorkspace = ({
                   <div className='rounded-8 border border-blue-200 bg-blue-50 p-4'>
                     <div className='flex flex-wrap items-center justify-between gap-3'>
                       <div>
-                        <p className='text-oln-16B-100 text-solid-gray-900'>セット展開前プレビュー</p>
-                        <p className='mt-1 text-oln-14N-100 text-solid-gray-700'>
+                        <p className='text-[16px] font-bold leading-none text-solid-gray-900'>セット展開前プレビュー</p>
+                        <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-700'>
                           {prescriptionSetPreview.label} / 追加可能 {prescriptionSetPreviewReadyCount} 剤 / ブロック {prescriptionSetPreviewBlockedCount} 剤
                         </p>
                       </div>
@@ -2962,9 +2962,9 @@ export const ChartWorkspace = ({
                             >
                               {item.status === 'blocked' ? '要除外' : item.status === 'warning' ? '要確認' : '追加予定'}
                             </ChipLabel>
-                            <span className='text-oln-14B-100 text-solid-gray-900'>{item.drugName}</span>
+                            <span className='text-[14px] font-bold leading-none text-solid-gray-900'>{item.drugName}</span>
                           </div>
-                          <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                          <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                             {item.dosage} / {item.days}日分
                             {item.messages.length > 0 ? ` / ${item.messages.join(' / ')}` : ''}
                           </p>
@@ -2982,8 +2982,8 @@ export const ChartWorkspace = ({
                         <div className='rounded-8 border border-blue-100 bg-blue-50 px-4 py-3' key={setItem.id}>
                           <div className='flex flex-wrap items-center justify-between gap-2'>
                             <div>
-                              <p className='text-oln-16B-100 text-solid-gray-900'>{setItem.label}</p>
-                              <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                              <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{setItem.label}</p>
+                              <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                                 {setItem.department} / 展開後 {expandedItems.length}剤
                               </p>
                             </div>
@@ -3034,9 +3034,9 @@ export const ChartWorkspace = ({
                       >
                         <div className='flex flex-wrap items-center justify-between gap-2'>
                           <div>
-                            <p className='text-oln-16B-100 text-solid-gray-900'>{drug.drugName}</p>
+                            <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{drug.drugName}</p>
                             {drug.genericName ? (
-                              <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{drug.genericName}</p>
+                              <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{drug.genericName}</p>
                             ) : null}
                           </div>
                           <ChipLabel color='blue' variant='filled-outline'>
@@ -3076,7 +3076,7 @@ export const ChartWorkspace = ({
                     ))}
                   </div>
                 ) : (
-                  <div className='rounded-8 border border-dashed border-solid-gray-300 bg-white px-4 py-4 text-oln-14N-100 text-solid-gray-536'>
+                  <div className='rounded-8 border border-dashed border-solid-gray-300 bg-white px-4 py-4 text-[14px] font-normal leading-none text-solid-gray-536'>
                     検索条件に一致する処方候補はありません。
                   </div>
                 )}
@@ -3128,9 +3128,9 @@ export const ChartWorkspace = ({
                   ))}
                 </div>
 
-                <p className='text-oln-14N-100 text-solid-gray-536'>{prescriptionAutofillHint}</p>
+                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{prescriptionAutofillHint}</p>
                 {selectedDrugPmdaUrl ? (
-                  <p className='text-oln-14N-100'>
+                  <p className='text-[14px] font-normal leading-none'>
                     <Link href={selectedDrugPmdaUrl}>PMDA 添付文書 / 安全情報を確認</Link>
                   </p>
                 ) : null}
@@ -3139,7 +3139,7 @@ export const ChartWorkspace = ({
                   <WarningList items={prescriptionWarnings} title='共通チェック' />
                 ) : null}
 
-                <p className='text-oln-14N-100 text-solid-gray-536'>{orderMessage}</p>
+                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{orderMessage}</p>
               </div>
 
               <div className='mt-4 space-y-3'>
@@ -3153,7 +3153,7 @@ export const ChartWorkspace = ({
                         {prescription.type}
                       </ChipLabel>
                       <div className='flex items-center gap-2'>
-                        <span className='text-oln-14B-100 text-blue-900'>{prescription.days}</span>
+                        <span className='text-[14px] font-bold leading-none text-blue-900'>{prescription.days}</span>
                         <Button
                           aria-disabled={isMutating}
                           onClick={() =>
@@ -3171,8 +3171,8 @@ export const ChartWorkspace = ({
                         </Button>
                       </div>
                     </div>
-                    <p className='mt-3 text-oln-16B-100 text-solid-gray-900'>{prescription.drugName}</p>
-                    <p className='mt-1 text-oln-16N-100 text-solid-gray-700'>{prescription.dosage}</p>
+                    <p className='mt-3 text-[16px] font-bold leading-none text-solid-gray-900'>{prescription.drugName}</p>
+                    <p className='mt-1 text-[16px] font-normal leading-none text-solid-gray-700'>{prescription.dosage}</p>
                   </article>
                 ))}
               </div>
@@ -3182,7 +3182,7 @@ export const ChartWorkspace = ({
           {activeOrderTab === 'lab' ? (
             <section className={cn(surfaceClassName, 'p-4 lg:p-5')}>
               <div className='mb-4 flex items-center justify-between gap-3'>
-                <h2 className='text-std-18B-160 text-solid-gray-900'>検査オーダー</h2>
+                <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>検査オーダー</h2>
                 <Button aria-disabled={isMutating} onClick={handlePreviewLabSet} size='xs' type='button' variant='outline'>
                   セットを確認
                 </Button>
@@ -3224,14 +3224,14 @@ export const ChartWorkspace = ({
                 {selectedLabSet ? (
                   <div className='rounded-8 border border-green-100 bg-white px-3 py-2'>
                     <div className='flex flex-wrap items-center gap-2'>
-                      <span className='text-oln-14B-100 text-solid-gray-900'>展開後 {selectedLabSetItems.length}項目</span>
+                      <span className='text-[14px] font-bold leading-none text-solid-gray-900'>展開後 {selectedLabSetItems.length}項目</span>
                       {selectedLabSet.includedSetIds.length > 0 ? (
                         <ChipLabel color='green' variant='filled-outline'>
                           複合 {selectedLabSet.includedSetIds.length}セット
                         </ChipLabel>
                       ) : null}
                     </div>
-                    <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{selectedLabSetItems.join(' / ')}</p>
+                    <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{selectedLabSetItems.join(' / ')}</p>
                   </div>
                 ) : null}
 
@@ -3239,8 +3239,8 @@ export const ChartWorkspace = ({
                   <div className='rounded-8 border border-green-200 bg-green-50 p-4'>
                     <div className='flex flex-wrap items-center justify-between gap-3'>
                       <div>
-                        <p className='text-oln-16B-100 text-solid-gray-900'>検査セット展開前プレビュー</p>
-                        <p className='mt-1 text-oln-14N-100 text-solid-gray-700'>
+                        <p className='text-[16px] font-bold leading-none text-solid-gray-900'>検査セット展開前プレビュー</p>
+                        <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-700'>
                           {labSetPreview.label} / {labSetPreview.items.length} 項目 / 重複 {labSetPreviewDuplicateCount} 項目
                         </p>
                       </div>
@@ -3290,7 +3290,7 @@ export const ChartWorkspace = ({
                     key={`${order.category}-${order.items.join('-')}`}
                   >
                     <div className='flex items-center justify-between gap-3'>
-                      <p className='text-oln-16B-100 text-green-900'>{order.category}</p>
+                      <p className='text-[16px] font-bold leading-none text-green-900'>{order.category}</p>
                       <div className='flex flex-wrap gap-2'>
                         {order.urgency ? (
                           <ChipLabel color={order.urgency === '至急' ? 'red' : 'gray'} variant='filled-outline'>
@@ -3318,7 +3318,7 @@ export const ChartWorkspace = ({
           {activeOrderTab === 'imaging' ? (
             <section className={cn(surfaceClassName, 'p-4 lg:p-5')}>
               <div className='mb-4 flex items-center justify-between gap-3'>
-                <h2 className='text-std-18B-160 text-solid-gray-900'>画像オーダー</h2>
+                <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>画像オーダー</h2>
                 <Button aria-disabled={isMutating} onClick={handleAddImagingOrder} size='xs' type='button' variant='outline'>
                   追加
                 </Button>
@@ -3370,18 +3370,18 @@ export const ChartWorkspace = ({
                   rows={3}
                   value={imagingComposer.note}
                 />
-                <p className='text-oln-14N-100 text-solid-gray-536'>{imagingMessage}</p>
+                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{imagingMessage}</p>
               </div>
               <div className='space-y-3'>
                 {currentImagingOrders.map((order) => (
                   <article className='rounded-8 border border-cyan-200 bg-cyan-50 p-4' key={order.category}>
                     <div className='flex items-center justify-between gap-3'>
-                      <p className='text-oln-16B-100 text-cyan-900'>{order.category}</p>
+                      <p className='text-[16px] font-bold leading-none text-cyan-900'>{order.category}</p>
                       <ChipLabel color={order.status === 'scheduled' ? 'cyan' : 'gray'} variant='filled-outline'>
                         {order.status === 'scheduled' ? '予約済み' : '下書き'}
                       </ChipLabel>
                     </div>
-                    <p className='mt-3 text-oln-16N-100 text-solid-gray-700'>{order.note}</p>
+                    <p className='mt-3 text-[16px] font-normal leading-none text-solid-gray-700'>{order.note}</p>
                     <p className='mt-2 text-mono-14N-150 text-solid-gray-536'>{order.scheduledAt}</p>
                   </article>
                 ))}
@@ -3392,7 +3392,7 @@ export const ChartWorkspace = ({
           {activeOrderTab === 'procedure' ? (
             <section className={cn(surfaceClassName, 'p-4 lg:p-5')}>
               <div className='mb-4 flex items-center justify-between gap-3'>
-                <h2 className='text-std-18B-160 text-solid-gray-900'>処置 / 指導</h2>
+                <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>処置 / 指導</h2>
                 <Button aria-disabled={isMutating} onClick={handleAddProcedureOrder} size='xs' type='button' variant='outline'>
                   追加
                 </Button>
@@ -3433,7 +3433,7 @@ export const ChartWorkspace = ({
                   rows={3}
                   value={procedureComposer.note}
                 />
-                <p className='text-oln-14N-100 text-solid-gray-536'>{procedureMessage}</p>
+                <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{procedureMessage}</p>
               </div>
               <div className='space-y-3'>
                 {currentProcedureOrders.map((order) => (
@@ -3442,12 +3442,12 @@ export const ChartWorkspace = ({
                     key={order.title}
                   >
                     <div className='flex items-center justify-between gap-3'>
-                      <p className='text-oln-16B-100 text-purple-800'>{order.title}</p>
+                      <p className='text-[16px] font-bold leading-none text-purple-800'>{order.title}</p>
                       <ChipLabel color={order.status === 'done' ? 'green' : 'purple'} variant='filled-outline'>
                         {order.status === 'done' ? '完了' : '予定'}
                       </ChipLabel>
                     </div>
-                    <p className='mt-3 text-oln-16N-100 text-solid-gray-700'>{order.note}</p>
+                    <p className='mt-3 text-[16px] font-normal leading-none text-solid-gray-700'>{order.note}</p>
                   </article>
                 ))}
               </div>
@@ -3456,7 +3456,7 @@ export const ChartWorkspace = ({
 
           <section className={cn(surfaceClassName, 'p-4 lg:p-5')}>
             <div className='mb-4 flex items-center justify-between gap-3'>
-              <h2 className='text-std-18B-160 text-solid-gray-900'>次回予約</h2>
+              <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>次回予約</h2>
               <Button aria-disabled={isMutating} onClick={handleSaveReservation} size='xs' type='button' variant='outline'>
                 <CalendarIcon className='h-4 w-4' />
                 更新
@@ -3489,8 +3489,8 @@ export const ChartWorkspace = ({
                       </ChipLabel>
                       <span className='text-mono-14B-150 text-solid-gray-700'>{slot.time}</span>
                     </div>
-                    <p className='mt-2 text-oln-16B-100 text-solid-gray-900'>{slot.date}</p>
-                    <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+                    <p className='mt-2 text-[16px] font-bold leading-none text-solid-gray-900'>{slot.date}</p>
+                    <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
                       {slot.department} / {slot.doctor}
                     </p>
                   </button>
@@ -3513,16 +3513,16 @@ export const ChartWorkspace = ({
                 <WarningList items={reservationWarnings} title='予約チェック' />
               ) : null}
 
-              <p className='text-oln-14N-100 text-solid-gray-536'>{reservationMessage}</p>
+              <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{reservationMessage}</p>
             </div>
 
             <div className='mt-4 rounded-8 border border-blue-100 bg-blue-50 p-4'>
-              <p className='flex items-center gap-2 text-oln-16B-100 text-blue-900'>
+              <p className='flex items-center gap-2 text-[16px] font-bold leading-none text-blue-900'>
                 <CalendarIcon className='h-4 w-4' />
                 {scheduledVisit.date}
               </p>
-              <p className='mt-2 text-oln-16N-100 text-solid-gray-700'>{scheduledVisit.department}</p>
-              <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{scheduledVisit.note}</p>
+              <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-700'>{scheduledVisit.department}</p>
+              <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{scheduledVisit.note}</p>
             </div>
           </section>
 
@@ -3530,7 +3530,7 @@ export const ChartWorkspace = ({
             <Button aria-disabled={isMutating} onClick={handleCompleteVisit} size='md' type='button' variant='solid-fill'>
               診察終了
             </Button>
-            <p className='mt-3 text-oln-14N-100 text-solid-gray-536'>
+            <p className='mt-3 text-[14px] font-normal leading-none text-solid-gray-536'>
               カルテ保存と状態更新をまとめて実行し、受付へ戻します。
             </p>
           </section>
@@ -3551,12 +3551,12 @@ const TemplatePreviewCard = ({
 }) => (
   <article className='rounded-8 border border-solid-gray-200 bg-solid-gray-50 p-4'>
     <div className='flex items-center gap-2'>
-      <span className='grid h-7 w-7 place-items-center rounded-full bg-blue-900 text-oln-14B-100 text-white'>
+      <span className='grid h-7 w-7 place-items-center rounded-full bg-blue-900 text-[14px] font-bold leading-none text-white'>
         {label}
       </span>
-      <p className='text-oln-16B-100 text-solid-gray-900'>{title}</p>
+      <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{title}</p>
     </div>
-    <p className='mt-3 whitespace-pre-line text-oln-14N-100 text-solid-gray-700'>{value}</p>
+    <p className='mt-3 whitespace-pre-line text-[14px] font-normal leading-none text-solid-gray-700'>{value}</p>
   </article>
 );
 
@@ -3575,7 +3575,7 @@ const TrendSparkline = ({ points }: { points: LabResultEntry['history'] }) => {
 
   if (numericPoints.length < 2) {
     return (
-      <div className='grid h-40 place-items-center rounded-8 border border-dashed border-solid-gray-300 bg-white text-oln-14N-100 text-solid-gray-536'>
+      <div className='grid h-40 place-items-center rounded-8 border border-dashed border-solid-gray-300 bg-white text-[14px] font-normal leading-none text-solid-gray-536'>
         推移グラフを表示できるデータが不足しています。
       </div>
     );
@@ -3634,7 +3634,7 @@ const LabTrendPanel = ({
 }) => {
   if (!result) {
     return (
-      <section className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-6 text-oln-14N-100 text-solid-gray-536'>
+      <section className='rounded-8 border border-dashed border-solid-gray-300 bg-solid-gray-50 px-4 py-6 text-[14px] font-normal leading-none text-solid-gray-536'>
         推移表示できる検査結果はありません。
       </section>
     );
@@ -3651,8 +3651,8 @@ const LabTrendPanel = ({
     <section className='rounded-12 border border-blue-200 bg-blue-50 p-5'>
       <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
         <div>
-          <p className='text-std-18B-160 text-blue-900'>{result.item} の推移</p>
-          <p className='mt-1 text-oln-14N-100 text-blue-900'>
+          <p className='text-[18px] font-bold leading-snug text-blue-900'>{result.item} の推移</p>
+          <p className='mt-1 text-[14px] font-normal leading-none text-blue-900'>
             {reportDate ? `${reportDate} 報告分までの ${trendPointCount} 回比較` : '履歴データを表示します'}
           </p>
         </div>
@@ -3673,20 +3673,20 @@ const LabTrendPanel = ({
         <TrendSparkline points={trendPoints} />
         <div className='space-y-3'>
           <article className='rounded-8 border border-solid-gray-200 bg-white p-4'>
-            <p className='text-oln-14B-100 text-solid-gray-700'>最新値</p>
+            <p className='text-[14px] font-bold leading-none text-solid-gray-700'>最新値</p>
             <p className='mt-2 text-mono-16B-150 text-solid-gray-900'>{latestPoint?.value ?? result.result}</p>
-            <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>
+            <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
               {latestPoint?.date ?? longTrend?.latestDate ?? result.reportedAt ?? '今回'} / 基準 {longTrend?.baseline ?? result.baseline}
             </p>
           </article>
           <article className='rounded-8 border border-solid-gray-200 bg-white p-4'>
-            <p className='text-oln-14B-100 text-solid-gray-700'>前回値</p>
+            <p className='text-[14px] font-bold leading-none text-solid-gray-700'>前回値</p>
             <p className='mt-2 text-mono-16B-150 text-solid-gray-900'>{previousPoint?.value ?? longTrend?.previousValue ?? result.previous}</p>
-            <p className='mt-1 text-oln-14N-100 text-solid-gray-536'>{previousPoint?.date ?? '前回採血'}</p>
+            <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{previousPoint?.date ?? '前回採血'}</p>
           </article>
           <article className='rounded-8 border border-solid-gray-200 bg-white p-4'>
-            <p className='text-oln-14B-100 text-solid-gray-700'>トレンドメモ</p>
-            <p className='mt-2 text-oln-14N-100 text-solid-gray-700'>
+            <p className='text-[14px] font-bold leading-none text-solid-gray-700'>トレンドメモ</p>
+            <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-700'>
               {abnormalCount > 0
                 ? `${trendPointCount}回中 ${abnormalCount}回で異常判定です。長期推移と直近値をあわせて評価できます。`
                 : `${trendPointCount}回の推移で基準内です。変動幅を見ながら再評価できます。`}
@@ -3702,7 +3702,7 @@ const ResultsTable = ({ reportDate, results }: { reportDate: string | null; resu
   <section className='overflow-hidden rounded-8 border border-solid-gray-200'>
     <header className='flex flex-col gap-3 border-b border-solid-gray-200 bg-white px-4 py-4 lg:flex-row lg:items-center lg:justify-between'>
       <div>
-        <p className='text-std-18B-160 text-solid-gray-900'>検査結果（{reportDate ?? '今回'}）</p>
+        <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>検査結果（{reportDate ?? '今回'}）</p>
       </div>
       <Link href='#'>全検査値を表示</Link>
     </header>
@@ -3710,7 +3710,7 @@ const ResultsTable = ({ reportDate, results }: { reportDate: string | null; resu
     <div className='overflow-x-auto'>
       <table className='min-w-full border-collapse'>
         <thead>
-          <tr className='border-b border-solid-gray-200 bg-white text-left text-oln-14B-100 text-solid-gray-700'>
+          <tr className='border-b border-solid-gray-200 bg-white text-left text-[14px] font-bold leading-none text-solid-gray-700'>
             <th className='px-4 py-3'>項目</th>
             <th className='px-4 py-3'>結果</th>
             <th className='px-4 py-3'>基準値</th>
@@ -3722,7 +3722,7 @@ const ResultsTable = ({ reportDate, results }: { reportDate: string | null; resu
           {results.length > 0 ? (
             results.map((result) => (
               <tr className='border-b border-solid-gray-200 last:border-b-0' key={result.item}>
-                <td className='px-4 py-4 text-oln-16B-100 text-solid-gray-900'>{result.item}</td>
+                <td className='px-4 py-4 text-[16px] font-bold leading-none text-solid-gray-900'>{result.item}</td>
                 <td
                   className={cn(
                     'px-4 py-4 text-mono-16B-150',
@@ -3731,8 +3731,8 @@ const ResultsTable = ({ reportDate, results }: { reportDate: string | null; resu
                 >
                   {result.result}
                 </td>
-                <td className='px-4 py-4 text-oln-16N-100 text-solid-gray-700'>{result.baseline}</td>
-                <td className='px-4 py-4 text-oln-16N-100 text-solid-gray-700'>{result.previous}</td>
+                <td className='px-4 py-4 text-[16px] font-normal leading-none text-solid-gray-700'>{result.baseline}</td>
+                <td className='px-4 py-4 text-[16px] font-normal leading-none text-solid-gray-700'>{result.previous}</td>
                 <td className='px-4 py-4'>
                   <ChipLabel color={labFlagColor(result.flag)} variant='filled-outline'>
                     {result.flag === 'high' ? 'H' : 'N'}
@@ -3742,7 +3742,7 @@ const ResultsTable = ({ reportDate, results }: { reportDate: string | null; resu
             ))
           ) : (
             <tr>
-              <td className='px-4 py-6 text-oln-14N-100 text-solid-gray-536' colSpan={5}>
+              <td className='px-4 py-6 text-[14px] font-normal leading-none text-solid-gray-536' colSpan={5}>
                 検査結果はまだ登録されていません。
               </td>
             </tr>
@@ -3755,10 +3755,10 @@ const ResultsTable = ({ reportDate, results }: { reportDate: string | null; resu
 
 const WarningList = ({ items, title }: { items: string[]; title: string }) => (
   <div className='rounded-8 border border-yellow-200 bg-yellow-50 p-4'>
-    <p className='text-oln-16B-100 text-yellow-1000'>{title}</p>
+    <p className='text-[16px] font-bold leading-none text-yellow-1000'>{title}</p>
     <div className='mt-2 space-y-2'>
       {items.map((item) => (
-        <p className='text-oln-14N-100 text-yellow-1100' key={item}>
+        <p className='text-[14px] font-normal leading-none text-yellow-1100' key={item}>
           {item}
         </p>
       ))}
@@ -3776,10 +3776,10 @@ const MetricCard = ({
   accent: 'blue' | 'green' | 'red';
 }) => (
   <div className='rounded-8 border border-solid-gray-200 bg-white p-4'>
-    <p className='text-oln-14N-100 text-solid-gray-536'>{label}</p>
+    <p className='text-[14px] font-normal leading-none text-solid-gray-536'>{label}</p>
     <p
       className={cn(
-        'mt-2 text-std-20B-150',
+        'mt-2 text-[20px] font-bold leading-snug',
         accent === 'blue' && 'text-blue-900',
         accent === 'green' && 'text-green-900',
         accent === 'red' && 'text-red-900',

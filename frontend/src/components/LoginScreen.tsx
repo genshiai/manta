@@ -32,12 +32,12 @@ export const LoginScreen = ({
 }: LoginScreenProps) => (
   <main className='mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 px-4 py-10 lg:px-6'>
     <div className='flex items-center gap-3'>
-      <div className='grid h-10 w-10 place-items-center rounded-8 bg-blue-900 text-std-18B-160 text-white'>
+      <div className='grid h-10 w-10 place-items-center rounded-8 bg-blue-900 text-[18px] font-bold leading-snug text-white'>
         M
       </div>
       <div>
-        <p className='text-std-20B-150 text-solid-gray-900'>Manta</p>
-        <p className='text-oln-14N-100 text-solid-gray-536'>外来電子カルテ</p>
+        <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>Manta</p>
+        <p className='text-[14px] font-normal leading-none text-solid-gray-536'>外来電子カルテ</p>
       </div>
     </div>
 
@@ -56,7 +56,7 @@ export const LoginScreen = ({
         }}
       >
         <div className='space-y-2'>
-          <label className='text-oln-14B-100 text-solid-gray-700' htmlFor='login-user-id'>
+          <label className='text-[14px] font-bold leading-none text-solid-gray-700' htmlFor='login-user-id'>
             利用者 ID
           </label>
           <Input
@@ -69,7 +69,7 @@ export const LoginScreen = ({
         </div>
 
         <div className='space-y-2'>
-          <label className='text-oln-14B-100 text-solid-gray-700' htmlFor='login-password'>
+          <label className='text-[14px] font-bold leading-none text-solid-gray-700' htmlFor='login-password'>
             パスワード
           </label>
           <Input
@@ -84,9 +84,9 @@ export const LoginScreen = ({
 
         {errorMessage ? (
           <div className='rounded-8 border border-red-200 bg-red-50 px-4 py-3'>
-            <p className='text-oln-16B-100 text-red-1000'>{errorMessage}</p>
+            <p className='text-[16px] font-bold leading-none text-red-1000'>{errorMessage}</p>
             {!isLocked ? (
-              <p className='mt-1 text-oln-14N-100 text-red-900'>残り試行回数: {remainingAttempts} 回</p>
+              <p className='mt-1 text-[14px] font-normal leading-none text-red-900'>残り試行回数: {remainingAttempts} 回</p>
             ) : null}
           </div>
         ) : null}
@@ -97,8 +97,8 @@ export const LoginScreen = ({
       </form>
     </section>
 
-    <details className='group text-oln-14N-100 text-solid-gray-536'>
-      <summary className='cursor-pointer select-none text-oln-14B-100 text-solid-gray-700 hover:text-solid-gray-900'>
+    <details className='group text-[14px] font-normal leading-none text-solid-gray-536'>
+      <summary className='cursor-pointer select-none text-[14px] font-bold leading-none text-solid-gray-700 hover:text-solid-gray-900'>
         デモ利用者を使う
       </summary>
       <div className='mt-3 space-y-2'>
@@ -110,12 +110,12 @@ export const LoginScreen = ({
             type='button'
           >
             <div>
-              <p className='text-oln-16B-100 text-solid-gray-900'>{account.displayName}</p>
+              <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{account.displayName}</p>
               <p className='mt-1 text-mono-14N-150 text-solid-gray-536'>
                 {account.id} / {account.password}
               </p>
             </div>
-            <span className='text-oln-14N-100 text-solid-gray-700'>{account.role}</span>
+            <span className='text-[14px] font-normal leading-none text-solid-gray-700'>{account.role}</span>
           </button>
         ))}
       </div>

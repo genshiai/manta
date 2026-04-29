@@ -28,10 +28,10 @@ export const AppHeader = ({
   <header className='sticky top-0 z-30 border-b border-solid-gray-200 bg-white/95 backdrop-blur'>
     <div className='mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-4 py-3 lg:px-6'>
       <div className='flex items-center gap-2'>
-        <div className='grid h-8 w-8 place-items-center rounded-8 bg-blue-900 text-std-18B-160 text-white'>
+        <div className='grid h-8 w-8 place-items-center rounded-8 bg-blue-900 text-[18px] font-bold leading-snug text-white'>
           M
         </div>
-        <p className='text-std-20B-150 text-solid-gray-900'>Manta</p>
+        <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>Manta</p>
       </div>
 
       <nav className='hidden items-center gap-6 xl:flex'>
@@ -42,7 +42,7 @@ export const AppHeader = ({
             <button
               className={cn(
                 buttonBaseStyle,
-                'border-b-2 px-1 pb-3 pt-2 text-oln-16B-100 transition-colors',
+                'border-b-2 px-1 pb-3 pt-2 text-[16px] font-bold leading-none transition-colors',
                 isActive
                   ? 'border-blue-700 text-blue-900'
                   : 'border-transparent text-solid-gray-536 hover:text-solid-gray-900',

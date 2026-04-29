@@ -320,8 +320,8 @@ function App() {
       <div className='min-h-screen bg-[#F5F6FA] text-solid-gray-900'>
         <main className='mx-auto flex min-h-screen max-w-[720px] items-center px-4 py-8'>
           <section className='w-full rounded-8 border border-solid-gray-200 bg-white p-6'>
-            <p className='text-std-20B-150 text-solid-gray-900'>認証状態を確認しています。</p>
-            <p className='mt-2 text-oln-16N-100 text-solid-gray-700'>
+            <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>認証状態を確認しています。</p>
+            <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-700'>
               保存済みのセッションを検証中です。
             </p>
           </section>
@@ -398,7 +398,7 @@ function App() {
       ) : (
         <main className='mx-auto max-w-[1600px] px-4 py-8 lg:px-6'>
           <section className='rounded-8 border border-solid-gray-200 bg-white p-6'>
-            <p className='text-std-18B-160 text-solid-gray-900'>カルテ対象の患者が未選択です。</p>
+            <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>カルテ対象の患者が未選択です。</p>
           </section>
         </main>
       )}

@@ -18,13 +18,13 @@ export const SoapSection = ({
     <header className='flex items-center gap-4 border-b border-solid-gray-200 bg-white px-4 py-4 lg:px-6'>
       <span
         className={cn(
-          'grid h-11 w-11 place-items-center rounded-8 text-std-20B-150 text-white',
+          'grid h-11 w-11 place-items-center rounded-8 text-[20px] font-bold leading-snug text-white',
           accentClassName,
         )}
       >
         {label}
       </span>
-      <h2 className='text-std-18B-160 text-solid-gray-900'>{title}</h2>
+      <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>{title}</h2>
     </header>
     <div className='flex flex-col gap-4 p-4 lg:p-6'>{children}</div>
   </section>
