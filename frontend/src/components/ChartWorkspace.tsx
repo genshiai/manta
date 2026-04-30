@@ -44,9 +44,18 @@ import { PatientPane } from './chart/PatientPane';
 import { RecordPane } from './chart/RecordPane';
 import type { SoapDraft } from './chart/SoapEditor';
 
-type ChartView = 'history' | 'calendar' | 'labs' | 'imaging' | 'documents' | 'reservations' | 'search';
+type ChartView =
+  | 'chart'
+  | 'history'
+  | 'calendar'
+  | 'labs'
+  | 'imaging'
+  | 'documents'
+  | 'reservations'
+  | 'search';
 
 const chartTabs: Array<{ value: ChartView; label: string }> = [
+  { value: 'chart', label: '診療録' },
   { value: 'history', label: '履歴' },
   { value: 'calendar', label: 'カレンダー' },
   { value: 'labs', label: '検査' },
@@ -136,7 +145,7 @@ export function ChartWorkspace({
   const [prescriptionTimeline, setPrescriptionTimeline] = useState<PrescriptionTimelineGroup[]>(
     [],
   );
-  const [activeView, setActiveView] = useState<ChartView>('history');
+  const [activeView, setActiveView] = useState<ChartView>('chart');
 
   // SOAP & 保存状態
   const [draft, setDraft] = useState<SoapDraft>(emptyDraft);
@@ -600,6 +609,7 @@ export function ChartWorkspace({
           labLongTrends={labLongTrends}
           labOrders={labOrders}
           imagingOrders={imagingOrders}
+          procedureOrders={procedureOrders}
           reservationSlots={reservationSlots}
           workspaceError={workspaceError}
           isLoading={isLoading}

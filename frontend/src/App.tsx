@@ -317,7 +317,7 @@ function App() {
 
   if (isRestoringSession) {
     return (
-      <div className='min-h-screen bg-[#F5F6FA] text-solid-gray-900'>
+      <div className='min-h-screen bg-surface-page text-text-primary'>
         <main className='mx-auto flex min-h-screen max-w-[720px] items-center px-4 py-8'>
           <section className='w-full rounded-8 border border-solid-gray-200 bg-white p-6'>
             <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>認証状態を確認しています。</p>
@@ -332,7 +332,7 @@ function App() {
 
   if (!session || screen === 'login') {
     return (
-      <div className='min-h-screen bg-[#F5F6FA] text-solid-gray-900'>
+      <div className='min-h-screen bg-surface-page text-text-primary'>
         <LoginScreen
           accounts={demoUsers}
           errorMessage={loginError}
@@ -358,13 +358,14 @@ function App() {
   const isChartScreen = screen === 'chart' && Boolean(selectedPatient);
   const rootClassName = isChartScreen
     ? 'flex h-screen flex-col overflow-hidden bg-surface-page text-text-primary'
-    : 'min-h-screen bg-[#F5F6FA] text-solid-gray-900';
+    : 'min-h-screen bg-surface-page text-text-primary';
   const mainSlotClassName = isChartScreen ? 'min-h-0 flex-1 overflow-hidden' : '';
 
   return (
     <div className={rootClassName}>
       <AppHeader
         currentUser={session}
+        currentPatient={currentPatient}
         onNavigate={setScreen}
         onSearchChange={handleSearchChange}
         onSwitchUser={handleSwitchUser}

@@ -45,7 +45,7 @@ export const ChartTopBar = ({
       className="flex h-9 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
     >
       <ArrowLeft size={16} />
-      受付へ戻る
+      診療キュー
     </button>
 
     <div className="flex min-w-0 flex-1 items-center gap-3">

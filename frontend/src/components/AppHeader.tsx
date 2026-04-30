@@ -1,83 +1,107 @@
-import { Button, Input, buttonBaseStyle } from '../vendor/dads';
-import { SearchIcon } from './Icons';
-import { cn } from '../lib/cn';
+import { Command, PanelLeft, Search, Settings, Sparkles, Users } from 'lucide-react';
+import type { PatientRecord } from '../data/chartMock';
 import type { UserSession } from '../types/workflow';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 type AppHeaderProps = {
   screen: 'reception' | 'chart' | 'settings';
   searchQuery: string;
   currentUser: UserSession;
+  currentPatient?: PatientRecord | null;
   onSearchChange: (value: string) => void;
   onNavigate: (screen: 'reception' | 'settings') => void;
   onSwitchUser: () => void;
 };
 
-const navItems = [
-  { key: 'reception', label: '受付' },
-  { key: 'settings', label: '設定' },
-] as const;
+const screenLabel = {
+  reception: '本日の診療キュー',
+  chart: 'AIカルテ',
+  settings: '管理設定',
+} as const;
 
 export const AppHeader = ({
   screen,
   searchQuery,
   currentUser,
+  currentPatient,
   onSearchChange,
   onNavigate,
   onSwitchUser,
 }: AppHeaderProps) => (
-  <header className='sticky top-0 z-30 border-b border-solid-gray-200 bg-white/95 backdrop-blur'>
-    <div className='mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-4 py-3 lg:px-6'>
-      <div className='flex items-center gap-2'>
-        <div className='grid h-8 w-8 place-items-center rounded-8 bg-blue-900 text-[18px] font-bold leading-snug text-white'>
+  <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
+    <div className="flex h-14 items-center gap-3 px-4 lg:px-5">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="grid size-8 place-items-center rounded-md bg-primary text-[15px] font-bold text-primary-foreground">
           M
         </div>
-        <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>Manta</p>
+        <div className="min-w-0">
+          <p className="text-[14px] font-bold leading-tight text-text-primary">Manta</p>
+          <p className="truncate text-[11px] text-text-tertiary">{screenLabel[screen]}</p>
+        </div>
       </div>
 
-      <nav className='hidden items-center gap-6 xl:flex'>
-        {navItems.map((item) => {
-          const isActive = item.key === screen || (item.key === 'reception' && screen === 'chart');
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onNavigate('reception')}
+        className="ml-2 hidden shrink-0 gap-1.5 xl:inline-flex"
+      >
+        <PanelLeft size={15} />
+        診療キュー
+      </Button>
 
-          return (
-            <button
-              className={cn(
-                buttonBaseStyle,
-                'border-b-2 px-1 pb-3 pt-2 text-[16px] font-bold leading-none transition-colors',
-                isActive
-                  ? 'border-blue-700 text-blue-900'
-                  : 'border-transparent text-solid-gray-536 hover:text-solid-gray-900',
-              )}
-              key={item.key}
-              onClick={() => onNavigate(item.key)}
-              type='button'
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className='ml-auto flex flex-1 items-center justify-end gap-3'>
-        <div
-          className={cn(
-            'hidden min-w-[22rem] max-w-[28rem] flex-1 items-center lg:flex',
-            screen !== 'reception' && 'invisible',
-          )}
-        >
-          <div className='relative w-full'>
-            <SearchIcon className='pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-solid-gray-536' />
-            <Input
-              aria-label='患者検索'
-              blockSize='md'
-              className='w-full pl-12'
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder='患者ID・氏名・診療科・担当医で検索'
-              value={searchQuery}
-            />
-          </div>
+      {currentPatient ? (
+        <div className="hidden min-w-0 items-center gap-2 rounded-full border border-border bg-surface-subtle px-3 py-1.5 lg:flex">
+          <span className="grid size-6 place-items-center rounded-full bg-brand-tint text-[12px] font-bold text-brand">
+            {currentPatient.name.slice(0, 1)}
+          </span>
+          <span className="truncate text-[13px] font-bold text-text-primary">{currentPatient.name}</span>
+          <span className="text-[12px] text-text-tertiary">{currentPatient.id}</span>
         </div>
+      ) : null}
 
-        <Button onClick={onSwitchUser} size='xs' type='button' variant='outline'>
+      <div className="mx-auto hidden w-full max-w-2xl items-center md:flex">
+        <div className="relative w-full">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            aria-label="患者・カルテ横断検索"
+            className="h-9 rounded-full border-border bg-surface-subtle pl-9 pr-24 text-[13px]"
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="患者、診療録、検査、予約を検索"
+            value={searchQuery}
+          />
+          <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[11px] text-text-tertiary lg:flex">
+            <Command size={12} /> K
+          </span>
+        </div>
+      </div>
+
+      <div className="ml-auto flex items-center gap-2">
+        <div className="hidden items-center gap-1.5 rounded-full bg-brand-tint px-3 py-1.5 text-[12px] font-medium text-brand lg:inline-flex">
+          <Sparkles size={14} />
+          AI ready
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onNavigate('reception')}
+          title="本日の診療キュー"
+        >
+          <Users size={17} />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onNavigate('settings')}
+          title="管理設定"
+        >
+          <Settings size={17} />
+        </Button>
+        <Button onClick={onSwitchUser} size="sm" type="button" variant="outline">
           {currentUser.displayName}
         </Button>
       </div>

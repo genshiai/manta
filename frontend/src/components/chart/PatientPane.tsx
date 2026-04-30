@@ -68,9 +68,8 @@ const todayKey = () => {
   return `${now.getFullYear()}/${month}/${day}`;
 };
 
-const currentMonthDays = () => {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+const currentMonthDays = (monthDate = new Date()) => {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const start = new Date(first);
   start.setDate(first.getDate() - first.getDay());
   return Array.from({ length: 42 }, (_, index) => {
@@ -222,9 +221,12 @@ const MiniCalendar = ({
   events: Map<string, Set<'chart' | 'lab' | 'rx' | 'image'>>;
   onOpenCalendar: () => void;
 }) => {
-  const days = currentMonthDays();
-  const now = new Date();
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const days = currentMonthDays(visibleMonth);
   const selectedKey = todayKey();
+  const moveMonth = (delta: number) => {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  };
 
   return (
     <section className="flex-shrink-0 border-b border-border p-3">
@@ -232,13 +234,31 @@ const MiniCalendar = ({
         <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
           カレンダー
         </h3>
-        <button
-          type="button"
-          onClick={onOpenCalendar}
-          className="text-[11px] font-medium text-brand hover:text-brand-hover"
-        >
-          月表示
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => moveMonth(-1)}
+            className="text-[13px] font-bold text-text-tertiary hover:text-text-primary"
+            aria-label="前月"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => moveMonth(1)}
+            className="text-[13px] font-bold text-text-tertiary hover:text-text-primary"
+            aria-label="次月"
+          >
+            ›
+          </button>
+          <button
+            type="button"
+            onClick={onOpenCalendar}
+            className="text-[11px] font-medium text-brand hover:text-brand-hover"
+          >
+            月表示
+          </button>
+        </div>
       </div>
       <button
         type="button"
@@ -246,7 +266,7 @@ const MiniCalendar = ({
         className="w-full rounded-lg border border-border bg-card p-2 text-left"
       >
         <div className="mb-2 text-[12px] font-bold text-text-primary">
-          {now.getFullYear()}年 {now.getMonth() + 1}月
+          {visibleMonth.getFullYear()}年 {visibleMonth.getMonth() + 1}月
         </div>
         <div className="grid grid-cols-7 gap-1">
           {['日', '月', '火', '水', '木', '金', '土'].map((dow) => (
@@ -257,7 +277,7 @@ const MiniCalendar = ({
           {days.map((day) => {
             const key = dateKey(day);
             const dayEvents = events.get(key);
-            const muted = day.getMonth() !== now.getMonth();
+            const muted = day.getMonth() !== visibleMonth.getMonth();
             const selected = key === selectedKey;
             return (
               <div
@@ -287,7 +307,7 @@ const MiniCalendar = ({
         </div>
       </button>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <CalendarChip className="bg-brand" label="カルテ" />
+        <CalendarChip className="bg-brand" label="診療録" />
         <CalendarChip className="bg-success" label="検査" />
         <CalendarChip className="bg-warning" label="処方" />
         <CalendarChip className="bg-chart-3" label="画像" />

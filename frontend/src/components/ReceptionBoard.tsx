@@ -98,16 +98,16 @@ export const ReceptionBoard = ({
       <section className='flex flex-wrap items-end justify-between gap-4'>
         <div>
           <Heading size='28'>
-            <HeadingTitle level='h1'>受付患者一覧</HeadingTitle>
+            <HeadingTitle level='h1'>本日の診療キュー</HeadingTitle>
           </Heading>
           <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
-            患者をクリックするとカルテが開きます · 更新: {lastRefreshedAt}
+            患者をクリックするとAIカルテを開きます · 更新: {lastRefreshedAt}
           </p>
         </div>
         <div className='flex items-center gap-4 text-[14px] font-normal leading-none text-solid-gray-536'>
           <span>全{patients.length}</span>
           <span className='text-solid-gray-400'>·</span>
-          <span>診察待ち {waitingCount}</span>
+          <span>進行中 {waitingCount}</span>
           <span className='text-solid-gray-400'>·</span>
           <span>終了 {completedCount}</span>
         </div>

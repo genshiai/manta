@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo, useState } from 'react';
-import { ExternalLink, Plus, Search, X } from 'lucide-react';
+import { ExternalLink, Plus, Search, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
   Dialog,
@@ -68,14 +68,98 @@ export const OrderPane = ({
 }: OrderPaneProps) => {
   const [tab, setTab] = useState<OrderTab>('prescription');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
+    {
+      role: 'assistant',
+      text: '見えている診療録・検査・本日のキューを前提に質問できます。例:「今日の注意点」「検査異常を要約」',
+    },
+  ]);
 
   const openAddDialog = (nextTab: OrderTab) => {
     setTab(nextTab);
     setAddDialogOpen(true);
   };
 
+  const handleAskAi = (query = aiQuery) => {
+    const text = query.trim();
+    if (!text) return;
+    const abnormalLabCount = labOrders.filter((order) => order.urgency === '至急').length;
+    const answer = [
+      `処方 ${prescriptions.length}件、検査 ${labOrders.length}件、画像 ${imagingOrders.length}件、処置 ${procedureOrders.length}件が本日のキューにあります。`,
+      abnormalLabCount > 0
+        ? `至急検査が ${abnormalLabCount} 件あります。先に結果確認と患者説明を優先してください。`
+        : '至急検査は現在キューにありません。',
+      'AI連携APIは未接続のため、現時点では画面内データに基づくローカル要約として表示しています。',
+    ].join('\n');
+    setAiMessages((current) => [
+      ...current,
+      { role: 'user', text },
+      { role: 'assistant', text: answer },
+    ]);
+    setAiQuery('');
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <section className="border-b border-border bg-brand-tint/50 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="grid size-7 place-items-center rounded-full bg-brand text-white">
+            <Sparkles size={15} />
+          </span>
+          <div>
+            <h2 className="text-[14px] font-bold text-text-primary">AIエージェント</h2>
+            <p className="text-[11px] text-text-tertiary">この画面の文脈で質問</p>
+          </div>
+        </div>
+        <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+          {aiMessages.slice(-4).map((message, index) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: transient local chat
+              key={index}
+              className={`rounded-md px-3 py-2 text-[12px] leading-normal ${
+                message.role === 'assistant'
+                  ? 'bg-card text-text-secondary'
+                  : 'bg-brand text-white'
+              }`}
+            >
+              {message.text}
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={aiQuery}
+            onChange={(event) => setAiQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') handleAskAi();
+            }}
+            placeholder="AIに質問"
+            className="h-8 min-w-0 flex-1 rounded-full border border-border bg-card px-3 text-[12px] text-text-primary outline-none focus:ring-[3px] focus:ring-brand-focus-ring"
+          />
+          <button
+            type="button"
+            onClick={() => handleAskAi()}
+            className="grid size-8 place-items-center rounded-full bg-brand text-white hover:bg-brand-hover"
+            aria-label="AIに送信"
+          >
+            <Send size={13} />
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {['今日の注意点', '検査異常を要約', '次の一手'].map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              onClick={() => handleAskAi(prompt)}
+              className="rounded-full border border-border bg-card px-2 py-1 text-[11px] text-text-secondary hover:border-brand hover:text-brand"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="flex-shrink-0 border-b border-border p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-[14px] font-bold text-text-primary">本日のキュー</h2>

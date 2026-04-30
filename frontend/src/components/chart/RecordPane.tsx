@@ -12,13 +12,22 @@ import type {
   ImagingOrderEntry,
   LabLongTrendItem,
   LabResultEntry,
+  ProcedureOrderEntry,
   PrescriptionTimelineEntry,
   PrescriptionTimelineGroup,
   ReservationSlot,
   VitalEntry,
 } from '../../types/workflow';
 
-type ChartView = 'history' | 'calendar' | 'labs' | 'imaging' | 'documents' | 'reservations' | 'search';
+type ChartView =
+  | 'chart'
+  | 'history'
+  | 'calendar'
+  | 'labs'
+  | 'imaging'
+  | 'documents'
+  | 'reservations'
+  | 'search';
 
 type LabOrderRow = {
   category: string;
@@ -44,6 +53,7 @@ type RecordPaneProps = {
   labLongTrends: LabLongTrendItem[];
   labOrders: LabOrderRow[];
   imagingOrders: ImagingOrderEntry[];
+  procedureOrders: ProcedureOrderEntry[];
   reservationSlots: ReservationSlot[];
   workspaceError: string | null;
   isLoading: boolean;
@@ -56,6 +66,7 @@ type RecordPaneProps = {
 const DEPT_ALL = 'all';
 
 const viewTitle: Record<ChartView, string> = {
+  chart: '診療録',
   history: '履歴',
   calendar: 'カレンダー',
   labs: '検査',
@@ -73,9 +84,8 @@ const versionDate = (savedAt: string): string => {
 
 const normalizeDate = (date: string): string => date.replaceAll('-', '/');
 
-const currentMonthDays = () => {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+const currentMonthDays = (monthDate = new Date()) => {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const start = new Date(first);
   start.setDate(first.getDate() - first.getDay());
   return Array.from({ length: 42 }, (_, index) => {
@@ -90,6 +100,34 @@ const formatDateKey = (date: Date): string => {
   const day = `${date.getDate()}`.padStart(2, '0');
   return `${date.getFullYear()}/${month}/${day}`;
 };
+
+type TimelineKind = 'chart' | 'lab' | 'rx' | 'image' | 'procedure';
+
+const timelineKindLabel: Record<TimelineKind, string> = {
+  chart: '診療録',
+  lab: '検査',
+  rx: '処方',
+  image: '画像',
+  procedure: '処置',
+};
+
+const timelineKindClass: Record<TimelineKind, string> = {
+  chart: 'bg-brand',
+  lab: 'bg-success',
+  rx: 'bg-warning',
+  image: 'bg-chart-3',
+  procedure: 'bg-text-tertiary',
+};
+
+const demoLabTimeline = [
+  { date: '2026/04/30', item: 'HbA1c', result: '7.0%', baseline: '4.6-6.2', previous: '7.2%', flag: 'high' as const },
+  { date: '2026/04/30', item: 'eGFR', result: '68', baseline: '60-', previous: '71', flag: 'normal' as const },
+  { date: '2026/04/30', item: 'LDL-C', result: '118', baseline: '70-139', previous: '126', flag: 'normal' as const },
+  { date: '2026/04/24', item: 'AST', result: '42 H', baseline: '13-30', previous: '35', flag: 'high' as const },
+  { date: '2026/03/27', item: 'HbA1c', result: '7.2%', baseline: '4.6-6.2', previous: '7.4%', flag: 'high' as const },
+  { date: '2026/02/28', item: 'HbA1c', result: '7.4%', baseline: '4.6-6.2', previous: '7.5%', flag: 'high' as const },
+  { date: '2026/02/28', item: 'Cr', result: '0.91', baseline: '0.65-1.07', previous: '0.88', flag: 'normal' as const },
+];
 
 /**
  * 中央ペイン (WHAT・記録)
@@ -118,6 +156,7 @@ export const RecordPane = ({
   labLongTrends,
   labOrders,
   imagingOrders,
+  procedureOrders,
   reservationSlots,
   workspaceError,
   isLoading,
@@ -129,6 +168,9 @@ export const RecordPane = ({
   const [departmentFilter, setDepartmentFilter] = useState<string>(DEPT_ALL);
   const [todayRecordOpen, setTodayRecordOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [timelineKinds, setTimelineKinds] = useState<Set<TimelineKind>>(
+    () => new Set(['chart', 'lab', 'rx', 'image', 'procedure']),
+  );
 
   useEffect(() => {
     if (!patientId) return;
@@ -206,6 +248,64 @@ export const RecordPane = ({
     });
   }, [filteredVersions, searchQuery]);
 
+  const timelineItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      date: string;
+      kind: TimelineKind;
+      title: string;
+      body: string;
+    }> = [];
+    for (const version of versions) {
+      items.push({
+        id: `chart-${version.version}-${version.savedAt}`,
+        date: versionDate(version.savedAt),
+        kind: 'chart',
+        title: `診療録 v${version.version}`,
+        body: [version.subjective, version.assessment, version.plan].filter(Boolean).join(' / '),
+      });
+    }
+    for (const order of labOrders) {
+      items.push({
+        id: `lab-${order.category}-${order.createdAt ?? 'today'}`,
+        date: normalizeDate((order.createdAt ?? formatDateKey(new Date())).split(' ')[0] ?? ''),
+        kind: 'lab',
+        title: order.category,
+        body: order.items.join('・') || '検査項目未設定',
+      });
+    }
+    for (const group of prescriptionTimeline) {
+      items.push({
+        id: `rx-${group.date}`,
+        date: normalizeDate(group.date),
+        kind: 'rx',
+        title: `処方 ${group.itemCount}件`,
+        body: group.items.map((item) => item.drugName).join('、'),
+      });
+    }
+    for (const order of imagingOrders) {
+      items.push({
+        id: `image-${order.category}-${order.scheduledAt}`,
+        date: normalizeDate((order.scheduledAt || formatDateKey(new Date())).split(' ')[0] ?? ''),
+        kind: 'image',
+        title: order.category,
+        body: order.note || '画像オーダ',
+      });
+    }
+    for (const order of procedureOrders) {
+      items.push({
+        id: `procedure-${order.title}`,
+        date: formatDateKey(new Date()),
+        kind: 'procedure',
+        title: order.title,
+        body: order.note || (order.status === 'done' ? '完了' : '予定'),
+      });
+    }
+    return items
+      .filter((item) => timelineKinds.has(item.kind))
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [versions, labOrders, prescriptionTimeline, imagingOrders, procedureOrders, timelineKinds]);
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-page">
       {/* sticky ヘッダー */}
@@ -214,7 +314,7 @@ export const RecordPane = ({
           {viewTitle[view]}
         </h2>
         <div className="flex items-center gap-2">
-          {(view === 'history' || view === 'search') && departments.length > 0 ? (
+          {(view === 'chart' || view === 'search') && departments.length > 0 ? (
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
@@ -243,7 +343,7 @@ export const RecordPane = ({
             </p>
           ) : null}
 
-          {view === 'history' ? (
+          {view === 'chart' ? (
             <>
               <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-surface-page/95 py-4 backdrop-blur">
                 <Button variant="default" size="sm" onClick={() => setTodayRecordOpen(true)}>
@@ -297,6 +397,66 @@ export const RecordPane = ({
                 })
               )}
             </>
+          ) : null}
+
+          {view === 'history' ? (
+            <section className="py-5">
+              <div className="mb-4 flex flex-wrap gap-2">
+                {(Object.keys(timelineKindLabel) as TimelineKind[]).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => {
+                      setTimelineKinds((current) => {
+                        const next = new Set(current);
+                        if (next.has(kind)) {
+                          next.delete(kind);
+                        } else {
+                          next.add(kind);
+                        }
+                        return next.size === 0 ? current : next;
+                      });
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium ${
+                      timelineKinds.has(kind)
+                        ? 'border-brand bg-brand-tint text-brand'
+                        : 'border-border bg-card text-text-secondary'
+                    }`}
+                  >
+                    <span className={`size-2 rounded-full ${timelineKindClass[kind]}`} />
+                    {timelineKindLabel[kind]}
+                  </button>
+                ))}
+              </div>
+
+              {timelineItems.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border bg-card py-12 text-center text-[13px] text-text-tertiary">
+                  表示できる時系列イベントはありません
+                </p>
+              ) : (
+                <ol className="relative border-l border-border pl-5">
+                  {timelineItems.map((item) => (
+                    <li key={item.id} className="relative mb-4 rounded-lg border border-border bg-card p-4 last:mb-0">
+                      <span
+                        className={`absolute -left-[27px] top-5 size-3 rounded-full border-2 border-card ${timelineKindClass[item.kind]}`}
+                      />
+                      <div className="mb-1 flex items-baseline justify-between gap-3">
+                        <p className="text-[14px] font-bold text-text-primary">{item.title}</p>
+                        <span className="text-[12px] text-text-tertiary">{item.date}</span>
+                      </div>
+                      <p className="text-[12px] font-medium text-text-tertiary">
+                        {timelineKindLabel[item.kind]}
+                      </p>
+                      {item.body ? (
+                        <p className="mt-2 line-clamp-2 text-[13px] leading-normal text-text-secondary">
+                          {item.body}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
           ) : null}
 
           {view === 'calendar' ? (
@@ -395,16 +555,30 @@ const CalendarView = ({
 }: {
   eventsByDate: Map<string, Set<'chart' | 'lab' | 'rx' | 'image'>>;
 }) => {
-  const days = currentMonthDays();
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const days = currentMonthDays(visibleMonth);
   const todayKey = formatDateKey(new Date());
-  const monthLabel = `${new Date().getFullYear()}年 ${new Date().getMonth() + 1}月`;
+  const monthLabel = `${visibleMonth.getFullYear()}年 ${visibleMonth.getMonth() + 1}月`;
+  const moveMonth = (delta: number) => {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  };
 
   return (
     <section className="py-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-[20px] font-bold text-text-primary">{monthLabel}</h3>
-        <div className="flex gap-2 text-[11px] text-text-secondary">
-          <CalendarLegend className="bg-brand" label="カルテ" />
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="xs" onClick={() => moveMonth(-1)}>
+            前月
+          </Button>
+          <h3 className="min-w-32 text-center text-[20px] font-bold text-text-primary">
+            {monthLabel}
+          </h3>
+          <Button variant="ghost" size="xs" onClick={() => moveMonth(1)}>
+            次月
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[11px] text-text-secondary">
+          <CalendarLegend className="bg-brand" label="診療録" />
           <CalendarLegend className="bg-success" label="検査" />
           <CalendarLegend className="bg-warning" label="処方" />
           <CalendarLegend className="bg-chart-3" label="画像" />
@@ -423,7 +597,7 @@ const CalendarView = ({
           const key = formatDateKey(day);
           const events = eventsByDate.get(key);
           const isToday = key === todayKey;
-          const muted = day.getMonth() !== new Date().getMonth();
+          const muted = day.getMonth() !== visibleMonth.getMonth();
           return (
             <div
               key={key}
@@ -466,14 +640,64 @@ const LabsView = ({
 }: {
   results: LabResultEntry[];
   trends: LabLongTrendItem[];
-}) => (
-  <section className="py-5">
-    {results.length === 0 ? (
-      <p className="py-12 text-center text-[13px] text-text-tertiary">検査結果はありません</p>
-    ) : (
+}) => {
+  const timeline = results.length > 0
+    ? [
+        ...results.map((result) => ({
+          date: result.reportedAt ? normalizeDate(result.reportedAt.split(' ')[0] ?? '') : '2026/04/30',
+          item: result.item,
+          result: result.result,
+          baseline: result.baseline,
+          previous: result.previous,
+          flag: result.flag,
+        })),
+        ...demoLabTimeline,
+      ]
+    : demoLabTimeline;
+  const items = Array.from(new Set(timeline.map((row) => row.item))).sort();
+  const [selectedItem, setSelectedItem] = useState<string>('all');
+  const [abnormalOnly, setAbnormalOnly] = useState(false);
+  const filtered = timeline.filter((row) => {
+    if (selectedItem !== 'all' && row.item !== selectedItem) return false;
+    if (abnormalOnly && row.flag !== 'high') return false;
+    return true;
+  });
+
+  return (
+    <section className="py-5">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select
+          value={selectedItem}
+          onChange={(event) => setSelectedItem(event.target.value)}
+          className="h-9 rounded-full border border-border bg-card px-3 text-[13px] text-text-primary focus:outline-none focus:ring-[3px] focus:ring-brand-focus-ring"
+        >
+          <option value="all">全項目</option>
+          {items.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setAbnormalOnly((current) => !current)}
+          className={`h-9 rounded-full border px-3 text-[13px] font-medium ${
+            abnormalOnly
+              ? 'border-destructive bg-destructive-bg text-destructive'
+              : 'border-border bg-card text-text-secondary'
+          }`}
+        >
+          異常のみ
+        </button>
+        <span className="ml-auto text-[12px] text-text-tertiary">
+          ダミー時系列を含む {filtered.length} 件
+        </span>
+      </div>
+
       <table className="w-full overflow-hidden rounded-lg border border-border bg-card text-[13px]">
         <thead>
           <tr className="border-b border-border bg-surface-subtle text-[11px] uppercase tracking-wide text-text-tertiary">
+            <th className="px-3 py-2 text-left font-bold">日付</th>
             <th className="px-3 py-2 text-left font-bold">項目</th>
             <th className="px-3 py-2 text-right font-bold">値</th>
             <th className="px-3 py-2 text-right font-bold">基準</th>
@@ -481,8 +705,13 @@ const LabsView = ({
           </tr>
         </thead>
         <tbody>
-          {results.map((result) => (
-            <tr key={result.item} className="border-b border-border/60 last:border-b-0">
+          {filtered.map((result, index) => (
+            <tr
+              // biome-ignore lint/suspicious/noArrayIndexKey: static demo timeline fallback
+              key={`${result.date}-${result.item}-${index}`}
+              className="border-b border-border/60 last:border-b-0"
+            >
+              <td className="px-3 py-2.5 text-text-tertiary tabular-nums">{result.date}</td>
               <td className="px-3 py-2.5 text-text-primary">{result.item}</td>
               <td
                 className={`px-3 py-2.5 text-right tabular-nums ${
@@ -501,11 +730,14 @@ const LabsView = ({
           ))}
         </tbody>
       </table>
-    )}
 
-    {trends.length > 0 ? (
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {trends.map((trend) => (
+        {(trends.length > 0 ? trends : [
+          { item: 'HbA1c', latestValue: '7.0%', deltaLabel: '-0.2%', abnormalCount: 4 },
+          { item: 'eGFR', latestValue: '68', deltaLabel: '-3', abnormalCount: 0 },
+          { item: 'LDL-C', latestValue: '118', deltaLabel: '-8', abnormalCount: 0 },
+          { item: 'AST', latestValue: '42 H', deltaLabel: '+7', abnormalCount: 1 },
+        ]).map((trend) => (
           <div key={trend.item} className="rounded-lg border border-border bg-card p-4">
             <p className="truncate text-[13px] font-bold text-text-primary">{trend.item}</p>
             <p className="mt-1 text-[12px] text-text-tertiary">
@@ -515,9 +747,9 @@ const LabsView = ({
           </div>
         ))}
       </div>
-    ) : null}
-  </section>
-);
+    </section>
+  );
+};
 
 const OrderListView = ({
   title,
