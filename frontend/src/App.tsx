@@ -18,6 +18,7 @@ type DepartmentFilter = string | 'all';
 type SortKey = 'receptionNumber' | 'reservationTime' | 'elapsed';
 
 const sessionStorageKey = 'manta-session';
+const recentChartPatientsStorageKey = 'manta-recent-chart-patients';
 const sessionExpiredMessage = 'セッションの有効期限が切れました。再度ログインしてください。';
 const initialChartMeta: ChartMeta = {
   isDirty: false,
@@ -60,6 +61,9 @@ const readStoredSession = () => {
   return storedSession;
 };
 
+const readRecentChartPatients = () =>
+  readStorage<PatientRecord[]>(recentChartPatientsStorageKey, []);
+
 function App() {
   const [session, setSession] = useState<UserSession | null>(readStoredSession);
   const [screen, setScreen] = useState<Screen>(() =>
@@ -83,6 +87,7 @@ function App() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [chartMeta, setChartMeta] = useState<ChartMeta>(initialChartMeta);
   const [homeSettings, setHomeSettings] = useState<HomeSettings>(readHomeSettings);
+  const [recentChartPatients, setRecentChartPatients] = useState<PatientRecord[]>(readRecentChartPatients);
 
   const resetClientSession = useCallback((message?: string) => {
     setSession(null);
@@ -108,6 +113,10 @@ function App() {
   useEffect(() => {
     writeHomeSettings(homeSettings);
   }, [homeSettings]);
+
+  useEffect(() => {
+    writeStorage(recentChartPatientsStorageKey, recentChartPatients.slice(0, 8));
+  }, [recentChartPatients]);
 
   useEffect(() => {
     const storedSession = readStoredSession();
@@ -276,15 +285,33 @@ function App() {
     setLoginUserId('');
   };
 
-  const handleOpenChart = (patientId: string) => {
-    const patient = patients.find((item) => item.id === patientId);
+  const rememberChartPatient = (patient: PatientRecord) => {
+    setRecentChartPatients((current) => [
+      patient,
+      ...current.filter((item) => item.id !== patient.id),
+    ].slice(0, 8));
+  };
 
+  const handleOpenPatient = (patient: PatientRecord) => {
     if (!patient) {
       return;
     }
 
     setSelectedPatient(patient);
+    rememberChartPatient(patient);
     setScreen('chart');
+  };
+
+  const handleOpenChart = (patientId: string) => {
+    const patient =
+      patients.find((item) => item.id === patientId) ??
+      recentChartPatients.find((item) => item.id === patientId);
+
+    if (!patient) {
+      return;
+    }
+
+    handleOpenPatient(patient);
   };
 
   const handlePatientStatusChange = async (
@@ -407,13 +434,16 @@ function App() {
           />
         ) : selectedPatient ? (
           <ChartWorkspace
+            availablePatients={patients}
             currentUser={session}
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
             onDataChanged={() => setRefreshToken((current) => current + 1)}
             onMetaChange={setChartMeta}
+            onOpenPatient={handleOpenPatient}
             onPatientStatusChange={handlePatientStatusChange}
             onReturnReception={() => setScreen('reception')}
             patient={selectedPatient}
+            recentPatients={recentChartPatients}
           />
         ) : (
           <main className='mx-auto max-w-[1600px] px-4 py-8 lg:px-6'>

@@ -1,10 +1,13 @@
-import { ArrowLeft, FlaskConical, Save } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, ChevronDown, Clock3, FlaskConical, Save, Stethoscope, UsersRound } from 'lucide-react';
 import { Button } from '../ui/button';
 import type { PatientRecord } from '../../data/chartMock';
 import type { UserSession } from '../../types/workflow';
 
 type ChartTopBarProps = {
   patient: PatientRecord;
+  availablePatients: PatientRecord[];
+  recentPatients: PatientRecord[];
   currentUser: UserSession;
   isDirty: boolean;
   isMutating: boolean;
@@ -12,10 +15,62 @@ type ChartTopBarProps = {
   lastSavedAt: string | null;
   version: number;
   abnormalLabCount: number;
+  onOpenPatient: (patient: PatientRecord) => void;
   onSave: () => void;
   onReturnReception: () => void;
   onFinishVisit: () => void;
   onOpenLabs: () => void;
+};
+
+type PatientSwitchSection = {
+  title: string;
+  icon: typeof UsersRound;
+  patients: PatientRecord[];
+  emptyText: string;
+};
+
+const uniquePatients = (patients: PatientRecord[]) => {
+  const seen = new Set<string>();
+
+  return patients.filter((item) => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+
+    seen.add(item.id);
+    return true;
+  });
+};
+
+const PatientSwitchItem = ({
+  patient,
+  currentPatientId,
+  onSelect,
+}: {
+  patient: PatientRecord;
+  currentPatientId: string;
+  onSelect: (patient: PatientRecord) => void;
+}) => {
+  const isCurrent = patient.id === currentPatientId;
+
+  return (
+    <button
+      className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
+        isCurrent ? 'bg-brand-tint text-brand' : 'hover:bg-surface-subtle'
+      }`}
+      disabled={isCurrent}
+      onClick={() => onSelect(patient)}
+      type="button"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[13px] font-bold">{patient.name}</span>
+        <span className="shrink-0 text-[11px] text-text-tertiary">{isCurrent ? '表示中' : patient.status}</span>
+      </div>
+      <p className="mt-0.5 truncate text-[12px] text-text-tertiary">
+        {patient.age} {patient.sex} / {patient.department} ・ 担当: {patient.doctor}
+      </p>
+    </button>
+  );
 };
 
 /**
@@ -26,6 +81,8 @@ type ChartTopBarProps = {
  */
 export const ChartTopBar = ({
   patient,
+  availablePatients,
+  recentPatients,
   currentUser,
   isDirty,
   isMutating,
@@ -33,11 +90,56 @@ export const ChartTopBar = ({
   lastSavedAt,
   version,
   abnormalLabCount,
+  onOpenPatient,
   onSave,
   onReturnReception,
   onFinishVisit,
   onOpenLabs,
-}: ChartTopBarProps) => (
+}: ChartTopBarProps) => {
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const patientSections = useMemo<PatientSwitchSection[]>(() => {
+    const currentDepartmentPatients = availablePatients.filter(
+      (item) => item.department === currentUser.department && item.doctor !== currentUser.displayName,
+    );
+    const assignedPatients = availablePatients.filter((item) => item.doctor === currentUser.displayName);
+    const recentSwitchPatients = recentPatients.filter((item) => item.id !== patient.id);
+
+    return [
+      {
+        title: '担当患者',
+        icon: Stethoscope,
+        patients: uniquePatients(assignedPatients),
+        emptyText: '担当医が自分の患者はいません',
+      },
+      {
+        title: '同じ診療科',
+        icon: UsersRound,
+        patients: uniquePatients(currentDepartmentPatients).slice(0, 5),
+        emptyText: '同じ診療科の患者はいません',
+      },
+      {
+        title: '最近開いた患者',
+        icon: Clock3,
+        patients: uniquePatients(recentSwitchPatients).slice(0, 5),
+        emptyText: '最近開いた患者はまだありません',
+      },
+    ];
+  }, [availablePatients, currentUser.department, currentUser.displayName, patient.id, recentPatients]);
+
+  const handleSelectPatient = (nextPatient: PatientRecord) => {
+    if (nextPatient.id === patient.id) {
+      return;
+    }
+
+    if (isDirty && !window.confirm('未保存のカルテがあります。保存せずに患者を切り替えますか？')) {
+      return;
+    }
+
+    setSwitcherOpen(false);
+    onOpenPatient(nextPatient);
+  };
+
+  return (
   <div className="flex items-center gap-4 px-6 py-3">
     <button
       type="button"
@@ -48,23 +150,75 @@ export const ChartTopBar = ({
       ホーム
     </button>
 
-    <div className="flex min-w-0 flex-1 items-center gap-3">
-      <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-brand-tint text-[14px] font-bold text-brand">
-        {patient.name.slice(0, 1)}
-      </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-[16px] font-bold leading-snug text-text-primary">{patient.name}</p>
-          <span className="text-[13px] text-text-tertiary">
-            {patient.age} {patient.sex} / ID: {patient.id}
-          </span>
+    <div className="relative min-w-0 flex-1">
+      <button
+        className="flex min-w-0 max-w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-subtle"
+        onClick={() => setSwitcherOpen((current) => !current)}
+        type="button"
+      >
+        <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-brand-tint text-[14px] font-bold text-brand">
+          {patient.name.slice(0, 1)}
         </div>
-        <p className="text-[12px] text-text-tertiary">
-          {patient.department} ・ 担当: {patient.doctor} ・ v{version}
-          {lastSavedAt ? ` ・ 最終保存 ${lastSavedAt}` : ''}
-        </p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[16px] font-bold leading-snug text-text-primary">{patient.name}</p>
+            <span className="shrink-0 text-[13px] text-text-tertiary">
+              {patient.age} {patient.sex} / ID: {patient.id}
+            </span>
+          </div>
+          <p className="truncate text-[12px] text-text-tertiary">
+            {patient.department} ・ 担当: {patient.doctor} ・ v{version}
+            {lastSavedAt ? ` ・ 最終保存 ${lastSavedAt}` : ''}
+          </p>
+        </div>
+        <ChevronDown size={16} className="shrink-0 text-text-tertiary" />
+      </button>
+
+      {switcherOpen ? (
+        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[28rem] max-w-[calc(100vw-2rem)] rounded-8 border border-border bg-card p-3 shadow-lg">
+          <div className="mb-2 flex items-center justify-between gap-3 px-1">
+            <div>
+              <p className="text-[13px] font-bold text-text-primary">患者を切り替え</p>
+              <p className="mt-0.5 text-[12px] text-text-tertiary">担当患者、同じ診療科、最近開いた患者</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSwitcherOpen(false)}>
+              閉じる
+            </Button>
+          </div>
+
+          <div className="max-h-[32rem] space-y-3 overflow-y-auto">
+            {patientSections.map((section) => {
+              const Icon = section.icon;
+
+              return (
+                <section key={section.title}>
+                  <div className="mb-1 flex items-center gap-1.5 px-1 text-[12px] font-bold text-text-secondary">
+                    <Icon size={13} />
+                    {section.title}
+                  </div>
+                  <div className="space-y-1">
+                    {section.patients.length > 0 ? (
+                      section.patients.map((item) => (
+                        <PatientSwitchItem
+                          currentPatientId={patient.id}
+                          key={`${section.title}-${item.id}`}
+                          onSelect={handleSelectPatient}
+                          patient={item}
+                        />
+                      ))
+                    ) : (
+                      <p className="rounded-md bg-surface-subtle px-3 py-2 text-[12px] text-text-tertiary">
+                        {section.emptyText}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
       </div>
-    </div>
 
     <div className="flex items-center gap-3">
       <span
@@ -99,4 +253,5 @@ export const ChartTopBar = ({
       <span className="text-[12px] text-text-tertiary">{currentUser.displayName}</span>
     </div>
   </div>
-);
+  );
+};

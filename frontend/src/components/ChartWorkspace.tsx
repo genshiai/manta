@@ -67,9 +67,12 @@ const chartTabs: Array<{ value: ChartView; label: string }> = [
 
 type ChartWorkspaceProps = {
   patient: PatientRecord;
+  availablePatients: PatientRecord[];
+  recentPatients: PatientRecord[];
   currentUser: UserSession;
   onAuthExpired: () => void;
   onDataChanged: () => void;
+  onOpenPatient: (patient: PatientRecord) => void;
   onReturnReception: () => void;
   onMetaChange: (meta: ChartMeta) => void;
   onPatientStatusChange: (
@@ -121,9 +124,12 @@ const draftFromTemplate = (template: ChartTemplate): SoapDraft => ({
  */
 export function ChartWorkspace({
   patient,
+  availablePatients,
+  recentPatients,
   currentUser,
   onAuthExpired,
   onDataChanged,
+  onOpenPatient,
   onReturnReception,
   onMetaChange,
   onPatientStatusChange,
@@ -545,6 +551,8 @@ export function ChartWorkspace({
       topBar={
         <ChartTopBar
           patient={patient}
+          availablePatients={availablePatients}
+          recentPatients={recentPatients}
           currentUser={currentUser}
           isDirty={isDirty}
           isMutating={isMutating}
@@ -552,6 +560,7 @@ export function ChartWorkspace({
           lastSavedAt={lastSavedAt}
           version={version}
           abnormalLabCount={abnormalLabCount}
+          onOpenPatient={onOpenPatient}
           onSave={handleSave}
           onReturnReception={onReturnReception}
           onFinishVisit={handleFinishVisit}
