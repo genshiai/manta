@@ -5,6 +5,7 @@
 
   body {
     @apply bg-background text-foreground;
+    letter-spacing: -0.012em;
   }
 
   html {
@@ -63,6 +64,25 @@
 
   p {
     text-wrap: pretty;
+  }
+
+  /* Apple JP 仕様: サイズ別 letter-spacing
+   * 根拠: docs/design-reference/apple-jp-design.md セクション 3.5
+   */
+  :where(
+    .text-xs,
+    .text-sm,
+    [class*="text-[10px]"],
+    [class*="text-[11px]"],
+    [class*="text-[12px]"],
+    [class*="text-[13px]"],
+    [class*="text-[14px]"]
+  ) {
+    letter-spacing: normal;
+  }
+
+  :where(h1, h2, .text-2xl, .text-3xl, .text-4xl, .text-5xl) {
+    letter-spacing: -0.015em;
   }
 
   ::selection {
