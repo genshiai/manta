@@ -42,7 +42,7 @@ export const StatusFooter = ({ screen, currentPatient, chartMeta, currentUser }:
         ) : null}
       </div>
       <div className='flex flex-wrap items-center gap-3 text-solid-gray-700'>
-        <span>{currentPatient ? `${currentPatient.name} (${currentPatient.id})` : '患者未選択'}</span>
+        <span>{currentPatient ? `${currentPatient.name} · ID ${currentPatient.id}` : '患者未選択'}</span>
         {currentPatient?.department ? (
           <>
             <span className='text-solid-gray-400'>·</span>

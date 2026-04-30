@@ -58,7 +58,9 @@ export const AppHeader = ({
             {currentPatient.name.slice(0, 1)}
           </span>
           <span className="truncate text-[13px] font-bold text-text-primary">{currentPatient.name}</span>
-          <span className="text-[12px] text-text-tertiary">{currentPatient.id}</span>
+          <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            ID {currentPatient.id}
+          </span>
         </div>
       ) : null}
 

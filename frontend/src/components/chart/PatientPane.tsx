@@ -350,8 +350,13 @@ const BasicTab = ({
       <section className="space-y-2">
         <div>
           <p className="text-[18px] font-bold leading-snug text-text-primary">{patient.name}</p>
-          <p className="text-[13px] text-text-tertiary">
-            {patient.age} {patient.sex} ・ ID: {patient.id}
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-text-tertiary">
+            <span>
+              {patient.age} {patient.sex}
+            </span>
+            <span className="rounded-full border border-border bg-surface-subtle px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+              ID {patient.id}
+            </span>
           </p>
         </div>
         {patient.alerts.length > 0 ? (

@@ -44,7 +44,7 @@ export const homeProfileConfigs: Record<HomeProfile, HomeProfileConfig> = {
   },
   er: {
     label: '救急',
-    description: '到着時刻、トリアージ、滞在時間を優先する救急向け構成です。',
+    description: '到着時刻、緊急度、滞在時間を優先する救急向け構成です。',
     defaultView: 'emergency',
     views: ['emergency', 'outpatient', 'inpatient'],
   },

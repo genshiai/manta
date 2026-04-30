@@ -4,6 +4,9 @@ import { Button } from '../ui/button';
 import type { PatientRecord } from '../../data/chartMock';
 import type { UserSession } from '../../types/workflow';
 
+const pressableTopBarClassName =
+  'cursor-pointer transition-[background-color,border-color,box-shadow,transform,color] duration-150 ease-out hover:-translate-y-px hover:shadow-sm active:translate-y-0 active:shadow-none';
+
 type ChartTopBarProps = {
   patient: PatientRecord;
   availablePatients: PatientRecord[];
@@ -55,8 +58,8 @@ const PatientSwitchItem = ({
 
   return (
     <button
-      className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
-        isCurrent ? 'bg-brand-tint text-brand' : 'hover:bg-surface-subtle'
+      className={`w-full rounded-md px-3 py-2 text-left ${
+        isCurrent ? 'cursor-default bg-brand-tint text-brand' : `${pressableTopBarClassName} hover:bg-surface-subtle`
       }`}
       disabled={isCurrent}
       onClick={() => onSelect(patient)}
@@ -144,7 +147,7 @@ export const ChartTopBar = ({
     <button
       type="button"
       onClick={onReturnReception}
-      className="flex h-9 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
+      className={`${pressableTopBarClassName} flex h-9 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary`}
     >
       <ArrowLeft size={16} />
       ホーム
@@ -152,7 +155,7 @@ export const ChartTopBar = ({
 
     <div className="relative min-w-0 flex-1">
       <button
-        className="flex min-w-0 max-w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-subtle"
+        className={`${pressableTopBarClassName} flex min-w-0 max-w-full items-center gap-3 rounded-md border border-transparent px-2 py-1.5 text-left hover:border-border hover:bg-surface-subtle`}
         onClick={() => setSwitcherOpen((current) => !current)}
         type="button"
       >
@@ -163,7 +166,10 @@ export const ChartTopBar = ({
           <div className="flex items-center gap-2">
             <p className="truncate text-[16px] font-bold leading-snug text-text-primary">{patient.name}</p>
             <span className="shrink-0 text-[13px] text-text-tertiary">
-              {patient.age} {patient.sex} / ID: {patient.id}
+              {patient.age} {patient.sex}
+            </span>
+            <span className="shrink-0 rounded-full border border-border bg-surface-subtle px-2 py-0.5 text-[12px] font-medium text-text-secondary">
+              ID {patient.id}
             </span>
           </div>
           <p className="truncate text-[12px] text-text-tertiary">

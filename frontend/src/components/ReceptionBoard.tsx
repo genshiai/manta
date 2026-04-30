@@ -44,6 +44,10 @@ type ReceptionBoardProps = {
 const surfaceClassName = 'rounded-8 border border-solid-gray-200 bg-white';
 const savedSearchKey = 'manta-reception-saved-searches';
 const worklistGridClassName = 'lg:grid-cols-[7.5rem_minmax(12rem,1.35fr)_10rem_8.5rem_minmax(9rem,1fr)_7rem]';
+const pressableControlClassName =
+  'cursor-pointer transition-[background-color,border-color,box-shadow,transform,color] duration-150 ease-out hover:-translate-y-px hover:border-blue-300 hover:shadow-sm active:translate-y-0 active:shadow-none';
+const pressableRowClassName =
+  'cursor-pointer transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px hover:bg-solid-gray-50 hover:shadow-sm active:translate-y-0 active:shadow-none';
 
 type SavedReceptionSearch = {
   id: string;
@@ -80,7 +84,7 @@ const badgeToneClasses: Record<BadgeTone, string> = {
 
 const wardLocations = ['5東 512', '3西 318', 'ICU 02', '6南 607'];
 const wardTeams = ['内科Aチーム', '皮膚科', '循環器チーム', '内科Bチーム'];
-const emergencyTriage = ['黄', '緑', '黄', '緑'];
+const emergencySeverity = ['中等症', '軽症', '中等症', '軽症'];
 const emergencyChiefComplaints = ['胸部圧迫感', '血糖高値', '皮疹増悪', '咳嗽'];
 
 const WorkBadge = ({
@@ -258,7 +262,7 @@ export const ReceptionBoard = ({
     activeView === 'inpatient'
       ? ['病棟/病室', '患者', '主治医/チーム', '入院日数', '未読', '指示/文書']
       : activeView === 'emergency'
-        ? ['到着', 'トリアージ', '患者', '主訴', '状態', '滞在']
+        ? ['到着', '緊急度', '患者', '主訴', '状態', '滞在']
         : isClinicProfile
           ? ['時刻', '患者', '年齢/性別', '状態', '検査', 'メモ']
           : ['時刻', '患者', '診療科/担当', '状態', '検査/文書', 'メモ'];
@@ -342,7 +346,7 @@ export const ReceptionBoard = ({
     const wardLocation = wardLocations[index % wardLocations.length];
     const wardTeam = wardTeams[index % wardTeams.length];
     const stayDays = `${index + 3}日目`;
-    const triage = emergencyTriage[index % emergencyTriage.length];
+    const severity = emergencySeverity[index % emergencySeverity.length];
     const chiefComplaint = emergencyChiefComplaints[index % emergencyChiefComplaints.length];
 
     if (activeView === 'inpatient') {
@@ -369,7 +373,7 @@ export const ReceptionBoard = ({
             <p className='mt-1 text-[12px] text-solid-gray-536'>到着</p>
           </div>
           <div>
-            <WorkBadge icon={Siren} label={`トリアージ${triage}`} tone={triage === '黄' ? 'progress' : 'done'} />
+            <WorkBadge icon={Siren} label={`緊急度 ${severity}`} tone={severity === '中等症' ? 'progress' : 'done'} />
           </div>
           {renderPatientIdentity(patient)}
           <div className='text-[14px] leading-normal text-solid-gray-700'>{chiefComplaint}</div>
@@ -434,11 +438,13 @@ export const ReceptionBoard = ({
                     <button
                       className={cn(
                         buttonBaseStyle,
-                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-bold leading-none transition-colors',
+                        pressableControlClassName,
+                        'flex items-center gap-1.5 rounded-md border border-transparent px-3 py-1.5 text-[13px] font-bold leading-none',
                         activeView === view
                           ? 'bg-white text-blue-900 shadow-sm'
                           : 'text-solid-gray-700 hover:text-solid-gray-900',
                       )}
+                      aria-pressed={activeView === view}
                       key={view}
                       onClick={() => setActiveView(view)}
                       type='button'
@@ -451,7 +457,7 @@ export const ReceptionBoard = ({
                 })}
               </div>
             ) : (
-              <span className='inline-flex items-center gap-1.5 rounded-md border border-solid-gray-200 bg-solid-gray-50 px-3 py-2 text-[13px] font-bold text-solid-gray-800'>
+              <span className='inline-flex cursor-default select-none items-center gap-1.5 rounded-md border border-solid-gray-200 bg-solid-gray-50 px-3 py-2 text-[13px] font-bold text-solid-gray-800'>
                 {(() => {
                   const Icon = viewIconMap[activeView];
                   return <Icon size={14} />;
@@ -468,11 +474,13 @@ export const ReceptionBoard = ({
                 <button
                   className={cn(
                     buttonBaseStyle,
-                    'rounded-md px-3 py-1.5 text-[13px] font-bold leading-none transition-colors',
+                    pressableControlClassName,
+                    'rounded-md border border-transparent px-3 py-1.5 text-[13px] font-bold leading-none',
                     workScope === scope.value
                       ? 'bg-white text-blue-900 shadow-sm'
                       : 'text-solid-gray-700 hover:text-solid-gray-900',
                   )}
+                  aria-pressed={workScope === scope.value}
                   key={scope.value}
                   onClick={() => setWorkScope(scope.value)}
                   type='button'
@@ -485,11 +493,13 @@ export const ReceptionBoard = ({
             <button
               className={cn(
                 buttonBaseStyle,
-                'flex items-center gap-1.5 rounded-8 border px-3 py-2 text-[13px] font-bold leading-none transition-colors',
+                pressableControlClassName,
+                'flex items-center gap-1.5 rounded-8 border px-3 py-2 text-[13px] font-bold leading-none',
                 pendingOnly
                   ? 'border-blue-900 bg-blue-50 text-blue-900'
                   : 'border-solid-gray-200 bg-white text-solid-gray-700 hover:bg-solid-gray-50',
               )}
+              aria-pressed={pendingOnly}
               onClick={() => setPendingOnly((current) => !current)}
               type='button'
             >
@@ -632,7 +642,8 @@ export const ReceptionBoard = ({
             <button
               className={cn(
                 buttonBaseStyle,
-                'grid w-full gap-3 px-5 py-3 text-left transition-colors hover:bg-solid-gray-50 lg:px-6',
+                pressableRowClassName,
+                'grid w-full gap-3 px-5 py-3 text-left lg:px-6',
                 worklistGridClassName,
               )}
               key={patient.id}
@@ -686,7 +697,7 @@ export const ReceptionBoard = ({
             <div className='space-y-2'>
               {patients.slice(0, 3).map((patient) => (
                 <button
-                  className='w-full rounded-md border border-border bg-surface-subtle px-3 py-2 text-left hover:border-brand'
+                  className='w-full cursor-pointer rounded-md border border-border bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px hover:border-brand hover:bg-white hover:shadow-sm active:translate-y-0 active:shadow-none'
                   key={patient.id}
                   onClick={() => onOpenChart(patient.id)}
                   type='button'
