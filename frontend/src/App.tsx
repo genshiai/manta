@@ -8,6 +8,7 @@ import { StatusFooter } from './components/StatusFooter';
 import type { PatientRecord, ReceptionStatus } from './data/chartMock';
 import { demoUsers } from './data/workflowMock';
 import { getCurrentSession, isUnauthorizedError, listPatients, login, updatePatientStatus } from './lib/api';
+import { type HomeSettings, readHomeSettings, writeHomeSettings } from './lib/homeSettings';
 import { removeStorage, readStorage, writeStorage } from './lib/storage';
 import type { ChartMeta, UserSession } from './types/workflow';
 
@@ -81,6 +82,7 @@ function App() {
   const [patientsError, setPatientsError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [chartMeta, setChartMeta] = useState<ChartMeta>(initialChartMeta);
+  const [homeSettings, setHomeSettings] = useState<HomeSettings>(readHomeSettings);
 
   const resetClientSession = useCallback((message?: string) => {
     setSession(null);
@@ -102,6 +104,10 @@ function App() {
 
     removeStorage(sessionStorageKey);
   }, [session]);
+
+  useEffect(() => {
+    writeHomeSettings(homeSettings);
+  }, [homeSettings]);
 
   useEffect(() => {
     const storedSession = readStoredSession();
@@ -377,12 +383,16 @@ function App() {
         {screen === 'settings' ? (
           <SettingsWorkspace
             currentUser={session}
+            homeSettings={homeSettings}
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+            onHomeSettingsChange={setHomeSettings}
           />
         ) : screen === 'reception' ? (
           <ReceptionBoard
+            currentUser={session}
             departmentFilter={departmentFilter}
             errorMessage={patientsError}
+            homeSettings={homeSettings}
             isLoading={patientsLoading}
             lastRefreshedAt={lastRefreshedAt}
             onDepartmentFilterChange={handleDepartmentFilterChange}

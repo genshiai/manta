@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, ClipboardList, FileText, Search, Stethoscope } from 'lucide-react';
+import { Building2, ClipboardCheck, FileText, History, Siren, Stethoscope, UserRound } from 'lucide-react';
 import { Button, ChipLabel, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
 import { departmentOptions, isVisitClosed, receptionStatusColor, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
 import { cn } from '../lib/cn';
+import { type HomeSettings, type HomeView, homeProfileConfigs, homeViewLabels } from '../lib/homeSettings';
 import { readStorage, writeStorage } from '../lib/storage';
+import type { UserSession } from '../types/workflow';
 
 type ReceptionBoardProps = {
+  currentUser: UserSession;
+  homeSettings: HomeSettings;
   patients: PatientRecord[];
   searchQuery: string;
   statusFilter: ReceptionStatus | 'all';
@@ -23,6 +27,7 @@ type ReceptionBoardProps = {
 
 const surfaceClassName = 'rounded-8 border border-solid-gray-200 bg-white';
 const savedSearchKey = 'manta-reception-saved-searches';
+const worklistGridClassName = 'lg:grid-cols-[7.5rem_minmax(12rem,1.35fr)_10rem_8.5rem_minmax(9rem,1fr)_7rem]';
 
 type SavedReceptionSearch = {
   id: string;
@@ -32,15 +37,19 @@ type SavedReceptionSearch = {
   departmentFilter: string | 'all';
 };
 
-const SidebarItem = ({
-  title,
-  meta,
-  body,
-}: {
-  title: string;
-  meta: string;
-  body: string;
-}) => (
+const pendingTypeColor: Record<string, 'yellow' | 'red' | 'blue' | 'gray'> = {
+  検査結果: 'yellow',
+  再開待ち: 'red',
+  患者照合: 'blue',
+  確認なし: 'gray',
+};
+
+const wardLocations = ['5東 512', '3西 318', 'ICU 02', '6南 607'];
+const wardTeams = ['内科Aチーム', '皮膚科', '循環器チーム', '内科Bチーム'];
+const emergencyTriage = ['黄', '緑', '黄', '緑'];
+const emergencyChiefComplaints = ['胸部圧迫感', '血糖高値', '皮疹増悪', '咳嗽'];
+
+const SidebarItem = ({ title, meta, body }: { title: string; meta: string; body: string }) => (
   <div className='rounded-md border border-border bg-surface-subtle px-3 py-2.5'>
     <div className='flex items-baseline justify-between gap-2'>
       <p className='truncate text-[13px] font-bold text-text-primary'>{title}</p>
@@ -51,6 +60,8 @@ const SidebarItem = ({
 );
 
 export const ReceptionBoard = ({
+  currentUser,
+  homeSettings,
   patients,
   searchQuery,
   statusFilter,
@@ -70,29 +81,44 @@ export const ReceptionBoard = ({
   const resultReviewCount = patients.filter((patient) =>
     patient.labProgress === '結果到着' || patient.labProgress === '一部結果'
   ).length;
-  const statusListItems = [
-    {
-      title: '検体結果参照',
-      meta: `${resultReviewCount}件`,
-      body: '結果到着・一部結果の患者を確認します。',
-    },
-    {
-      title: '文書作成状況',
-      meta: '確認',
-      body: '診断書・紹介状など、カルテ内文書の登録状況を確認します。',
-    },
-    {
-      title: '予約確認',
-      meta: '本日',
-      body: '予約時間と来院状態を患者一覧と照合します。',
-    },
-  ];
-  const homeEntrypoints = [
-    { label: '患者検索', description: 'ID・氏名・カナでカルテを探す', icon: Search },
-    { label: '患者一覧', description: '本日の外来患者を開く', icon: Stethoscope },
-    { label: '予約簿', description: '時間帯ごとの予約を確認', icon: CalendarDays },
-    { label: '状況一覧', description: '検査・文書・オーダの状態を確認', icon: ClipboardList },
-  ];
+  const sameNameReviewCount = patients.filter((patient) => patient.sameNameDuplicateCount > 1).length;
+  const interruptedCount = patients.filter((patient) => patient.status === '診察一時中断').length;
+  const profileConfig = homeProfileConfigs[homeSettings.profile];
+  const [activeView, setActiveView] = useState<HomeView>(homeSettings.defaultView);
+  const pendingItems = [
+    resultReviewCount > 0
+      ? {
+          type: '検査',
+          title: '未読検査結果',
+          meta: `${resultReviewCount}件`,
+          body: '結果到着・一部結果の患者を確認します。',
+        }
+      : null,
+    interruptedCount > 0
+      ? {
+          type: '中断',
+          title: '診察一時中断',
+          meta: `${interruptedCount}件`,
+          body: '中断中の診療を再開または引き継ぎます。',
+        }
+      : null,
+    sameNameReviewCount > 0
+      ? {
+          type: '照合',
+          title: '同姓同名確認',
+          meta: `${sameNameReviewCount}名`,
+          body: '患者取り違え防止のため、ID と生年月日を確認します。',
+        }
+      : null,
+  ].filter((item): item is { type: string; title: string; meta: string; body: string } => Boolean(item));
+  const viewIconMap = {
+    outpatient: Stethoscope,
+    inpatient: Building2,
+    emergency: Siren,
+    personal: UserRound,
+    pending: ClipboardCheck,
+    recent: History,
+  };
   const [savedSearches, setSavedSearches] = useState<SavedReceptionSearch[]>([]);
 
   useEffect(() => {
@@ -100,8 +126,63 @@ export const ReceptionBoard = ({
   }, []);
 
   useEffect(() => {
+    setActiveView(profileConfig.views.includes(homeSettings.defaultView) ? homeSettings.defaultView : profileConfig.defaultView);
+  }, [homeSettings.defaultView, profileConfig.defaultView, profileConfig.views]);
+
+  useEffect(() => {
     writeStorage(savedSearchKey, savedSearches);
   }, [savedSearches]);
+
+  const personalPatients = patients.filter(
+    (patient) => patient.doctor === currentUser.displayName || patient.department === currentUser.department,
+  );
+  const pendingPatients = patients.filter(
+    (patient) =>
+      patient.labProgress === '結果到着' ||
+      patient.labProgress === '一部結果' ||
+      patient.status === '診察一時中断' ||
+      patient.sameNameDuplicateCount > 1,
+  );
+  const activePatients = (() => {
+    if (activeView === 'personal') {
+      return personalPatients.length > 0 ? personalPatients : patients;
+    }
+    if (activeView === 'pending') {
+      return pendingPatients;
+    }
+    if (activeView === 'recent') {
+      return patients.slice(0, 3);
+    }
+    if (activeView === 'emergency') {
+      return patients.slice(0, 3);
+    }
+
+    return patients;
+  })();
+  const viewCounts: Record<HomeView, number> = {
+    outpatient: patients.length,
+    inpatient: patients.length,
+    emergency: Math.min(3, patients.length),
+    personal: personalPatients.length > 0 ? personalPatients.length : patients.length,
+    pending: pendingPatients.length,
+    recent: Math.min(3, patients.length),
+  };
+  const isOutpatientView = activeView === 'outpatient';
+  const isClinicProfile = homeSettings.profile === 'clinic';
+  const headerLabels =
+    activeView === 'inpatient'
+      ? ['病棟/病室', '患者', '主治医/チーム', '入院日数', '未読', '指示/文書']
+      : activeView === 'emergency'
+        ? ['到着', 'トリアージ', '患者', '主訴', '状態', '滞在']
+        : activeView === 'personal'
+          ? ['区分', '患者', '場所/科', '未処理', '最新メモ', '状態']
+          : activeView === 'pending'
+            ? ['種別', '患者', '場所/科', '未処理', '確認内容', '状態']
+            : activeView === 'recent'
+              ? ['最終表示', '患者', '場所/科', '最近の文脈', '検査', '状態']
+              : isClinicProfile
+                ? ['時刻', '患者', '年齢/性別', '状態', '検査', 'メモ']
+                : ['時刻', '患者', '診療科/担当', '状態', '検査/文書', 'メモ'];
 
   const createSearchLabel = () => {
     const parts = [
@@ -138,6 +219,143 @@ export const ReceptionBoard = ({
     setSavedSearches((current) => current.filter((item) => item.id !== savedSearchId));
   };
 
+  const renderPatientIdentity = (patient: PatientRecord) => (
+    <div className='min-w-0'>
+      <div className='flex flex-wrap items-center gap-2'>
+        <span className='text-[16px] font-bold leading-snug text-solid-gray-900'>{patient.name}</span>
+        <span className='text-mono-14N-150 text-solid-gray-536'>{patient.id}</span>
+        {patient.sameNameDuplicateCount > 1 ? (
+          <ChipLabel color='yellow' variant='filled-outline'>
+            同姓同名
+          </ChipLabel>
+        ) : null}
+      </div>
+      {patient.alerts.length > 0 ? (
+        <div className='mt-1 flex flex-wrap gap-2'>
+          {patient.alerts.slice(0, 2).map((alert) => (
+            <ChipLabel color={alert.color} key={alert.label} variant='filled-outline'>
+              {alert.label}
+            </ChipLabel>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const renderPatientCells = (patient: PatientRecord, index: number) => {
+    const wardLocation = wardLocations[index % wardLocations.length];
+    const wardTeam = wardTeams[index % wardTeams.length];
+    const stayDays = `${index + 3}日目`;
+    const triage = emergencyTriage[index % emergencyTriage.length];
+    const chiefComplaint = emergencyChiefComplaints[index % emergencyChiefComplaints.length];
+    const pendingLabel =
+      patient.labProgress === '結果到着' || patient.labProgress === '一部結果'
+        ? '検査結果'
+        : patient.sameNameDuplicateCount > 1
+          ? '患者照合'
+          : patient.status === '診察一時中断'
+            ? '再開待ち'
+            : '確認なし';
+
+    if (activeView === 'inpatient') {
+      return (
+        <>
+          <div className='text-[15px] font-bold leading-snug text-solid-gray-900'>{wardLocation}</div>
+          {renderPatientIdentity(patient)}
+          <div>
+            <p className='text-[14px] font-bold leading-snug text-solid-gray-900'>{patient.doctor}</p>
+            <p className='mt-1 text-[12px] text-solid-gray-536'>{wardTeam}</p>
+          </div>
+          <div className='text-[14px] font-bold text-solid-gray-900'>{stayDays}</div>
+          <div>
+            <ChipLabel color={patient.labProgress === '未依頼' ? 'gray' : 'yellow'} variant='filled-outline'>
+              {patient.labProgress === '未依頼' ? '未読なし' : patient.labProgress}
+            </ChipLabel>
+          </div>
+          <div className='text-[13px] leading-normal text-solid-gray-700'>指示確認 / 文書確認</div>
+        </>
+      );
+    }
+
+    if (activeView === 'emergency') {
+      return (
+        <>
+          <div>
+            <p className='text-mono-14B-150 text-solid-gray-900'>{patient.receptionTime}</p>
+            <p className='mt-1 text-[12px] text-solid-gray-536'>到着</p>
+          </div>
+          <div>
+            <ChipLabel color={triage === '黄' ? 'yellow' : 'green'} variant='filled-outline'>
+              {triage}
+            </ChipLabel>
+          </div>
+          {renderPatientIdentity(patient)}
+          <div className='text-[14px] leading-normal text-solid-gray-700'>{chiefComplaint}</div>
+          <div>
+            <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
+              {patient.status}
+            </ChipLabel>
+          </div>
+          <div className='text-[15px] font-bold text-solid-gray-900'>{patient.elapsed}</div>
+        </>
+      );
+    }
+
+    if (activeView === 'personal' || activeView === 'pending' || activeView === 'recent') {
+      return (
+        <>
+          <div className='text-[14px] font-bold leading-snug text-solid-gray-900'>
+            {activeView === 'recent' ? patient.elapsed : patient.department}
+          </div>
+          {renderPatientIdentity(patient)}
+          <div>
+            <p className='text-[14px] font-bold leading-snug text-solid-gray-900'>{patient.department}</p>
+            <p className='mt-1 text-[12px] text-solid-gray-536'>{patient.doctor}</p>
+          </div>
+          <div>
+            <ChipLabel color={pendingTypeColor[pendingLabel] ?? 'gray'} variant='filled-outline'>
+              {pendingLabel}
+            </ChipLabel>
+          </div>
+          <div className='line-clamp-2 text-[13px] leading-normal text-solid-gray-700'>{patient.comment}</div>
+          <div>
+            <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
+              {patient.status}
+            </ChipLabel>
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div>
+          <p className='text-mono-14B-150 text-solid-gray-900'>{patient.reservationTime}</p>
+          <p className='mt-1 text-mono-14N-150 text-solid-gray-536'>{patient.receptionTime}</p>
+        </div>
+        {renderPatientIdentity(patient)}
+        <div>
+          <p className='text-[14px] font-bold leading-snug text-solid-gray-900'>
+            {isClinicProfile ? `${patient.age} / ${patient.sex}` : patient.department}
+          </p>
+          <p className='mt-1 text-[12px] text-solid-gray-536'>{isClinicProfile ? patient.department : patient.doctor}</p>
+        </div>
+        <div>
+          <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
+            {patient.status}
+          </ChipLabel>
+        </div>
+        <div>
+          <ChipLabel color={patient.labProgress === '未依頼' ? 'gray' : 'yellow'} variant='filled-outline'>
+            {patient.labProgress}
+          </ChipLabel>
+          {!isClinicProfile ? <p className='mt-1 text-[12px] text-solid-gray-536'>文書確認</p> : null}
+        </div>
+        <div className='line-clamp-2 text-[13px] leading-normal text-solid-gray-700'>{patient.comment}</div>
+      </>
+    );
+  };
+
   return (
     <div className='mx-auto w-full max-w-[1280px] space-y-5 px-4 py-6 lg:px-6'>
       <section className='flex flex-wrap items-end justify-between gap-4'>
@@ -146,7 +364,7 @@ export const ReceptionBoard = ({
             <HeadingTitle level='h1'>ホーム</HeadingTitle>
           </Heading>
           <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
-            患者一覧からカルテを開き、検査・文書・予約の状況を確認します · 更新: {lastRefreshedAt}
+            {profileConfig.label} · {homeViewLabels[activeView]}ワークリスト · 更新: {lastRefreshedAt}
           </p>
         </div>
         <div className='flex items-center gap-4 text-[14px] font-normal leading-none text-solid-gray-536'>
@@ -158,17 +376,42 @@ export const ReceptionBoard = ({
         </div>
       </section>
 
+      <section className='flex flex-wrap gap-2'>
+        {profileConfig.views.map((view) => {
+          const Icon = viewIconMap[view];
+          return (
+            <button
+              className={cn(
+                buttonBaseStyle,
+                'flex items-center gap-2 rounded-8 border px-3 py-2 text-[14px] font-bold leading-none transition-colors',
+                activeView === view
+                  ? 'border-blue-900 bg-blue-50 text-blue-900'
+                  : 'border-solid-gray-200 bg-white text-solid-gray-700 hover:bg-solid-gray-50 hover:text-solid-gray-900',
+              )}
+              key={view}
+              onClick={() => setActiveView(view)}
+              type='button'
+            >
+              <Icon size={15} />
+              {homeViewLabels[view]}
+              <span className='text-[12px] font-normal text-solid-gray-536'>{viewCounts[view]}</span>
+            </button>
+          );
+        })}
+      </section>
+
       <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
         <section className={cn(surfaceClassName, 'overflow-hidden')}>
           <div className='flex items-center justify-between gap-3 border-b border-solid-gray-200 px-5 py-4 lg:px-6'>
             <div>
-              <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>患者一覧</h2>
+              <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>患者ワークリスト</h2>
               <p className='mt-1 text-[13px] text-solid-gray-536'>
-                患者を選択してカルテを開きます
+                {profileConfig.description}
               </p>
             </div>
           </div>
-        <div className='grid gap-3 border-b border-solid-gray-200 bg-white px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:px-6'>
+        {isOutpatientView ? (
+          <div className='grid gap-3 border-b border-solid-gray-200 bg-white px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:px-6'>
           <Select
             aria-label='受付状態で絞り込む'
             blockSize='md'
@@ -234,7 +477,8 @@ export const ReceptionBoard = ({
               クリア
             </Button>
           </div>
-        </div>
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className='border-b border-solid-gray-200 px-5 py-3 text-[14px] font-normal leading-none text-solid-gray-536 lg:px-6'>
@@ -276,70 +520,34 @@ export const ReceptionBoard = ({
           </div>
         ) : null}
 
-        <div className='hidden grid-cols-[5rem_7rem_1fr_9rem_8rem_7rem] gap-3 border-b border-solid-gray-200 px-5 py-2 text-[14px] font-normal leading-none text-solid-gray-536 lg:grid lg:px-6'>
-          <span>受付</span>
-          <span>予約</span>
-          <span>患者</span>
-          <span>診療科</span>
-          <span>状態</span>
-          <span>経過</span>
+        <div className={cn('hidden gap-3 border-b border-solid-gray-200 px-5 py-2 text-[13px] font-normal leading-none text-solid-gray-536 lg:grid lg:px-6', worklistGridClassName)}>
+          {headerLabels.map((label) => (
+            <span key={label}>{label}</span>
+          ))}
         </div>
 
         <div className='divide-y divide-solid-gray-200'>
-          {patients.map((patient) => (
+          {activePatients.map((patient, index) => (
             <button
               className={cn(
                 buttonBaseStyle,
-                'grid w-full gap-3 px-5 py-3 text-left transition-colors hover:bg-solid-gray-50 lg:grid-cols-[5rem_7rem_1fr_9rem_8rem_7rem] lg:px-6',
+                'grid w-full gap-3 px-5 py-3 text-left transition-colors hover:bg-solid-gray-50 lg:px-6',
+                worklistGridClassName,
               )}
               key={patient.id}
               onClick={() => onOpenChart(patient.id)}
               type='button'
             >
-              <div className='text-[16px] font-bold leading-none text-solid-gray-900'>#{patient.receptionNumber}</div>
-              <div>
-                <div className='text-mono-14B-150 text-solid-gray-900'>{patient.reservationTime}</div>
-                <div className='mt-1 text-mono-14N-150 text-solid-gray-536'>{patient.receptionTime}</div>
-              </div>
-              <div className='min-w-0'>
-                <div className='flex flex-wrap items-center gap-2'>
-                  <span className='text-[16px] font-bold leading-none text-solid-gray-900'>{patient.name}</span>
-                  <span className='text-mono-14N-150 text-solid-gray-536'>{patient.id}</span>
-                  {patient.sameNameDuplicateCount > 1 ? (
-                    <ChipLabel color='yellow' variant='filled-outline'>
-                      同姓同名
-                    </ChipLabel>
-                  ) : null}
-                </div>
-                {patient.alerts.length > 0 ? (
-                  <div className='mt-1 flex flex-wrap gap-2'>
-                    {patient.alerts.slice(0, 2).map((alert) => (
-                      <ChipLabel color={alert.color} key={alert.label} variant='filled-outline'>
-                        {alert.label}
-                      </ChipLabel>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-              <div className='text-[16px] font-normal leading-none text-solid-gray-700'>{patient.department}</div>
-              <div>
-                <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
-                  {patient.status}
-                </ChipLabel>
-              </div>
-              <div>
-                <div className='text-[16px] font-bold leading-none text-solid-gray-900'>{patient.elapsed}</div>
-                <div className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>{patient.labProgress}</div>
-              </div>
+              {renderPatientCells(patient, index)}
             </button>
           ))}
         </div>
 
-        {patients.length === 0 ? (
+        {activePatients.length === 0 ? (
           <div className='px-5 py-10 text-center lg:px-6'>
             <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>該当する患者がいません</p>
             <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-536'>
-              検索条件か受付状態を見直してください。
+              ビュー、検索条件、または受付状態を見直してください。
             </p>
           </div>
         ) : null}
@@ -348,42 +556,20 @@ export const ReceptionBoard = ({
         <aside className='space-y-4'>
           <section className='rounded-8 border border-border bg-card p-4'>
             <div className='mb-3 flex items-center gap-2'>
-              <Search size={16} className='text-brand' />
-              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>主な入口</h2>
+              <ClipboardCheck size={16} className='text-brand' />
+              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>自分の未処理</h2>
             </div>
-            <div className='grid gap-2'>
-              {homeEntrypoints.map((entrypoint) => {
-                const Icon = entrypoint.icon;
-                return (
-                  <div
-                    className='grid grid-cols-[2rem_minmax(0,1fr)] gap-2 rounded-md border border-border bg-surface-subtle p-2.5'
-                    key={entrypoint.label}
-                  >
-                    <span className='grid size-8 place-items-center rounded-full bg-brand-tint text-brand'>
-                      <Icon size={15} />
-                    </span>
-                    <div className='min-w-0'>
-                      <p className='truncate text-[13px] font-bold text-text-primary'>{entrypoint.label}</p>
-                      <p className='mt-0.5 truncate text-[12px] text-text-secondary'>
-                        {entrypoint.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className='rounded-8 border border-border bg-card p-4'>
-            <div className='mb-3 flex items-center gap-2'>
-              <ClipboardList size={16} className='text-brand' />
-              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>状況一覧</h2>
-            </div>
-            <div className='space-y-2'>
-              {statusListItems.map((item) => (
-                <SidebarItem body={item.body} key={item.title} meta={item.meta} title={item.title} />
-              ))}
-            </div>
+            {pendingItems.length > 0 ? (
+              <div className='space-y-2'>
+                {pendingItems.map((item) => (
+                  <SidebarItem body={item.body} key={item.title} meta={item.meta} title={item.title} />
+                ))}
+              </div>
+            ) : (
+              <p className='rounded-md border border-border bg-surface-subtle px-3 py-2.5 text-[13px] text-text-secondary'>
+                いま表示できる未処理はありません。
+              </p>
+            )}
           </section>
 
           <section className='rounded-8 border border-border bg-card p-4'>

@@ -33,6 +33,14 @@ import {
   updateUser,
 } from '../lib/api';
 import { cn } from '../lib/cn';
+import {
+  type HomeSettings,
+  homeProfileConfigs,
+  homeViewLabels,
+  normalizeHomeSettings,
+  type HomeProfile,
+  type HomeView,
+} from '../lib/homeSettings';
 import { buildPmdaDrugInfoUrl } from '../lib/pmda';
 import type {
   AdminUserSummary,
@@ -52,7 +60,9 @@ import { AuditPanel } from './AuditPanel';
 
 type SettingsWorkspaceProps = {
   currentUser: UserSession;
+  homeSettings: HomeSettings;
   onAuthExpired: () => void;
+  onHomeSettingsChange: (settings: HomeSettings) => void;
 };
 
 type FlashState = {
@@ -515,7 +525,12 @@ const formatAdminError = (message: string) => {
   return message;
 };
 
-export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorkspaceProps) => {
+export const SettingsWorkspace = ({
+  currentUser,
+  homeSettings,
+  onAuthExpired,
+  onHomeSettingsChange,
+}: SettingsWorkspaceProps) => {
   const isAdmin = currentUser.role === '管理者';
   const [managementTab, setManagementTab] = useState<ManagementTab>('users');
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
@@ -1561,6 +1576,19 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
     { key: 'slot' as const, label: '予約枠', count: orderConfig.reservationSlots.length },
     { key: 'template' as const, label: 'テンプレート', count: orderConfig.chartTemplates.length },
   ];
+  const currentHomeProfileConfig = homeProfileConfigs[homeSettings.profile];
+  const availableHomeViews = currentHomeProfileConfig.views;
+  const handleHomeProfileChange = (profile: HomeProfile) => {
+    onHomeSettingsChange(
+      normalizeHomeSettings({
+        profile,
+        defaultView: homeProfileConfigs[profile].defaultView,
+      }),
+    );
+  };
+  const handleDefaultHomeViewChange = (defaultView: HomeView) => {
+    onHomeSettingsChange(normalizeHomeSettings({ ...homeSettings, defaultView }));
+  };
 
   return (
     <main className='mx-auto max-w-[1600px] px-4 py-6 lg:px-6'>
@@ -1578,6 +1606,69 @@ export const SettingsWorkspace = ({ currentUser, onAuthExpired }: SettingsWorksp
           <div className='grid gap-3 sm:grid-cols-2'>
             <SummaryTile label='ログイン利用者' value={currentUser.displayName} />
             <SummaryTile label='現在ロール' value={currentUser.role} />
+          </div>
+        </div>
+      </section>
+
+      <section className={cn(surfaceClassName, 'mt-6 p-5 lg:p-6')}>
+        <div className='grid gap-5 xl:grid-cols-[minmax(0,1fr)_26rem]'>
+          <div>
+            <Heading size='20'>
+              <HeadingTitle level='h2'>ホーム設定</HeadingTitle>
+            </Heading>
+            <p className='mt-2 text-[15px] leading-normal text-solid-gray-700'>
+              施設や担当業務に合わせて、ホームの初期ワークリストと表示ビューを切り替えます。
+            </p>
+            <div className='mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
+              {(Object.entries(homeProfileConfigs) as Array<[HomeProfile, typeof currentHomeProfileConfig]>).map(
+                ([profile, config]) => (
+                  <button
+                    className={cn(
+                      buttonBaseStyle,
+                      'rounded-8 border p-4 text-left transition-colors',
+                      homeSettings.profile === profile
+                        ? 'border-blue-900 bg-blue-50'
+                        : 'border-solid-gray-200 bg-white hover:bg-solid-gray-50',
+                    )}
+                    key={profile}
+                    onClick={() => handleHomeProfileChange(profile)}
+                    type='button'
+                  >
+                    <p className='text-[15px] font-bold leading-snug text-solid-gray-900'>{config.label}</p>
+                    <p className='mt-2 text-[13px] leading-normal text-solid-gray-536'>{config.description}</p>
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+
+          <div className='rounded-8 border border-solid-gray-200 bg-solid-gray-50 p-4'>
+            <p className='text-[16px] font-bold leading-snug text-solid-gray-900'>現在のプロファイル</p>
+            <p className='mt-1 text-[14px] leading-normal text-solid-gray-536'>{currentHomeProfileConfig.description}</p>
+            <label className='mt-4 block text-[13px] font-bold leading-none text-solid-gray-700' htmlFor='home-default-view'>
+              起動時に開くビュー
+            </label>
+            <Select
+              aria-label='起動時に開くビュー'
+              blockSize='md'
+              className='mt-2'
+              id='home-default-view'
+              onChange={(event) => handleDefaultHomeViewChange(event.target.value as HomeView)}
+              value={homeSettings.defaultView}
+            >
+              {availableHomeViews.map((view) => (
+                <option key={view} value={view}>
+                  {homeViewLabels[view]}
+                </option>
+              ))}
+            </Select>
+            <div className='mt-4 flex flex-wrap gap-2'>
+              {availableHomeViews.map((view) => (
+                <ChipLabel color={view === homeSettings.defaultView ? 'blue' : 'gray'} key={view} variant='filled-outline'>
+                  {homeViewLabels[view]}
+                </ChipLabel>
+              ))}
+            </div>
           </div>
         </div>
       </section>
