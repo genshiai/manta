@@ -1,7 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Building2, ClipboardCheck, FileText, History, Siren, Stethoscope, UserRound } from 'lucide-react';
-import { Button, ChipLabel, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
-import { departmentOptions, isVisitClosed, receptionStatusColor, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
+import {
+  AlertTriangle,
+  BadgeAlert,
+  Building2,
+  CheckCircle2,
+  CircleDashed,
+  CircleDot,
+  ClipboardCheck,
+  FileText,
+  FlaskConical,
+  HeartPulse,
+  History,
+  ShieldAlert,
+  Siren,
+  Stethoscope,
+  UserCheck,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react';
+import { Button, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
+import { departmentOptions, isVisitClosed, type AlertItem, type LabProgress, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
 import { cn } from '../lib/cn';
 import { type HomeSettings, type HomeView, homeProfileConfigs, homeViewLabels } from '../lib/homeSettings';
 import { readStorage, writeStorage } from '../lib/storage';
@@ -37,17 +55,92 @@ type SavedReceptionSearch = {
   departmentFilter: string | 'all';
 };
 
-const pendingTypeColor: Record<string, 'yellow' | 'red' | 'blue' | 'gray'> = {
-  検査結果: 'yellow',
-  再開待ち: 'red',
-  患者照合: 'blue',
-  確認なし: 'gray',
+type BadgeTone =
+  | 'identity'
+  | 'safety'
+  | 'condition'
+  | 'lab'
+  | 'muted'
+  | 'progress'
+  | 'done'
+  | 'paused'
+  | 'active';
+
+const badgeToneClasses: Record<BadgeTone, string> = {
+  identity: 'border-yellow-400 bg-yellow-50 text-yellow-1100 ring-1 ring-yellow-100',
+  safety: 'border-red-300 bg-red-50 text-red-1000 ring-1 ring-red-100',
+  condition: 'border-blue-200 bg-blue-50 text-blue-900 ring-1 ring-blue-100',
+  lab: 'border-purple-200 bg-purple-50 text-purple-1000 ring-1 ring-purple-100',
+  muted: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-800',
+  progress: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+  done: 'border-green-200 bg-green-50 text-green-900',
+  paused: 'border-red-200 bg-red-50 text-red-1000',
+  active: 'border-blue-200 bg-blue-50 text-blue-900',
 };
 
 const wardLocations = ['5東 512', '3西 318', 'ICU 02', '6南 607'];
 const wardTeams = ['内科Aチーム', '皮膚科', '循環器チーム', '内科Bチーム'];
 const emergencyTriage = ['黄', '緑', '黄', '緑'];
 const emergencyChiefComplaints = ['胸部圧迫感', '血糖高値', '皮疹増悪', '咳嗽'];
+
+const WorkBadge = ({
+  icon: Icon,
+  label,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  tone: BadgeTone;
+}) => (
+  <span
+    className={cn(
+      'inline-flex min-h-7 items-center gap-1 rounded-md border px-2 py-1 text-[12px] font-bold leading-none',
+      badgeToneClasses[tone],
+    )}
+  >
+    <Icon size={13} strokeWidth={2.4} />
+    <span>{label}</span>
+  </span>
+);
+
+const classifyAlert = (alert: AlertItem): { icon: LucideIcon; tone: BadgeTone } => {
+  if (
+    alert.label.includes('アレルギー') ||
+    alert.label.includes('副反応') ||
+    alert.label.includes('ラテックス') ||
+    alert.label.includes('妊娠')
+  ) {
+    return { icon: ShieldAlert, tone: 'safety' };
+  }
+
+  return { icon: HeartPulse, tone: 'condition' };
+};
+
+const statusBadgeConfig: Record<ReceptionStatus, { icon: LucideIcon; tone: BadgeTone }> = {
+  未受付: { icon: CircleDashed, tone: 'muted' },
+  来院済: { icon: UserCheck, tone: 'active' },
+  問診中: { icon: CircleDot, tone: 'progress' },
+  問診済: { icon: CheckCircle2, tone: 'done' },
+  到着済: { icon: UserCheck, tone: 'active' },
+  診察中: { icon: Stethoscope, tone: 'progress' },
+  診察終了: { icon: CheckCircle2, tone: 'done' },
+  診察一時中断: { icon: AlertTriangle, tone: 'paused' },
+  会計済: { icon: CheckCircle2, tone: 'muted' },
+};
+
+const labBadgeConfig: Record<LabProgress, { icon: LucideIcon; tone: BadgeTone; label: string }> = {
+  未依頼: { icon: CircleDashed, tone: 'muted', label: '検査なし' },
+  依頼中: { icon: FlaskConical, tone: 'active', label: '検査依頼中' },
+  一部結果: { icon: FlaskConical, tone: 'progress', label: '一部結果' },
+  結果到着: { icon: FlaskConical, tone: 'lab', label: '結果到着' },
+};
+
+const pendingBadgeConfig: Record<string, { icon: LucideIcon; tone: BadgeTone }> = {
+  検査結果: { icon: FlaskConical, tone: 'lab' },
+  再開待ち: { icon: AlertTriangle, tone: 'paused' },
+  患者照合: { icon: BadgeAlert, tone: 'identity' },
+  確認なし: { icon: CircleDashed, tone: 'muted' },
+};
 
 const SidebarItem = ({ title, meta, body }: { title: string; meta: string; body: string }) => (
   <div className='rounded-md border border-border bg-surface-subtle px-3 py-2.5'>
@@ -219,24 +312,41 @@ export const ReceptionBoard = ({
     setSavedSearches((current) => current.filter((item) => item.id !== savedSearchId));
   };
 
+  const renderStatusBadge = (status: ReceptionStatus) => {
+    const config = statusBadgeConfig[status];
+
+    return <WorkBadge icon={config.icon} label={status} tone={config.tone} />;
+  };
+
+  const renderLabBadge = (labProgress: LabProgress) => {
+    const config = labBadgeConfig[labProgress];
+
+    return <WorkBadge icon={config.icon} label={config.label} tone={config.tone} />;
+  };
+
   const renderPatientIdentity = (patient: PatientRecord) => (
     <div className='min-w-0'>
       <div className='flex flex-wrap items-center gap-2'>
         <span className='text-[16px] font-bold leading-snug text-solid-gray-900'>{patient.name}</span>
         <span className='text-mono-14N-150 text-solid-gray-536'>{patient.id}</span>
         {patient.sameNameDuplicateCount > 1 ? (
-          <ChipLabel color='yellow' variant='filled-outline'>
-            同姓同名
-          </ChipLabel>
+          <WorkBadge icon={BadgeAlert} label='同姓同名' tone='identity' />
         ) : null}
       </div>
       {patient.alerts.length > 0 ? (
         <div className='mt-1 flex flex-wrap gap-2'>
-          {patient.alerts.slice(0, 2).map((alert) => (
-            <ChipLabel color={alert.color} key={alert.label} variant='filled-outline'>
-              {alert.label}
-            </ChipLabel>
-          ))}
+          {patient.alerts.slice(0, 2).map((alert) => {
+            const alertBadge = classifyAlert(alert);
+
+            return (
+              <WorkBadge
+                icon={alertBadge.icon}
+                key={alert.label}
+                label={alert.label}
+                tone={alertBadge.tone}
+              />
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -267,11 +377,7 @@ export const ReceptionBoard = ({
             <p className='mt-1 text-[12px] text-solid-gray-536'>{wardTeam}</p>
           </div>
           <div className='text-[14px] font-bold text-solid-gray-900'>{stayDays}</div>
-          <div>
-            <ChipLabel color={patient.labProgress === '未依頼' ? 'gray' : 'yellow'} variant='filled-outline'>
-              {patient.labProgress === '未依頼' ? '未読なし' : patient.labProgress}
-            </ChipLabel>
-          </div>
+          <div>{renderLabBadge(patient.labProgress)}</div>
           <div className='text-[13px] leading-normal text-solid-gray-700'>指示確認 / 文書確認</div>
         </>
       );
@@ -285,17 +391,11 @@ export const ReceptionBoard = ({
             <p className='mt-1 text-[12px] text-solid-gray-536'>到着</p>
           </div>
           <div>
-            <ChipLabel color={triage === '黄' ? 'yellow' : 'green'} variant='filled-outline'>
-              {triage}
-            </ChipLabel>
+            <WorkBadge icon={Siren} label={`トリアージ${triage}`} tone={triage === '黄' ? 'progress' : 'done'} />
           </div>
           {renderPatientIdentity(patient)}
           <div className='text-[14px] leading-normal text-solid-gray-700'>{chiefComplaint}</div>
-          <div>
-            <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
-              {patient.status}
-            </ChipLabel>
-          </div>
+          <div>{renderStatusBadge(patient.status)}</div>
           <div className='text-[15px] font-bold text-solid-gray-900'>{patient.elapsed}</div>
         </>
       );
@@ -313,16 +413,14 @@ export const ReceptionBoard = ({
             <p className='mt-1 text-[12px] text-solid-gray-536'>{patient.doctor}</p>
           </div>
           <div>
-            <ChipLabel color={pendingTypeColor[pendingLabel] ?? 'gray'} variant='filled-outline'>
-              {pendingLabel}
-            </ChipLabel>
+            <WorkBadge
+              icon={pendingBadgeConfig[pendingLabel].icon}
+              label={pendingLabel}
+              tone={pendingBadgeConfig[pendingLabel].tone}
+            />
           </div>
           <div className='line-clamp-2 text-[13px] leading-normal text-solid-gray-700'>{patient.comment}</div>
-          <div>
-            <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
-              {patient.status}
-            </ChipLabel>
-          </div>
+          <div>{renderStatusBadge(patient.status)}</div>
         </>
       );
     }
@@ -340,15 +438,9 @@ export const ReceptionBoard = ({
           </p>
           <p className='mt-1 text-[12px] text-solid-gray-536'>{isClinicProfile ? patient.department : patient.doctor}</p>
         </div>
+        <div>{renderStatusBadge(patient.status)}</div>
         <div>
-          <ChipLabel color={receptionStatusColor[patient.status]} variant='filled-outline'>
-            {patient.status}
-          </ChipLabel>
-        </div>
-        <div>
-          <ChipLabel color={patient.labProgress === '未依頼' ? 'gray' : 'yellow'} variant='filled-outline'>
-            {patient.labProgress}
-          </ChipLabel>
+          {renderLabBadge(patient.labProgress)}
           {!isClinicProfile ? <p className='mt-1 text-[12px] text-solid-gray-536'>文書確認</p> : null}
         </div>
         <div className='line-clamp-2 text-[13px] leading-normal text-solid-gray-700'>{patient.comment}</div>
@@ -555,9 +647,14 @@ export const ReceptionBoard = ({
 
         <aside className='space-y-4'>
           <section className='rounded-8 border border-border bg-card p-4'>
-            <div className='mb-3 flex items-center gap-2'>
-              <ClipboardCheck size={16} className='text-brand' />
-              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>自分の未処理</h2>
+            <div className='mb-3 flex items-start gap-2'>
+              <ClipboardCheck size={16} className='mt-0.5 text-brand' />
+              <div>
+                <h2 className='text-[16px] font-bold leading-snug text-text-primary'>自分の未処理</h2>
+                <p className='mt-1 text-[12px] leading-normal text-text-tertiary'>
+                  確認、説明、署名、再開が必要なもの
+                </p>
+              </div>
             </div>
             {pendingItems.length > 0 ? (
               <div className='space-y-2'>
@@ -589,9 +686,10 @@ export const ReceptionBoard = ({
                     <span className='truncate text-[13px] font-bold text-text-primary'>{patient.name}</span>
                     <span className='text-[11px] text-text-tertiary'>{patient.elapsed}</span>
                   </div>
-                  <p className='mt-0.5 truncate text-[12px] text-text-secondary'>
-                    {patient.department} ・ {patient.labProgress}
-                  </p>
+                  <div className='mt-1 flex flex-wrap items-center gap-2'>
+                    <span className='text-[12px] text-text-secondary'>{patient.department}</span>
+                    {renderLabBadge(patient.labProgress)}
+                  </div>
                 </button>
               ))}
             </div>
