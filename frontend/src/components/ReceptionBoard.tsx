@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, Clock3, FileText, Sparkles } from 'lucide-react';
+import { CalendarDays, ClipboardList, FileText, Search, Stethoscope } from 'lucide-react';
 import { Button, ChipLabel, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
 import { departmentOptions, isVisitClosed, receptionStatusColor, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
 import { cn } from '../lib/cn';
@@ -32,9 +32,20 @@ type SavedReceptionSearch = {
   departmentFilter: string | 'all';
 };
 
-const InsightItem = ({ title, body }: { title: string; body: string }) => (
-  <div className='rounded-md bg-surface-subtle p-3'>
-    <p className='text-[13px] font-bold text-text-primary'>{title}</p>
+const SidebarItem = ({
+  title,
+  meta,
+  body,
+}: {
+  title: string;
+  meta: string;
+  body: string;
+}) => (
+  <div className='rounded-md border border-border bg-surface-subtle px-3 py-2.5'>
+    <div className='flex items-baseline justify-between gap-2'>
+      <p className='truncate text-[13px] font-bold text-text-primary'>{title}</p>
+      <span className='shrink-0 text-[11px] text-text-tertiary'>{meta}</span>
+    </div>
     <p className='mt-1 text-[12px] leading-normal text-text-secondary'>{body}</p>
   </div>
 );
@@ -59,35 +70,28 @@ export const ReceptionBoard = ({
   const resultReviewCount = patients.filter((patient) =>
     patient.labProgress === '結果到着' || patient.labProgress === '一部結果'
   ).length;
-  const alertPatientCount = patients.filter((patient) => patient.alerts.length > 0).length;
-  const activePatient = patients.find((patient) => patient.status === '診察中') ?? patients[0];
-  const workspaceCards = [
+  const statusListItems = [
     {
-      label: '次に開く候補',
-      value: activePatient?.name ?? '患者なし',
-      detail: activePatient
-        ? `${activePatient.department} ・ ${activePatient.status} ・ ${activePatient.elapsed}`
-        : '来院中の患者はいません',
-      icon: Sparkles,
+      title: '検体結果参照',
+      meta: `${resultReviewCount}件`,
+      body: '結果到着・一部結果の患者を確認します。',
     },
     {
-      label: '結果確認',
-      value: `${resultReviewCount}件`,
-      detail: '検査結果到着・一部結果を優先表示',
-      icon: Activity,
+      title: '文書作成状況',
+      meta: '確認',
+      body: '診断書・紹介状など、カルテ内文書の登録状況を確認します。',
     },
     {
-      label: '安全タグ',
-      value: `${alertPatientCount}名`,
-      detail: 'アレルギー、同姓同名、妊娠など',
-      icon: AlertTriangle,
+      title: '予約確認',
+      meta: '本日',
+      body: '予約時間と来院状態を患者一覧と照合します。',
     },
-    {
-      label: '未完了',
-      value: `${waitingCount}名`,
-      detail: `終了 ${completedCount}名 ・ 全${patients.length}名`,
-      icon: Clock3,
-    },
+  ];
+  const homeEntrypoints = [
+    { label: '患者検索', description: 'ID・氏名・カナでカルテを探す', icon: Search },
+    { label: '患者一覧', description: '本日の外来患者を開く', icon: Stethoscope },
+    { label: '予約簿', description: '時間帯ごとの予約を確認', icon: CalendarDays },
+    { label: '状況一覧', description: '検査・文書・オーダの状態を確認', icon: ClipboardList },
   ];
   const [savedSearches, setSavedSearches] = useState<SavedReceptionSearch[]>([]);
 
@@ -142,7 +146,7 @@ export const ReceptionBoard = ({
             <HeadingTitle level='h1'>ホーム</HeadingTitle>
           </Heading>
           <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
-            診療、結果確認、最近のカルテを横断して始めます · 更新: {lastRefreshedAt}
+            患者一覧からカルテを開き、検査・文書・予約の状況を確認します · 更新: {lastRefreshedAt}
           </p>
         </div>
         <div className='flex items-center gap-4 text-[14px] font-normal leading-none text-solid-gray-536'>
@@ -154,90 +158,16 @@ export const ReceptionBoard = ({
         </div>
       </section>
 
-      <section className='grid gap-3 lg:grid-cols-4'>
-        {workspaceCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div className='rounded-8 border border-border bg-card p-4' key={card.label}>
-              <div className='mb-3 flex items-center justify-between gap-3'>
-                <span className='text-[12px] font-bold uppercase tracking-[0.06em] text-text-tertiary'>
-                  {card.label}
-                </span>
-                <span className='grid size-8 place-items-center rounded-full bg-brand-tint text-brand'>
-                  <Icon size={16} />
-                </span>
-              </div>
-              <p className='truncate text-[20px] font-bold leading-snug text-text-primary'>{card.value}</p>
-              <p className='mt-1 line-clamp-2 text-[13px] leading-normal text-text-secondary'>
-                {card.detail}
+      <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
+        <section className={cn(surfaceClassName, 'overflow-hidden')}>
+          <div className='flex items-center justify-between gap-3 border-b border-solid-gray-200 px-5 py-4 lg:px-6'>
+            <div>
+              <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>患者一覧</h2>
+              <p className='mt-1 text-[13px] text-solid-gray-536'>
+                患者を選択してカルテを開きます
               </p>
             </div>
-          );
-        })}
-      </section>
-
-      <section className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]'>
-        <div className='rounded-8 border border-border bg-card p-5'>
-          <div className='mb-4 flex items-center gap-2'>
-            <span className='grid size-8 place-items-center rounded-full bg-brand text-white'>
-              <Sparkles size={16} />
-            </span>
-            <div>
-              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>AIインサイト</h2>
-              <p className='text-[12px] text-text-tertiary'>今日の画面を開く前に見るべきこと</p>
-            </div>
           </div>
-          <div className='grid gap-3 md:grid-cols-3'>
-            <InsightItem
-              title='結果確認を先に'
-              body={`${resultReviewCount}件の検査結果があります。異常値と前回差分を確認してから診療録に入れます。`}
-            />
-            <InsightItem
-              title='安全タグに注意'
-              body={`${alertPatientCount}名にアレルギー・同姓同名などのタグがあります。オーダ前に確認してください。`}
-            />
-            <InsightItem
-              title='最近の文脈'
-              body='直近カルテ、検査、処方変更を患者画面でまとめてAIに質問できます。'
-            />
-          </div>
-        </div>
-
-        <div className='rounded-8 border border-border bg-card p-5'>
-          <div className='mb-4 flex items-center gap-2'>
-            <FileText size={16} className='text-brand' />
-            <h2 className='text-[16px] font-bold leading-snug text-text-primary'>最近開いたカルテ</h2>
-          </div>
-          <div className='space-y-2'>
-            {patients.slice(0, 3).map((patient) => (
-              <button
-                className='w-full rounded-md border border-border bg-surface-subtle px-3 py-2 text-left hover:border-brand'
-                key={patient.id}
-                onClick={() => onOpenChart(patient.id)}
-                type='button'
-              >
-                <div className='flex items-baseline justify-between gap-2'>
-                  <span className='truncate text-[13px] font-bold text-text-primary'>{patient.name}</span>
-                  <span className='text-[11px] text-text-tertiary'>{patient.elapsed}</span>
-                </div>
-                <p className='mt-0.5 truncate text-[12px] text-text-secondary'>
-                  {patient.department} ・ {patient.labProgress}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className={cn(surfaceClassName, 'overflow-hidden')}>
-        <div className='flex items-center justify-between gap-3 border-b border-solid-gray-200 px-5 py-4 lg:px-6'>
-          <div>
-            <h2 className='text-[18px] font-bold leading-snug text-solid-gray-900'>来院中の患者</h2>
-            <p className='mt-1 text-[13px] text-solid-gray-536'>
-              受付情報はホーム内の作業リストとして扱います
-            </p>
-          </div>
-        </div>
         <div className='grid gap-3 border-b border-solid-gray-200 bg-white px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:px-6'>
           <Select
             aria-label='受付状態で絞り込む'
@@ -413,7 +343,75 @@ export const ReceptionBoard = ({
             </p>
           </div>
         ) : null}
-      </section>
+        </section>
+
+        <aside className='space-y-4'>
+          <section className='rounded-8 border border-border bg-card p-4'>
+            <div className='mb-3 flex items-center gap-2'>
+              <Search size={16} className='text-brand' />
+              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>主な入口</h2>
+            </div>
+            <div className='grid gap-2'>
+              {homeEntrypoints.map((entrypoint) => {
+                const Icon = entrypoint.icon;
+                return (
+                  <div
+                    className='grid grid-cols-[2rem_minmax(0,1fr)] gap-2 rounded-md border border-border bg-surface-subtle p-2.5'
+                    key={entrypoint.label}
+                  >
+                    <span className='grid size-8 place-items-center rounded-full bg-brand-tint text-brand'>
+                      <Icon size={15} />
+                    </span>
+                    <div className='min-w-0'>
+                      <p className='truncate text-[13px] font-bold text-text-primary'>{entrypoint.label}</p>
+                      <p className='mt-0.5 truncate text-[12px] text-text-secondary'>
+                        {entrypoint.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className='rounded-8 border border-border bg-card p-4'>
+            <div className='mb-3 flex items-center gap-2'>
+              <ClipboardList size={16} className='text-brand' />
+              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>状況一覧</h2>
+            </div>
+            <div className='space-y-2'>
+              {statusListItems.map((item) => (
+                <SidebarItem body={item.body} key={item.title} meta={item.meta} title={item.title} />
+              ))}
+            </div>
+          </section>
+
+          <section className='rounded-8 border border-border bg-card p-4'>
+            <div className='mb-3 flex items-center gap-2'>
+              <FileText size={16} className='text-brand' />
+              <h2 className='text-[16px] font-bold leading-snug text-text-primary'>最近開いたカルテ</h2>
+            </div>
+            <div className='space-y-2'>
+              {patients.slice(0, 3).map((patient) => (
+                <button
+                  className='w-full rounded-md border border-border bg-surface-subtle px-3 py-2 text-left hover:border-brand'
+                  key={patient.id}
+                  onClick={() => onOpenChart(patient.id)}
+                  type='button'
+                >
+                  <div className='flex items-baseline justify-between gap-2'>
+                    <span className='truncate text-[13px] font-bold text-text-primary'>{patient.name}</span>
+                    <span className='text-[11px] text-text-tertiary'>{patient.elapsed}</span>
+                  </div>
+                  <p className='mt-0.5 truncate text-[12px] text-text-secondary'>
+                    {patient.department} ・ {patient.labProgress}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 };
