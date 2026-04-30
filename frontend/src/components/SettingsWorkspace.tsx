@@ -1617,7 +1617,7 @@ export const SettingsWorkspace = ({
               <HeadingTitle level='h2'>ホーム設定</HeadingTitle>
             </Heading>
             <p className='mt-2 text-[15px] leading-normal text-solid-gray-700'>
-              施設や担当業務に合わせて、ホームの初期ワークリストと表示ビューを切り替えます。
+              施設や担当業務に合わせて、ホームの初期患者群と表示スコープを切り替えます。
             </p>
             <div className='mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
               {(Object.entries(homeProfileConfigs) as Array<[HomeProfile, typeof currentHomeProfileConfig]>).map(
@@ -1646,10 +1646,10 @@ export const SettingsWorkspace = ({
             <p className='text-[16px] font-bold leading-snug text-solid-gray-900'>現在のプロファイル</p>
             <p className='mt-1 text-[14px] leading-normal text-solid-gray-536'>{currentHomeProfileConfig.description}</p>
             <label className='mt-4 block text-[13px] font-bold leading-none text-solid-gray-700' htmlFor='home-default-view'>
-              起動時に開くビュー
+              起動時に開く患者群
             </label>
             <Select
-              aria-label='起動時に開くビュー'
+              aria-label='起動時に開く患者群'
               blockSize='md'
               className='mt-2'
               id='home-default-view'

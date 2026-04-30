@@ -10,12 +10,10 @@ import {
   FileText,
   FlaskConical,
   HeartPulse,
-  History,
   ShieldAlert,
   Siren,
   Stethoscope,
   UserCheck,
-  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 import { Button, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
@@ -54,6 +52,8 @@ type SavedReceptionSearch = {
   statusFilter: ReceptionStatus | 'all';
   departmentFilter: string | 'all';
 };
+
+type WorkScope = 'all' | 'assigned' | 'department';
 
 type BadgeTone =
   | 'identity'
@@ -135,13 +135,6 @@ const labBadgeConfig: Record<LabProgress, { icon: LucideIcon; tone: BadgeTone; l
   結果到着: { icon: FlaskConical, tone: 'lab', label: '結果到着' },
 };
 
-const pendingBadgeConfig: Record<string, { icon: LucideIcon; tone: BadgeTone }> = {
-  検査結果: { icon: FlaskConical, tone: 'lab' },
-  再開待ち: { icon: AlertTriangle, tone: 'paused' },
-  患者照合: { icon: BadgeAlert, tone: 'identity' },
-  確認なし: { icon: CircleDashed, tone: 'muted' },
-};
-
 const SidebarItem = ({ title, meta, body }: { title: string; meta: string; body: string }) => (
   <div className='rounded-md border border-border bg-surface-subtle px-3 py-2.5'>
     <div className='flex items-baseline justify-between gap-2'>
@@ -178,6 +171,8 @@ export const ReceptionBoard = ({
   const interruptedCount = patients.filter((patient) => patient.status === '診察一時中断').length;
   const profileConfig = homeProfileConfigs[homeSettings.profile];
   const [activeView, setActiveView] = useState<HomeView>(homeSettings.defaultView);
+  const [workScope, setWorkScope] = useState<WorkScope>(homeSettings.profile === 'personal' ? 'assigned' : 'all');
+  const [pendingOnly, setPendingOnly] = useState(false);
   const pendingItems = [
     resultReviewCount > 0
       ? {
@@ -208,9 +203,6 @@ export const ReceptionBoard = ({
     outpatient: Stethoscope,
     inpatient: Building2,
     emergency: Siren,
-    personal: UserRound,
-    pending: ClipboardCheck,
-    recent: History,
   };
   const [savedSearches, setSavedSearches] = useState<SavedReceptionSearch[]>([]);
 
@@ -223,12 +215,14 @@ export const ReceptionBoard = ({
   }, [homeSettings.defaultView, profileConfig.defaultView, profileConfig.views]);
 
   useEffect(() => {
+    setWorkScope(homeSettings.profile === 'personal' ? 'assigned' : 'all');
+    setPendingOnly(false);
+  }, [homeSettings.profile]);
+
+  useEffect(() => {
     writeStorage(savedSearchKey, savedSearches);
   }, [savedSearches]);
 
-  const personalPatients = patients.filter(
-    (patient) => patient.doctor === currentUser.displayName || patient.department === currentUser.department,
-  );
   const pendingPatients = patients.filter(
     (patient) =>
       patient.labProgress === '結果到着' ||
@@ -236,30 +230,28 @@ export const ReceptionBoard = ({
       patient.status === '診察一時中断' ||
       patient.sameNameDuplicateCount > 1,
   );
-  const activePatients = (() => {
-    if (activeView === 'personal') {
-      return personalPatients.length > 0 ? personalPatients : patients;
-    }
-    if (activeView === 'pending') {
-      return pendingPatients;
-    }
-    if (activeView === 'recent') {
-      return patients.slice(0, 3);
-    }
-    if (activeView === 'emergency') {
-      return patients.slice(0, 3);
-    }
-
-    return patients;
-  })();
+  const modePatients = activeView === 'emergency' ? patients.slice(0, 3) : patients;
+  const assignedModePatients = modePatients.filter((patient) => patient.doctor === currentUser.displayName);
+  const departmentModePatients = modePatients.filter((patient) => patient.department === currentUser.department);
+  const scopedPatients =
+    workScope === 'assigned'
+      ? assignedModePatients
+      : workScope === 'department'
+        ? departmentModePatients
+        : modePatients;
+  const activePatients = pendingOnly
+    ? scopedPatients.filter((patient) => pendingPatients.some((pendingPatient) => pendingPatient.id === patient.id))
+    : scopedPatients;
   const viewCounts: Record<HomeView, number> = {
     outpatient: patients.length,
     inpatient: patients.length,
     emergency: Math.min(3, patients.length),
-    personal: personalPatients.length > 0 ? personalPatients.length : patients.length,
-    pending: pendingPatients.length,
-    recent: Math.min(3, patients.length),
   };
+  const scopeOptions: Array<{ value: WorkScope; label: string; count: number }> = [
+    { value: 'all', label: '全体', count: modePatients.length },
+    { value: 'assigned', label: '自分の担当', count: assignedModePatients.length },
+    { value: 'department', label: '同じ診療科', count: departmentModePatients.length },
+  ];
   const isOutpatientView = activeView === 'outpatient';
   const isClinicProfile = homeSettings.profile === 'clinic';
   const headerLabels =
@@ -267,15 +259,9 @@ export const ReceptionBoard = ({
       ? ['病棟/病室', '患者', '主治医/チーム', '入院日数', '未読', '指示/文書']
       : activeView === 'emergency'
         ? ['到着', 'トリアージ', '患者', '主訴', '状態', '滞在']
-        : activeView === 'personal'
-          ? ['区分', '患者', '場所/科', '未処理', '最新メモ', '状態']
-          : activeView === 'pending'
-            ? ['種別', '患者', '場所/科', '未処理', '確認内容', '状態']
-            : activeView === 'recent'
-              ? ['最終表示', '患者', '場所/科', '最近の文脈', '検査', '状態']
-              : isClinicProfile
-                ? ['時刻', '患者', '年齢/性別', '状態', '検査', 'メモ']
-                : ['時刻', '患者', '診療科/担当', '状態', '検査/文書', 'メモ'];
+        : isClinicProfile
+          ? ['時刻', '患者', '年齢/性別', '状態', '検査', 'メモ']
+          : ['時刻', '患者', '診療科/担当', '状態', '検査/文書', 'メモ'];
 
   const createSearchLabel = () => {
     const parts = [
@@ -358,14 +344,6 @@ export const ReceptionBoard = ({
     const stayDays = `${index + 3}日目`;
     const triage = emergencyTriage[index % emergencyTriage.length];
     const chiefComplaint = emergencyChiefComplaints[index % emergencyChiefComplaints.length];
-    const pendingLabel =
-      patient.labProgress === '結果到着' || patient.labProgress === '一部結果'
-        ? '検査結果'
-        : patient.sameNameDuplicateCount > 1
-          ? '患者照合'
-          : patient.status === '診察一時中断'
-            ? '再開待ち'
-            : '確認なし';
 
     if (activeView === 'inpatient') {
       return (
@@ -401,30 +379,6 @@ export const ReceptionBoard = ({
       );
     }
 
-    if (activeView === 'personal' || activeView === 'pending' || activeView === 'recent') {
-      return (
-        <>
-          <div className='text-[14px] font-bold leading-snug text-solid-gray-900'>
-            {activeView === 'recent' ? patient.elapsed : patient.department}
-          </div>
-          {renderPatientIdentity(patient)}
-          <div>
-            <p className='text-[14px] font-bold leading-snug text-solid-gray-900'>{patient.department}</p>
-            <p className='mt-1 text-[12px] text-solid-gray-536'>{patient.doctor}</p>
-          </div>
-          <div>
-            <WorkBadge
-              icon={pendingBadgeConfig[pendingLabel].icon}
-              label={pendingLabel}
-              tone={pendingBadgeConfig[pendingLabel].tone}
-            />
-          </div>
-          <div className='line-clamp-2 text-[13px] leading-normal text-solid-gray-700'>{patient.comment}</div>
-          <div>{renderStatusBadge(patient.status)}</div>
-        </>
-      );
-    }
-
     return (
       <>
         <div>
@@ -456,7 +410,7 @@ export const ReceptionBoard = ({
             <HeadingTitle level='h1'>ホーム</HeadingTitle>
           </Heading>
           <p className='mt-1 text-[14px] font-normal leading-none text-solid-gray-536'>
-            {profileConfig.label} · {homeViewLabels[activeView]}ワークリスト · 更新: {lastRefreshedAt}
+            {profileConfig.label} · {homeViewLabels[activeView]}患者群 · 更新: {lastRefreshedAt}
           </p>
         </div>
         <div className='flex items-center gap-4 text-[14px] font-normal leading-none text-solid-gray-536'>
@@ -468,28 +422,83 @@ export const ReceptionBoard = ({
         </div>
       </section>
 
-      <section className='flex flex-wrap gap-2'>
-        {profileConfig.views.map((view) => {
-          const Icon = viewIconMap[view];
-          return (
+      <section className='rounded-8 border border-solid-gray-200 bg-white p-3'>
+        <div className='flex flex-wrap items-center justify-between gap-3'>
+          <div className='flex flex-wrap items-center gap-2'>
+            <span className='text-[13px] font-bold text-solid-gray-700'>患者群</span>
+            {profileConfig.views.length > 1 ? (
+              <div className='inline-flex rounded-8 border border-solid-gray-200 bg-solid-gray-50 p-1'>
+                {profileConfig.views.map((view) => {
+                  const Icon = viewIconMap[view];
+                  return (
+                    <button
+                      className={cn(
+                        buttonBaseStyle,
+                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-bold leading-none transition-colors',
+                        activeView === view
+                          ? 'bg-white text-blue-900 shadow-sm'
+                          : 'text-solid-gray-700 hover:text-solid-gray-900',
+                      )}
+                      key={view}
+                      onClick={() => setActiveView(view)}
+                      type='button'
+                    >
+                      <Icon size={14} />
+                      {homeViewLabels[view]}
+                      <span className='text-[11px] font-normal text-solid-gray-536'>{viewCounts[view]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className='inline-flex items-center gap-1.5 rounded-md border border-solid-gray-200 bg-solid-gray-50 px-3 py-2 text-[13px] font-bold text-solid-gray-800'>
+                {(() => {
+                  const Icon = viewIconMap[activeView];
+                  return <Icon size={14} />;
+                })()}
+                {homeViewLabels[activeView]}
+              </span>
+            )}
+          </div>
+
+          <div className='flex flex-wrap items-center gap-2'>
+            <span className='text-[13px] font-bold text-solid-gray-700'>スコープ</span>
+            <div className='inline-flex rounded-8 border border-solid-gray-200 bg-solid-gray-50 p-1'>
+              {scopeOptions.map((scope) => (
+                <button
+                  className={cn(
+                    buttonBaseStyle,
+                    'rounded-md px-3 py-1.5 text-[13px] font-bold leading-none transition-colors',
+                    workScope === scope.value
+                      ? 'bg-white text-blue-900 shadow-sm'
+                      : 'text-solid-gray-700 hover:text-solid-gray-900',
+                  )}
+                  key={scope.value}
+                  onClick={() => setWorkScope(scope.value)}
+                  type='button'
+                >
+                  {scope.label}
+                  <span className='ml-1 text-[11px] font-normal text-solid-gray-536'>{scope.count}</span>
+                </button>
+              ))}
+            </div>
             <button
               className={cn(
                 buttonBaseStyle,
-                'flex items-center gap-2 rounded-8 border px-3 py-2 text-[14px] font-bold leading-none transition-colors',
-                activeView === view
+                'flex items-center gap-1.5 rounded-8 border px-3 py-2 text-[13px] font-bold leading-none transition-colors',
+                pendingOnly
                   ? 'border-blue-900 bg-blue-50 text-blue-900'
-                  : 'border-solid-gray-200 bg-white text-solid-gray-700 hover:bg-solid-gray-50 hover:text-solid-gray-900',
+                  : 'border-solid-gray-200 bg-white text-solid-gray-700 hover:bg-solid-gray-50',
               )}
-              key={view}
-              onClick={() => setActiveView(view)}
+              onClick={() => setPendingOnly((current) => !current)}
               type='button'
             >
-              <Icon size={15} />
-              {homeViewLabels[view]}
-              <span className='text-[12px] font-normal text-solid-gray-536'>{viewCounts[view]}</span>
+              <ClipboardCheck size={14} />
+              未処理のみ
+              <span className='text-[11px] font-normal text-solid-gray-536'>{pendingPatients.length}</span>
             </button>
-          );
-        })}
+          </div>
+        </div>
       </section>
 
       <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
@@ -639,7 +648,7 @@ export const ReceptionBoard = ({
           <div className='px-5 py-10 text-center lg:px-6'>
             <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>該当する患者がいません</p>
             <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-536'>
-              ビュー、検索条件、または受付状態を見直してください。
+              患者群、スコープ、フィルタ、または受付状態を見直してください。
             </p>
           </div>
         ) : null}

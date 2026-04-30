@@ -1,7 +1,7 @@
 import { readStorage, writeStorage } from './storage';
 
 export type HomeProfile = 'clinic' | 'hospital' | 'ward' | 'er' | 'personal';
-export type HomeView = 'outpatient' | 'inpatient' | 'emergency' | 'personal' | 'pending' | 'recent';
+export type HomeView = 'outpatient' | 'inpatient' | 'emergency';
 
 export type HomeSettings = {
   profile: HomeProfile;
@@ -21,9 +21,6 @@ export const homeViewLabels: Record<HomeView, string> = {
   outpatient: '外来',
   inpatient: '入院',
   emergency: '救急',
-  personal: '自分の担当',
-  pending: '未処理',
-  recent: '最近',
 };
 
 export const homeProfileConfigs: Record<HomeProfile, HomeProfileConfig> = {
@@ -31,31 +28,31 @@ export const homeProfileConfigs: Record<HomeProfile, HomeProfileConfig> = {
     label: 'クリニック外来',
     description: '予約時刻と受付状態を中心に、本日の外来患者を開く構成です。',
     defaultView: 'outpatient',
-    views: ['outpatient', 'pending', 'recent'],
+    views: ['outpatient'],
   },
   hospital: {
     label: '病院外来',
-    description: '外来を起点に、入院患者や未処理も横断して確認する構成です。',
+    description: '外来と入院を切り替え、未処理はフィルタとして確認する構成です。',
     defaultView: 'outpatient',
-    views: ['outpatient', 'inpatient', 'pending', 'recent'],
+    views: ['outpatient', 'inpatient'],
   },
   ward: {
     label: '病棟',
     description: '病棟・病室、主治医、入院日数、未読結果を中心に見る構成です。',
     defaultView: 'inpatient',
-    views: ['inpatient', 'personal', 'pending', 'recent'],
+    views: ['inpatient', 'outpatient'],
   },
   er: {
     label: '救急',
     description: '到着時刻、トリアージ、滞在時間を優先する救急向け構成です。',
     defaultView: 'emergency',
-    views: ['emergency', 'outpatient', 'inpatient', 'pending', 'recent'],
+    views: ['emergency', 'outpatient', 'inpatient'],
   },
   personal: {
     label: '医師個人',
-    description: '自分の担当患者、未処理、最近開いたカルテを横断する構成です。',
-    defaultView: 'personal',
-    views: ['personal', 'outpatient', 'inpatient', 'pending', 'recent'],
+    description: '外来と入院を切り替えながら、自分の担当患者を初期スコープにする構成です。',
+    defaultView: 'outpatient',
+    views: ['outpatient', 'inpatient'],
   },
 };
 
