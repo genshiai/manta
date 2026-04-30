@@ -24,7 +24,7 @@ export const StatusFooter = ({ screen, currentPatient, chartMeta, currentUser }:
         <span>{currentUser.displayName}</span>
         <span className='text-solid-gray-400'>·</span>
         <span>
-          {screen === 'reception' ? '本日の診療キュー' : screen === 'chart' ? 'AIカルテ' : '管理設定'}
+          {screen === 'reception' ? 'ホーム' : screen === 'chart' ? 'AIカルテ' : '管理設定'}
         </span>
         {screen === 'chart' ? (
           <>

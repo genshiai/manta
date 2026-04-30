@@ -1,4 +1,4 @@
-import { Command, PanelLeft, Search, Settings, Sparkles, Users } from 'lucide-react';
+import { Command, House, Search, Settings, Sparkles } from 'lucide-react';
 import type { PatientRecord } from '../data/chartMock';
 import type { UserSession } from '../types/workflow';
 import { Button } from './ui/button';
@@ -15,7 +15,7 @@ type AppHeaderProps = {
 };
 
 const screenLabel = {
-  reception: '本日の診療キュー',
+  reception: 'ホーム',
   chart: 'AIカルテ',
   settings: '管理設定',
 } as const;
@@ -48,8 +48,8 @@ export const AppHeader = ({
         onClick={() => onNavigate('reception')}
         className="ml-2 hidden shrink-0 gap-1.5 xl:inline-flex"
       >
-        <PanelLeft size={15} />
-        診療キュー
+        <House size={15} />
+        ホーム
       </Button>
 
       {currentPatient ? (
@@ -88,9 +88,9 @@ export const AppHeader = ({
           variant="ghost"
           size="icon"
           onClick={() => onNavigate('reception')}
-          title="本日の診療キュー"
+          title="ホーム"
         >
-          <Users size={17} />
+          <House size={17} />
         </Button>
         <Button
           type="button"
