@@ -4,18 +4,6 @@
 @import './styles/theme.css';
 @import './styles/base.css';
 
-/* === Manta-specific overrides === */
-:root {
-  /* 日本語 (Noto Sans JP) との混植: Inter を優先しつつ JP フォールバックで日本語可読性を確保 */
-  font-family:
-    'Inter',
-    'Noto Sans JP',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
 html {
   /* 旧 index.css 由来: 背景はテーマトークンに従う */
   scroll-behavior: smooth;
