@@ -5,13 +5,13 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap font-bold transition-colors duration-150 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-brand/20",
+  "inline-flex items-center justify-center whitespace-nowrap font-bold transition-colors duration-150 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 shrink-0 outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--brand-focus-ring)] focus-visible:ring-offset-0",
   {
     variants: {
       variant: {
         // 토스 스타일: brandSolid — 키컬러 배경, 흰 텍스트
         default:
-          "bg-brand text-white active:bg-brand/85 disabled:bg-surface-muted disabled:text-text-disabled",
+          "bg-brand text-white hover:bg-brand-hover active:bg-brand-hover/90 disabled:bg-surface-muted disabled:text-text-disabled",
         // neutralSolid — 어두운 배경, 흰 텍스트
         neutral:
           "bg-primary text-primary-foreground active:bg-primary/85 disabled:bg-surface-muted disabled:text-text-disabled",
@@ -23,7 +23,7 @@ const buttonVariants = cva(
           "bg-destructive text-white active:bg-destructive/85 focus-visible:ring-destructive/20 disabled:bg-surface-muted disabled:text-text-disabled",
         // outline — 테두리만
         outline:
-          "border border-border bg-transparent text-text-primary active:bg-surface-muted/50 disabled:border-surface-muted disabled:text-text-disabled dark:border-white/8",
+          "border border-brand bg-transparent text-brand hover:border-brand-hover hover:text-brand-hover active:bg-brand-tint disabled:border-surface-muted disabled:text-text-disabled",
         // ghost — 배경/테두리 없음
         ghost:
           "bg-transparent text-text-primary active:bg-surface-muted/50 disabled:text-text-disabled",
@@ -40,6 +40,12 @@ const buttonVariants = cva(
         icon: "size-10 rounded-full [&_svg:not([class*='size-'])]:size-[18px]",
       },
     },
+    compoundVariants: [
+      {
+        variant: ["default", "outline"],
+        class: "rounded-full",
+      },
+    ],
     defaultVariants: {
       variant: "default",
       size: "md",
