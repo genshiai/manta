@@ -14,10 +14,10 @@ const buttonVariants = cva(
           "bg-brand text-white active:bg-brand/85 disabled:bg-surface-muted disabled:text-text-disabled",
         // neutralSolid — 어두운 배경, 흰 텍스트
         neutral:
-          "bg-[#2A2A2A] text-white active:bg-[#3C3C3C] disabled:bg-surface-muted disabled:text-text-disabled dark:bg-[#E0E0E0] dark:text-[#121212] dark:active:bg-[#C0C0C0]",
+          "bg-primary text-primary-foreground active:bg-primary/85 disabled:bg-surface-muted disabled:text-text-disabled",
         // neutralWeak — 연한 회색 배경, 어두운 텍스트
         secondary:
-          "bg-[#F3F4F5] text-text-primary active:bg-[#EAEBEC] disabled:bg-surface-muted disabled:text-text-disabled dark:bg-[#2B2E35] dark:text-[#E0E0E0] dark:active:bg-[#393D46]",
+          "bg-surface-subtle text-text-primary active:bg-surface-muted disabled:bg-surface-muted disabled:text-text-disabled dark:bg-secondary dark:active:bg-accent",
         // criticalSolid — 위험 액션
         destructive:
           "bg-destructive text-white active:bg-destructive/85 focus-visible:ring-destructive/20 disabled:bg-surface-muted disabled:text-text-disabled",

@@ -41,7 +41,12 @@ function DonutChartCard({
   className,
   ...props
 }: DonutChartCardProps) {
-  const grayColors = ["#D4D4D4", "#A8A8A8", "#8B8B8B", "#6B6B6B"]
+  const grayColors = [
+    "var(--border)",
+    "color-mix(in srgb, var(--text-tertiary) 45%, var(--background))",
+    "var(--text-tertiary)",
+    "color-mix(in srgb, var(--text-primary) 82%, var(--background))",
+  ]
 
   return (
     <div
