@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { ExternalLink, Plus, Search, X } from 'lucide-react';
 import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { buildPmdaDrugInfoUrl } from '../../lib/pmda';
@@ -61,66 +67,197 @@ export const OrderPane = ({
   onAddPrescriptionsBatch,
 }: OrderPaneProps) => {
   const [tab, setTab] = useState<OrderTab>('prescription');
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const openAddDialog = (nextTab: OrderTab) => {
+    setTab(nextTab);
+    setAddDialogOpen(true);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Tabs
-        value={tab}
-        onValueChange={(v) => setTab(v as OrderTab)}
-        className="flex h-full min-h-0 flex-col"
-      >
-        <div className="flex-shrink-0 border-b border-border px-3 pt-3">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="prescription">処方</TabsTrigger>
-            <TabsTrigger value="lab">検査</TabsTrigger>
-            <TabsTrigger value="imaging">画像</TabsTrigger>
-            <TabsTrigger value="procedure">処置</TabsTrigger>
-          </TabsList>
-          <p className="mt-2 truncate px-1 text-[11px] text-text-tertiary" title={orderMessage}>
-            {orderMessage}
-          </p>
+      <div className="flex-shrink-0 border-b border-border p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-[14px] font-bold text-text-primary">本日のキュー</h2>
+          <Button variant="default" size="xs" onClick={() => openAddDialog('prescription')}>
+            <Plus size={12} />
+            追加
+          </Button>
         </div>
+        <p className="truncate text-[11px] text-text-tertiary" title={orderMessage}>
+          {orderMessage}
+        </p>
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <TabsContent value="prescription" className="m-0 p-3">
-            <PrescriptionTab
-              orderConfig={orderConfig}
-              prescriptions={prescriptions}
-              isMutating={isMutating}
-              onAdd={onAddPrescription}
-              onAddBatch={onAddPrescriptionsBatch}
-            />
-          </TabsContent>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <QueueSection
+          title="処方"
+          count={prescriptions.length}
+          onAdd={() => openAddDialog('prescription')}
+        >
+          {prescriptions.length > 0 ? (
+            prescriptions.map((p, idx) => (
+              <QueueItem
+                // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
+                key={`${p.drugName}-${p.dosage}-${idx}`}
+                title={p.drugName}
+                meta={`${p.dosage} ・ ${p.days}`}
+              />
+            ))
+          ) : (
+            <QueueEmpty>未追加</QueueEmpty>
+          )}
+        </QueueSection>
 
-          <TabsContent value="lab" className="m-0 p-3">
-            <LabTab
-              orderConfig={orderConfig}
-              labOrders={labOrders}
-              isMutating={isMutating}
-              onAdd={onAddLab}
-            />
-          </TabsContent>
+        <QueueSection title="検査" count={labOrders.length} onAdd={() => openAddDialog('lab')}>
+          {labOrders.length > 0 ? (
+            labOrders.map((order, idx) => (
+              <QueueItem
+                // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
+                key={`${order.category}-${idx}`}
+                title={order.category}
+                meta={`${order.items.join('・') || '項目未設定'}${order.urgency === '至急' ? ' ・ 至急' : ''}`}
+              />
+            ))
+          ) : (
+            <QueueEmpty>未追加</QueueEmpty>
+          )}
+        </QueueSection>
 
-          <TabsContent value="imaging" className="m-0 p-3">
-            <ImagingTab
-              imagingOrders={imagingOrders}
-              isMutating={isMutating}
-              onAdd={onAddImaging}
-            />
-          </TabsContent>
+        <QueueSection title="画像" count={imagingOrders.length} onAdd={() => openAddDialog('imaging')}>
+          {imagingOrders.length > 0 ? (
+            imagingOrders.map((order, idx) => (
+              <QueueItem
+                // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
+                key={`${order.category}-${order.scheduledAt}-${idx}`}
+                title={order.category}
+                meta={`${order.scheduledAt || '日時未定'} ・ ${order.status === 'scheduled' ? '予定' : '下書き'}`}
+              />
+            ))
+          ) : (
+            <QueueEmpty>未追加</QueueEmpty>
+          )}
+        </QueueSection>
 
-          <TabsContent value="procedure" className="m-0 p-3">
-            <ProcedureTab
-              procedureOrders={procedureOrders}
-              isMutating={isMutating}
-              onAdd={onAddProcedure}
-            />
-          </TabsContent>
-        </div>
-      </Tabs>
+        <QueueSection title="処置" count={procedureOrders.length} onAdd={() => openAddDialog('procedure')}>
+          {procedureOrders.length > 0 ? (
+            procedureOrders.map((order, idx) => (
+              <QueueItem
+                // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
+                key={`${order.title}-${idx}`}
+                title={order.title}
+                meta={order.status === 'planned' ? '予定' : '完了'}
+              />
+            ))
+          ) : (
+            <QueueEmpty>未追加</QueueEmpty>
+          )}
+        </QueueSection>
+
+        <section className="border-b border-border p-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-[13px] font-bold text-text-primary">次回予約</h3>
+            <span className="text-[11px] text-text-tertiary">診察終了時に設定</span>
+          </div>
+          <QueueEmpty>未設定</QueueEmpty>
+        </section>
+      </div>
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-h-[86vh] max-w-2xl overflow-y-auto bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-[18px] font-bold">オーダ追加</DialogTitle>
+          </DialogHeader>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as OrderTab)} className="min-h-0">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="prescription">処方</TabsTrigger>
+              <TabsTrigger value="lab">検査</TabsTrigger>
+              <TabsTrigger value="imaging">画像</TabsTrigger>
+              <TabsTrigger value="procedure">処置</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="prescription" className="m-0 pt-3">
+              <PrescriptionTab
+                orderConfig={orderConfig}
+                prescriptions={prescriptions}
+                isMutating={isMutating}
+                onAdd={onAddPrescription}
+                onAddBatch={onAddPrescriptionsBatch}
+              />
+            </TabsContent>
+
+            <TabsContent value="lab" className="m-0 pt-3">
+              <LabTab
+                orderConfig={orderConfig}
+                labOrders={labOrders}
+                isMutating={isMutating}
+                onAdd={onAddLab}
+              />
+            </TabsContent>
+
+            <TabsContent value="imaging" className="m-0 pt-3">
+              <ImagingTab
+                imagingOrders={imagingOrders}
+                isMutating={isMutating}
+                onAdd={onAddImaging}
+              />
+            </TabsContent>
+
+            <TabsContent value="procedure" className="m-0 pt-3">
+              <ProcedureTab
+                procedureOrders={procedureOrders}
+                isMutating={isMutating}
+                onAdd={onAddProcedure}
+              />
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
+const QueueSection = ({
+  title,
+  count,
+  onAdd,
+  children,
+}: {
+  title: string;
+  count: number;
+  onAdd: () => void;
+  children: ReactNode;
+}) => (
+  <section className="border-b border-border p-4">
+    <div className="mb-2 flex items-center justify-between gap-2">
+      <h3 className="text-[13px] font-bold text-text-primary">
+        {title} <span className="text-text-tertiary">({count})</span>
+      </h3>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="inline-flex h-7 items-center gap-1 rounded-full border border-border-strong px-2.5 text-[11px] font-medium text-brand hover:border-brand hover:bg-brand-tint"
+      >
+        <Plus size={12} />
+        追加
+      </button>
+    </div>
+    <div className="space-y-1.5">{children}</div>
+  </section>
+);
+
+const QueueItem = ({ title, meta }: { title: string; meta: string }) => (
+  <div className="rounded-md bg-surface-subtle px-3 py-2">
+    <p className="truncate text-[12px] font-bold text-text-primary">{title}</p>
+    <p className="mt-0.5 truncate text-[11px] text-text-tertiary">{meta}</p>
+  </div>
+);
+
+const QueueEmpty = ({ children }: { children: ReactNode }) => (
+  <div className="rounded-md border border-dashed border-border px-3 py-3 text-center text-[12px] text-text-tertiary">
+    {children}
+  </div>
+);
 
 // === 処方タブ (薬剤検索・PMDA・セット展開) ===
 

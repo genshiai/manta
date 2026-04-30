@@ -6,8 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { searchDiagnoses } from '../../lib/api';
 import type { PatientRecord } from '../../data/chartMock';
 import type {
+  ChartHistoryEntry,
   DiagnosisSearchResult,
+  ImagingOrderEntry,
   PatientProfileEntry,
+  PrescriptionEntry,
   ProblemListItem,
   VisitHistoryEntry,
 } from '../../types/workflow';
@@ -20,11 +23,24 @@ type PatientPaneProps = {
   profile: EditableProfile[];
   problems: EditableProblem[];
   visitHistory: VisitHistoryEntry[];
+  chartHistory: ChartHistoryEntry[];
+  prescriptions: PrescriptionEntry[];
+  labOrders: LabOrderRow[];
+  imagingOrders: ImagingOrderEntry[];
   isMutating: boolean;
   onSaveContext: (
     profile: EditableProfile[],
     problems: EditableProblem[],
   ) => Promise<void>;
+  onOpenCalendar: () => void;
+};
+
+type LabOrderRow = {
+  category: string;
+  status: 'done' | 'pending';
+  urgency?: '通常' | '至急';
+  items: string[];
+  createdAt?: string;
 };
 
 type SubTab = 'basic' | 'problems' | 'visits';
@@ -43,6 +59,33 @@ const problemStatusLabel = (status: string) => {
 
 const newId = () => `local-${Math.random().toString(36).slice(2, 10)}`;
 
+const normalizeDate = (date: string): string => date.replaceAll('-', '/');
+
+const todayKey = () => {
+  const now = new Date();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${now.getFullYear()}/${month}/${day}`;
+};
+
+const currentMonthDays = () => {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    return day;
+  });
+};
+
+const dateKey = (date: Date): string => {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}/${month}/${day}`;
+};
+
 /**
  * 左ペイン (WHO・不変情報)
  *
@@ -55,13 +98,33 @@ export const PatientPane = ({
   profile,
   problems,
   visitHistory,
+  chartHistory,
+  prescriptions,
+  labOrders,
+  imagingOrders,
   isMutating,
   onSaveContext,
+  onOpenCalendar,
 }: PatientPaneProps) => {
   const [tab, setTab] = useState<SubTab>('basic');
   const [editingProfile, setEditingProfile] = useState<EditableProfile[]>(profile);
   const [editingProblems, setEditingProblems] = useState<EditableProblem[]>(problems);
   const [editMode, setEditMode] = useState(false);
+  const calendarEvents = useMemo(() => {
+    const map = new Map<string, Set<'chart' | 'lab' | 'rx' | 'image'>>();
+    const add = (date: string | undefined, kind: 'chart' | 'lab' | 'rx' | 'image') => {
+      if (!date) return;
+      const key = normalizeDate(date.split(' ')[0] ?? date);
+      const existing = map.get(key) ?? new Set<'chart' | 'lab' | 'rx' | 'image'>();
+      existing.add(kind);
+      map.set(key, existing);
+    };
+    for (const entry of chartHistory) add(entry.date, 'chart');
+    for (const order of labOrders) add(order.createdAt ?? todayKey(), 'lab');
+    for (const prescription of prescriptions) add(prescription.createdAt ?? todayKey(), 'rx');
+    for (const order of imagingOrders) add(order.scheduledAt || todayKey(), 'image');
+    return map;
+  }, [chartHistory, labOrders, prescriptions, imagingOrders]);
 
   // 親 props 同期 (患者切替時など)
   useEffect(() => {
@@ -87,6 +150,7 @@ export const PatientPane = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <MiniCalendar events={calendarEvents} onOpenCalendar={onOpenCalendar} />
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as SubTab)}
@@ -143,6 +207,101 @@ export const PatientPane = ({
     </div>
   );
 };
+
+const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image', string> = {
+  chart: 'bg-brand',
+  lab: 'bg-success',
+  rx: 'bg-warning',
+  image: 'bg-chart-3',
+};
+
+const MiniCalendar = ({
+  events,
+  onOpenCalendar,
+}: {
+  events: Map<string, Set<'chart' | 'lab' | 'rx' | 'image'>>;
+  onOpenCalendar: () => void;
+}) => {
+  const days = currentMonthDays();
+  const now = new Date();
+  const selectedKey = todayKey();
+
+  return (
+    <section className="flex-shrink-0 border-b border-border p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+          カレンダー
+        </h3>
+        <button
+          type="button"
+          onClick={onOpenCalendar}
+          className="text-[11px] font-medium text-brand hover:text-brand-hover"
+        >
+          月表示
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onOpenCalendar}
+        className="w-full rounded-lg border border-border bg-card p-2 text-left"
+      >
+        <div className="mb-2 text-[12px] font-bold text-text-primary">
+          {now.getFullYear()}年 {now.getMonth() + 1}月
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {['日', '月', '火', '水', '木', '金', '土'].map((dow) => (
+            <div key={dow} className="text-center text-[10px] font-bold text-text-tertiary">
+              {dow}
+            </div>
+          ))}
+          {days.map((day) => {
+            const key = dateKey(day);
+            const dayEvents = events.get(key);
+            const muted = day.getMonth() !== now.getMonth();
+            const selected = key === selectedKey;
+            return (
+              <div
+                key={key}
+                className={`flex aspect-square flex-col items-center justify-center rounded text-[11px] ${
+                  selected
+                    ? 'bg-brand text-white'
+                    : muted
+                      ? 'text-text-tertiary/50'
+                      : 'text-text-primary'
+                }`}
+              >
+                <span>{day.getDate()}</span>
+                {dayEvents ? (
+                  <span className="mt-0.5 flex h-1 gap-0.5">
+                    {Array.from(dayEvents).map((event) => (
+                      <span
+                        key={event}
+                        className={`size-1 rounded-full ${selected ? 'bg-white' : eventDotClass[event]}`}
+                      />
+                    ))}
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </button>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <CalendarChip className="bg-brand" label="カルテ" />
+        <CalendarChip className="bg-success" label="検査" />
+        <CalendarChip className="bg-warning" label="処方" />
+        <CalendarChip className="bg-chart-3" label="画像" />
+      </div>
+    </section>
+  );
+};
+
+const CalendarChip = ({ className, label }: { className: string; label: string }) => (
+  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-subtle px-2 py-0.5 text-[11px] text-text-secondary">
+    <span className={`size-1.5 rounded-full ${className}`} />
+    {label}
+  </span>
+);
 
 // === 基本タブ ===
 

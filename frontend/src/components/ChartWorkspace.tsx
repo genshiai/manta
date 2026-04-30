@@ -44,6 +44,18 @@ import { PatientPane } from './chart/PatientPane';
 import { RecordPane } from './chart/RecordPane';
 import type { SoapDraft } from './chart/SoapEditor';
 
+type ChartView = 'history' | 'calendar' | 'labs' | 'imaging' | 'documents' | 'reservations' | 'search';
+
+const chartTabs: Array<{ value: ChartView; label: string }> = [
+  { value: 'history', label: '履歴' },
+  { value: 'calendar', label: 'カレンダー' },
+  { value: 'labs', label: '検査' },
+  { value: 'imaging', label: '画像' },
+  { value: 'documents', label: '文書' },
+  { value: 'reservations', label: '予約' },
+  { value: 'search', label: '検索' },
+];
+
 type ChartWorkspaceProps = {
   patient: PatientRecord;
   currentUser: UserSession;
@@ -124,6 +136,7 @@ export function ChartWorkspace({
   const [prescriptionTimeline, setPrescriptionTimeline] = useState<PrescriptionTimelineGroup[]>(
     [],
   );
+  const [activeView, setActiveView] = useState<ChartView>('history');
 
   // SOAP & 保存状態
   const [draft, setDraft] = useState<SoapDraft>(emptyDraft);
@@ -536,18 +549,44 @@ export function ChartWorkspace({
           onOpenLabs={() => setLabsSheetOpen(true)}
         />
       }
+      tabs={
+        <nav className="flex h-11 items-end gap-1 px-6" aria-label="カルテ画面">
+          {chartTabs.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setActiveView(tab.value)}
+              className={`h-full border-b-2 px-4 text-[13px] font-medium transition-colors ${
+                activeView === tab.value
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+              aria-current={activeView === tab.value ? 'page' : undefined}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      }
       left={
         <PatientPane
           patient={patient}
           profile={profile}
           problems={problems}
           visitHistory={visitHistory}
+          chartHistory={chartHistory}
+          prescriptions={prescriptions}
+          labOrders={labOrders}
+          imagingOrders={imagingOrders}
           isMutating={isMutating}
           onSaveContext={handleSaveContext}
+          onOpenCalendar={() => setActiveView('calendar')}
         />
       }
       center={
         <RecordPane
+          patientId={patient.id}
+          view={activeView}
           draft={draft}
           isDirty={isDirty}
           vitals={vitals}
@@ -558,6 +597,10 @@ export function ChartWorkspace({
           chartHistory={chartHistory}
           prescriptionTimeline={prescriptionTimeline}
           labResults={labResults}
+          labLongTrends={labLongTrends}
+          labOrders={labOrders}
+          imagingOrders={imagingOrders}
+          reservationSlots={reservationSlots}
           workspaceError={workspaceError}
           isLoading={isLoading}
           onDraftChange={setDraft}
