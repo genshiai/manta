@@ -7,6 +7,7 @@
 処方検索 UX は [PRESCRIPTION_SEARCH_UX.md](/Users/daichi/Work/genshiai/manta/docs/PRESCRIPTION_SEARCH_UX.md) を参照してください。
 PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/genshiai/manta/docs/PMDA_SYNC_STRATEGY.md) を参照してください。
 レセコン連携 / AI 算定補助方針は [RECEIPT_GATEWAY_STRATEGY.md](RECEIPT_GATEWAY_STRATEGY.md) を参照してください。
+backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) を参照してください。
 
 前提は以下の通りです。
 
@@ -15,7 +16,7 @@ PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/gens
 - Tailwind は `@digital-go-jp/tailwind-theme-plugin` で統一する
 - 未実装コンポーネントは Headless UI / APG 準拠で補う
 - まずは「外来 1 ループ」を end-to-end で通す
-- レセコン連携は Manta 本体から直結せず、Receipt Gateway / Billing Core / adapter 層を経由する
+- レセコン連携は Mantaカルテから直結せず、Mantaレセコン / レセコン連携層 / adapter を経由する
 
 ## 実装原則
 
@@ -83,7 +84,7 @@ PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/gens
 - 検査結果参照との接続
 - Order Catalog と公式マスター参照の分離
 
-### Wave 4.5: Billing Core / Receipt Gateway
+### Wave 4.5: Mantaレセコン入口 / レセコン連携層
 
 - 診療行為 / 医薬品 / 特定器材 / 傷病名 / コメント master の取り込み口を整備
 - オーダから `BillingCandidate` を生成
@@ -91,6 +92,13 @@ PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/gens
 - AI Claims Assist が送信前レビュー用の説明を生成
 - `ClaimDraft` を保存し、レセコン送信前に人間が確認できる画面を作る
 - ORCA adapter はまず stub として実装し、実環境連携は後続で進める
+
+### Wave 4.6: backend モジュール再編
+
+- `main.py`, `models.py`, `schemas.py` に集約された実装を段階的に分割する
+- `modules/chart`, `modules/orders`, `modules/masters`, `modules/order_catalog`, `modules/rececon`, `modules/integrations` の境界を作る
+- 既存 API の URL と response は維持し、router 分割から始める
+- 物理サーバー分割は行わず、FastAPI / PostgreSQL のモジュラーモノリスを維持する
 
 ### Wave 5: 予約と監査
 
@@ -148,7 +156,7 @@ PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/gens
 - 8.1: 検査セット追加、通常 / 至急指定
 - 24.1: 検査結果表示、異常値色分け
 - 25.12: 認証 / 患者選択 / 保存 / オーダ / 予約の操作ログ表示
-- 独自: Receipt Gateway / AI 算定補助の方針を ADR 0004 と戦略ドキュメントに固定
+- 独自: Mantaレセコン / レセコン連携層 / AI 算定補助の方針を ADR 0004 と戦略ドキュメントに固定
 
 ## 次の実装焦点
 
@@ -186,7 +194,8 @@ PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/gens
 - 検査結果は `lab_results.history` を返すようにして、結果タブで 3 回分の推移グラフと比較パネルを表示できるようにした
 - `GET /api/patients/{patient_id}/lab-trends` を追加し、FHIR Observation 正本から項目別の長期検査トレンド、最新値、前回差分、異常回数を返すようにした
 - 結果タブの検査推移パネルは長期検査トレンド API を優先し、選択項目ごとの全履歴推移と異常回数を確認できるようにした
-- レセコン連携は ORCA 直結ではなく Receipt Gateway / Billing Core / ORCA adapter に分離する方針を採用し、AI は最終請求確定ではなく算定候補レビューを補助する位置づけにした
+- レセコン連携は ORCA 直結ではなく Mantaレセコン / Billing Core / レセコン連携層 / ORCA adapter に分離する方針を採用し、AI は最終請求確定ではなく算定候補レビューを補助する位置づけにした
+- backend は当面 1 FastAPI app のまま、`modules/chart`, `modules/orders`, `modules/masters`, `modules/order_catalog`, `modules/rececon`, `modules/integrations` に分割する方針にした
 - `scripts/verify_local.py` を追加し、pytest / lint / build / migration / compose / preview smoke を 1 コマンドで確認できるようにした
 - backend test は更新系テスト後に cleanup するように直し、開発 DB を汚さずに繰り返し回せるようにした
 - 次の主課題は外部 preview への公開と、マスタの更新者 / 更新日時表示、レビュー運用の整備
