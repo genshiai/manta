@@ -11,11 +11,11 @@ backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_REST
 
 前提は以下の通りです。
 
-- UI はデジタル庁デザインシステムをそのまま使う
-- React コンポーネントは `@digital-go-jp/design-system-example-components-react` を優先する
-- Tailwind は `@digital-go-jp/tailwind-theme-plugin` で統一する
-- 未実装コンポーネントは Headless UI / APG 準拠で補う
-- まずは「外来 1 ループ」を end-to-end で通す
+- UI は Apple HIG 寄りの Manta 独自トークンへ移行済み。デジタル庁デザインシステムは過去の参照であり、新規 UI の前提にしない
+- React コンポーネントは既存の `frontend/src/components/ui` とカルテ専用分割コンポーネントを優先する
+- Tailwind v4 + CSS token を正本にし、色・角丸・フォーカスリングは `frontend/src/styles/theme.css` に寄せる
+- 未実装コンポーネントは Radix / APG 準拠で補う
+- まずは「外来 1 ループ」を end-to-end で通し、その上で病院外来・入院・救急のビューを拡張する
 - レセコン連携は Mantaカルテから直結せず、Mantaレセコン / レセコン連携層 / adapter を経由する
 
 ## 実装原則
@@ -140,8 +140,28 @@ backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_REST
 - Wave 2: 完了
 - Wave 3: 完了
 - Wave 4: UI 完了、FastAPI の受け口を実装
+- Wave 4.5: 方針決定済み。Mantaレセコン / レセコン連携 / AI 算定補助は設計確定、実装はこれから
+- Wave 4.6: 方針決定済み。`karte / master_data / order_catalog / rececon / gateway` への backend 分割はこれから
 - Wave 5: UI 完了、FastAPI に監査ログ / 認証 / 予約 / 利用者マスタ API を追加
 - Wave 6: ローカル preview compose を実装
+
+## 本筋の現在地
+
+Mantaカルテ本体は **外来 1 ループの demo MVP はかなり進んでいる**。一方で、Mantaレセコンを追加したため、プロダクト全体ではまだ **MVP 前半** と見るべき。
+
+実装率の目安:
+
+| 領域 | 現在地 | 目安 |
+|---|---|---|
+| Mantaカルテ UI | Phase 6 初期完了。改善フェーズ | 70% |
+| カルテ API / 永続化 | 主要 API は動作。モジュール境界は未整理 | 55% |
+| オーダ / マスター | 処方・検査・予約 master はあり。公式診療報酬 master 連携は未着手 | 40% |
+| FHIR / 外部公開 | 主要 resource の preview adapter あり | 35% |
+| Mantaレセコン | 方針決定のみ。ClaimDraft / ReviewIssue は未実装 | 5% |
+| レセコン連携 | ORCA adapter 方針のみ。stub 未実装 | 5% |
+| AI算定補助 | UI concept と方針のみ。実API未接続 | 5% |
+
+したがって、次の山は UI ではなく **backend の責務分割 + レセコン最小スライス**。
 
 ## 現在の到達点
 

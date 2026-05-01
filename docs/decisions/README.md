@@ -38,6 +38,7 @@ NNNN-kebab-case-title.md
 |---|---|---|---|
 | [0001](0001-design-system-digital-cho-and-pivot.md) | デジタル庁デザインシステム参照と離脱の経緯 | Superseded by 0002 | design-system, frontend |
 | [0002](0002-styleseed-adoption.md) | styleseed 採用・Notion skin 単独構成・Tailwind v4 同時移行 | Accepted | design-system, frontend, tailwind |
+| [0003](0003-color-system-apple-hig.md) | Apple HIG (apple.com/jp) 準拠のカラーシステム採用 | Accepted | design-system, frontend, color-tokens, typography |
 
 ## ファイル一覧外（本ディレクトリのメタ）
 

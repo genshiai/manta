@@ -198,6 +198,31 @@ FHIR は同じ `gateway` の考え方で扱う。FHIR はカルテ正本では�
    - 会計、レセプト作成、月次請求、返戻/査定レビューを段階的に追加
    - 既存レセコン連携と併存できるよう、同じ `ClaimDraft` / `BillingCandidate` を入口にする
 
+## 規模感
+
+レセコン機能を入れると、Manta は「カルテ UI を作る」から「診療録、オーダ、病名、算定、会計、請求、外部連携を持つ医療基幹システム」になる。これは大きい。
+
+現実的には以下の 3 段階に分ける。
+
+| 段階 | 目的 | 実装量 | 到達点 |
+|---|---|---:|---|
+| Receipt MVP | カルテから算定候補を作り、人間が確認できる | 4〜8 週間 | ClaimDraft、BillingCandidate、ReviewIssue、AI確認理由、ORCA stub |
+| ORCA連携版 | 既存レセコンへ安全に流す | 2〜4 か月 | ORCA 日レセ API adapter、送信結果、エラー正規化、監査 |
+| Mantaレセコン本体 | 会計・月次請求・返戻/査定レビューまで内製 | 6〜12 か月以上 | 会計、レセプト作成、返戻、査定、医事運用、改定対応 |
+
+最初から完成レセコンを作るとカルテ MVP が止まる。先に **Receipt MVP** を作り、オーダ / 病名 / マスター / AI レビューのデータ構造を正しくする。
+
+## 直近の実装順
+
+1. backend を `karte / master_data / order_catalog / rececon / gateway` に分ける skeleton を作る
+2. `official_master_imports` と診療報酬系 master table を追加する
+3. `order_catalog_items` と `order_catalog_fee_links` を追加し、既存の処方・検査・画像候補を寄せる
+4. オーダ保存時に `BillingCandidate` を生成する
+5. `ClaimDraft` と `ClaimReviewIssue` を保存する
+6. カルテ画面または別画面に「算定候補レビュー」を追加する
+7. AI Claims Assist は ClaimDraft を読んで、病名不足・コメント不足・算定漏れ候補を説明する
+8. `gateway/orca` に stub を置き、送信前レビューから ORCA 送信の test double までつなぐ
+
 ## 最初の到達点
 
 Phase 1.5 として、Mantaレセコン本体までは作らず、以下を作る。

@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manta カラーパレット比較</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    /* Apple JP 仕様: SF Pro JP を最優先、ヒラギノ角ゴ Pro（ProN ではない） */
+    font-family: "SF Pro JP", "SF Pro Text", "SF Pro Icons",
+      "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3",
+      メイリオ, Meiryo, "ＭＳ Ｐゴシック",
+      -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Apple HIG 採用時のみ負のトラッキング（Apple の特徴） */
+  [data-theme="apple"] { letter-spacing: -0.012em; }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  /* ============ Theme A: Apple HIG (apple.com/jp 実測値) ============ */
+  /* ref: docs/design-reference/apple-jp-design.md */
+  [data-theme="apple"] {
+    --bg: #f5f5f7;            /* Apple セクション背景 */
+    --card: #FFFFFF;
+    --subtle: #f5f5f7;
+    --tinted: #e8f1fc;        /* Apple Blue 透過 */
+    --border: #D2D2D7;
+    --border-strong: #BCBCC2;
+    --text-primary: #1d1d1f;  /* Apple Near Black（純黒禁止） */
+    --text-secondary: rgba(29,29,31,0.72);
+    --text-tertiary: #6e6e73; /* Apple Glyph Gray Secondary */
+    --accent: #0071e3;        /* Apple CTA Blue */
+    --accent-hover: #0066cc;  /* Apple Link Blue */
+    --warning: #FF9500;       /* iOS System Orange */
+    --warning-bg: #FFF4E5;
+    --destructive: #FF3B30;   /* iOS System Red */
+    --destructive-bg: #FFE5E3;
+    --success: #34C759;       /* iOS System Green */
+    --success-bg: #E5F8EA;
+    --dot-soap: #0071e3;
+    --dot-lab: #34C759;
+    --dot-rx: #FF9500;
+    --dot-img: #AF52DE;       /* iOS System Purple */
+  }
+  /* Apple は CTA を完全ピル型（980px radius）にする */
+  [data-theme="apple"] .btn-primary,
+  [data-theme="apple"] .add-record-btn {
+    border-radius: 980px;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  [data-theme="apple"] .btn-primary:focus-visible,
+  [data-theme="apple"] .add-record-btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.2);
+  }
+
+  /* ============ Theme B: Notion 調整版（おすすめ） ============ */
+  [data-theme="notion"] {
+    --bg: #FAFAF9;
+    --card: #FFFFFF;
+    --subtle: #F4F3F1;
+    --tinted: #EEF3F8;
+    --border: #EAE8E4;
+    --border-strong: #DAD7D1;
+    --text-primary: #2C2925;
+    --text-secondary: #6B6864;
+    --text-tertiary: #9C9893;
+    --accent: #4A7AAF;
+    --accent-hover: #3B6594;
+    --warning: #C58A3F;
+    --warning-bg: #FAF3E0;
+    --destructive: #B0492C;
+    --destructive-bg: #F8E9E2;
+    --success: #6A9A6E;
+    --success-bg: #EAF1EB;
+    --dot-soap: #4A7AAF;
+    --dot-lab: #6A9A6E;
+    --dot-rx: #C58A3F;
+    --dot-img: #8A6BA0;
+  }
+
+  /* ============ Theme C: Linear ============ */
+  [data-theme="linear"] {
+    --bg: #FAFAFA;
+    --card: #FFFFFF;
+    --subtle: #F4F4F5;
+    --tinted: #EEF0FB;
+    --border: #E4E4E7;
+    --border-strong: #D4D4D8;
+    --text-primary: #1F1F1F;
+    --text-secondary: #71717A;
+    --text-tertiary: #A1A1AA;
+    --accent: #5E6AD2;
+    --accent-hover: #4F5BBE;
+    --warning: #F59E0B;
+    --warning-bg: #FEF3C7;
+    --destructive: #EF4444;
+    --destructive-bg: #FEE2E2;
+    --success: #10B981;
+    --success-bg: #D1FAE5;
+    --dot-soap: #5E6AD2;
+    --dot-lab: #10B981;
+    --dot-rx: #F59E0B;
+    --dot-img: #EC4899;
+  }
+
+  /* ============ Theme D: 医療ミューテッド ============ */
+  [data-theme="medical"] {
+    --bg: #FAF9F7;
+    --card: #FFFFFF;
+    --subtle: #F2F0EC;
+    --tinted: #EEF2F4;
+    --border: #E5E1DA;
+    --border-strong: #D5D0C7;
+    --text-primary: #2C2823;
+    --text-secondary: #6B6660;
+    --text-tertiary: #9D978F;
+    --accent: #5A7B8B;
+    --accent-hover: #46636F;
+    --warning: #B5894A;
+    --warning-bg: #F5EBDA;
+    --destructive: #A05A4A;
+    --destructive-bg: #F2E2DD;
+    --success: #7A9B7A;
+    --success-bg: #ECF1EC;
+    --dot-soap: #5A7B8B;
+    --dot-lab: #7A9B7A;
+    --dot-rx: #B5894A;
+    --dot-img: #8B7396;
+  }
+
+  /* ============ Switcher ============ */
+  .switcher {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 100;
+    display: flex;
+    gap: 6px;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  .switcher button {
+    padding: 8px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .switcher button:hover { background: rgba(0,0,0,0.04); }
+  .switcher button.active { background: #1C1C1E; color: #fff; }
+
+  /* ============ Layout ============ */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--bg);
+  }
+
+  .topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-radius: 6px;
+  }
+  .back-btn:hover { background: var(--subtle); color: var(--text-primary); }
+
+  .patient-ctx { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--tinted);
+    color: var(--accent);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .pname { font-weight: 700; font-size: 15px; color: var(--text-primary); }
+  .pmeta { font-size: 12px; color: var(--text-tertiary); margin-top: 1px; }
+  .alert-tag {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px;
+    background: var(--destructive-bg);
+    color: var(--destructive);
+    font-size: 11px; font-weight: 600;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+  .warning-tag {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px;
+    background: var(--warning-bg);
+    color: var(--warning);
+    font-size: 11px; font-weight: 600;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .btn {
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary {
+    background: var(--card); color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-secondary:hover { background: var(--subtle); }
+  .btn-ghost { color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--subtle); color: var(--text-primary); }
+
+  /* ============ Chart tabs ============ */
+  .chart-tabs {
+    flex-shrink: 0;
+    display: flex;
+    gap: 2px;
+    padding: 0 20px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ============ Main 3-pane ============ */
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 260px 1fr 320px;
+    min-height: 0;
+    background: var(--bg);
+  }
+
+  .pane {
+    background: var(--card);
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+  }
+  .pane:last-child { border-right: none; border-left: 1px solid var(--border); }
+  .pane.center { background: var(--bg); }
+
+  /* ============ Left pane ============ */
+  .pane-section { padding: 16px; border-bottom: 1px solid var(--border); }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    margin-bottom: 10px;
+  }
+
+  .profile-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+  .profile-row dt { color: var(--text-tertiary); }
+  .profile-row dd { color: var(--text-primary); font-weight: 500; }
+
+  .problem-list { display: flex; flex-direction: column; gap: 6px; }
+  .problem-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 10px;
+    background: var(--subtle);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .problem-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .problem-dot.active { background: var(--warning); }
+  .problem-dot.resolved { background: var(--success); }
+  .problem-name { font-weight: 600; color: var(--text-primary); }
+  .problem-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+  /* ============ Mini calendar ============ */
+  .mini-cal {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: var(--card);
+  }
+  .mini-cal-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .mini-cal-month { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+  .mini-cal-nav {
+    display: flex; gap: 2px;
+  }
+  .mini-cal-nav button {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 4px;
+    color: var(--text-tertiary);
+    font-size: 14px;
+  }
+  .mini-cal-nav button:hover { background: var(--subtle); color: var(--text-primary); }
+
+  .mini-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+  }
+  .mini-cal-dow {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 4px 0;
+    font-weight: 600;
+  }
+  .mini-cal-day {
+    aspect-ratio: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 11px;
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    padding-top: 2px;
+  }
+  .mini-cal-day.muted { color: var(--text-tertiary); opacity: 0.4; }
+  .mini-cal-day:hover { background: var(--subtle); }
+  .mini-cal-day.selected { background: var(--accent); color: #fff; font-weight: 700; }
+  .mini-cal-day.today { font-weight: 700; }
+  .mini-cal-day.today:not(.selected) { color: var(--accent); }
+
+  .day-dots {
+    display: flex; gap: 2px;
+    height: 4px;
+    margin-top: 1px;
+  }
+  .day-dots span {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+  }
+  .mini-cal-day.selected .day-dots span { background: rgba(255,255,255,0.85) !important; }
+
+  /* ============ Center pane ============ */
+  .center-inner { padding: 16px 28px 60px; max-width: 760px; margin: 0 auto; }
+  .center-actions {
+    display: flex; gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .add-record-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 7px;
+    transition: background-color 0.15s;
+  }
+  .add-record-btn:hover { background: var(--accent-hover); }
+  .add-record-btn .plus {
+    display: grid; place-items: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+    font-weight: 700;
+  }
+
+  /* ============ Past chart card ============ */
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 14px;
+    transition: border-color 0.15s;
+  }
+  .chart-card:hover { border-color: var(--border-strong); }
+  .chart-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--tinted); }
+
+  .chart-card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .chart-date { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+  .chart-meta { font-size: 12px; color: var(--text-tertiary); }
+  .chart-dept-tag {
+    display: inline-flex;
+    padding: 2px 8px;
+    background: var(--subtle);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+
+  .soap-block { margin-bottom: 10px; }
+  .soap-label {
+    display: inline-block;
+    width: 18px;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .soap-text {
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .chart-extras {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .extra-row {
+    display: flex; gap: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .extra-label {
+    flex-shrink: 0;
+    width: 50px;
+    color: var(--text-tertiary);
+    font-weight: 600;
+  }
+  .extra-content { color: var(--text-secondary); }
+
+  .lab-abnormal {
+    color: var(--destructive);
+    font-weight: 600;
+  }
+
+  /* ============ Right pane (今日のキュー) ============ */
+  .queue-section { padding: 16px; border-bottom: 1px solid var(--border); }
+  .queue-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .queue-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .add-btn-mini {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+  }
+  .add-btn-mini:hover { background: var(--tinted); border-color: var(--accent); }
+
+  .queue-item {
+    padding: 8px 10px;
+    background: var(--subtle);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .queue-item-name { font-weight: 600; color: var(--text-primary); }
+  .queue-item-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+  .queue-empty {
+    padding: 14px 10px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+  }
+
+  /* Calendar event filter chips */
+  .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px;
+    background: var(--subtle);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .chip.active {
+    background: var(--tinted);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .chip-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  /* ============ Status footer ============ */
+  .footer {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 20px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .footer-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+  .footer-saved { margin-left: auto; }
+
+  /* color swatch row at bottom */
+  .palette-info {
+    padding: 12px 20px;
+    background: var(--subtle);
+    border-top: 1px solid var(--border);
+    display: flex; gap: 16px; flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .swatch-group { display: flex; align-items: center; gap: 6px; }
+  .swatch {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+</style>
+</head>
+<body data-theme="apple">
+
+<nav class="switcher" role="tablist">
+  <button data-set="apple" class="active">A. Apple HIG ★（採用）</button>
+  <button data-set="notion">B. Notion 調整版</button>
+  <button data-set="linear">C. Linear</button>
+  <button data-set="medical">D. 医療ミューテッド</button>
+</nav>
+
+<div class="app">
+
+  <!-- ===== Top bar ===== -->
+  <header class="topbar">
+    <button class="back-btn">← 受付へ戻る</button>
+    <div class="patient-ctx">
+      <div class="avatar">佐</div>
+      <div>
+        <div>
+          <span class="pname">佐藤 次郎</span>
+          <span class="alert-tag">造影剤副反応歴</span>
+          <span class="warning-tag">高血圧</span>
+        </div>
+        <div class="pmeta">65歳 男性 ・ ID: 0007712301 ・ 循環器内科 ・ 担当: 田中 太郎 ・ v3 ・ 最終保存 2026/04/30 09:18</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn btn-ghost">検査結果</button>
+      <button class="btn btn-secondary">保存</button>
+      <button class="btn btn-primary">診察終了</button>
+    </div>
+  </header>
+
+  <!-- ===== Chart tabs ===== -->
+  <nav class="chart-tabs">
+    <button class="tab active">履歴</button>
+    <button class="tab">カレンダー</button>
+    <button class="tab">検査</button>
+    <button class="tab">画像</button>
+    <button class="tab">文書</button>
+    <button class="tab">予約</button>
+    <button class="tab">検索</button>
+  </nav>
+
+  <!-- ===== Main 3-pane ===== -->
+  <main class="main">
+
+    <!-- ----- Left pane (患者情報 + ミニカレンダー) ----- -->
+    <aside class="pane">
+
+      <div class="pane-section">
+        <div class="section-label">患者プロファイル</div>
+        <dl>
+          <div class="profile-row"><dt>生年月日</dt><dd>1960/05/12</dd></div>
+          <div class="profile-row"><dt>身長 / 体重</dt><dd>172 / 74kg</dd></div>
+          <div class="profile-row"><dt>保険</dt><dd>協会けんぽ</dd></div>
+          <div class="profile-row"><dt>主治医</dt><dd>田中 太郎</dd></div>
+        </dl>
+      </div>
+
+      <div class="pane-section">
+        <div class="section-label">カレンダー</div>
+        <div class="mini-cal">
+          <div class="mini-cal-head">
+            <span class="mini-cal-month">2026年 4月</span>
+            <div class="mini-cal-nav">
+              <button>‹</button><button>›</button>
+            </div>
+          </div>
+          <div class="mini-cal-grid">
+            <div class="mini-cal-dow">日</div>
+            <div class="mini-cal-dow">月</div>
+            <div class="mini-cal-dow">火</div>
+            <div class="mini-cal-dow">水</div>
+            <div class="mini-cal-dow">木</div>
+            <div class="mini-cal-dow">金</div>
+            <div class="mini-cal-dow">土</div>
+
+            <div class="mini-cal-day muted">29</div>
+            <div class="mini-cal-day muted">30</div>
+            <div class="mini-cal-day muted">31</div>
+            <div class="mini-cal-day">1</div>
+            <div class="mini-cal-day">2</div>
+            <div class="mini-cal-day">3</div>
+            <div class="mini-cal-day">4</div>
+
+            <div class="mini-cal-day">5</div>
+            <div class="mini-cal-day">6
+              <div class="day-dots"><span style="background: var(--dot-soap)"></span></div>
+            </div>
+            <div class="mini-cal-day">7</div>
+            <div class="mini-cal-day">8</div>
+            <div class="mini-cal-day">9
+              <div class="day-dots"><span style="background: var(--dot-rx)"></span></div>
+            </div>
+            <div class="mini-cal-day">10</div>
+            <div class="mini-cal-day">11</div>
+
+            <div class="mini-cal-day">12</div>
+            <div class="mini-cal-day">13</div>
+            <div class="mini-cal-day">14
+              <div class="day-dots">
+                <span style="background: var(--dot-soap)"></span>
+                <span style="background: var(--dot-lab)"></span>
+              </div>
+            </div>
+            <div class="mini-cal-day">15</div>
+            <div class="mini-cal-day">16</div>
+            <div class="mini-cal-day">17</div>
+            <div class="mini-cal-day">18</div>
+
+            <div class="mini-cal-day">19</div>
+            <div class="mini-cal-day">20</div>
+            <div class="mini-cal-day">21
+              <div class="day-dots">
+                <span style="background: var(--dot-soap)"></span>
+                <span style="background: var(--dot-img)"></span>
+              </div>
+            </div>
+            <div class="mini-cal-day">22</div>
+            <div class="mini-cal-day">23</div>
+            <div class="mini-cal-day selected">24
+              <div class="day-dots">
+                <span style="background: var(--dot-soap)"></span>
+                <span style="background: var(--dot-lab)"></span>
+                <span style="background: var(--dot-rx)"></span>
+              </div>
+            </div>
+            <div class="mini-cal-day">25</div>
+
+            <div class="mini-cal-day">26</div>
+            <div class="mini-cal-day">27</div>
+            <div class="mini-cal-day">28</div>
+            <div class="mini-cal-day">29</div>
+            <div class="mini-cal-day today">30</div>
+            <div class="mini-cal-day muted">1</div>
+            <div class="mini-cal-day muted">2</div>
+          </div>
+        </div>
+        <div class="filter-chips" style="margin-top: 10px;">
+          <span class="chip active"><span class="chip-dot" style="background: var(--dot-soap)"></span>カルテ</span>
+          <span class="chip active"><span class="chip-dot" style="background: var(--dot-lab)"></span>検査</span>
+          <span class="chip"><span class="chip-dot" style="background: var(--dot-rx)"></span>処方</span>
+          <span class="chip"><span class="chip-dot" style="background: var(--dot-img)"></span>画像</span>
+        </div>
+      </div>
+
+      <div class="pane-section">
+        <div class="section-label">プロブレム ( 2 )</div>
+        <ul class="problem-list">
+          <li class="problem-item">
+            <span class="problem-dot active"></span>
+            <div>
+              <div class="problem-name">高血圧症</div>
+              <div class="problem-meta">継続中 ・ 2024/01/15 ・ ICD10 I10</div>
+            </div>
+          </li>
+          <li class="problem-item">
+            <span class="problem-dot active"></span>
+            <div>
+              <div class="problem-name">2型糖尿病</div>
+              <div class="problem-meta">継続中 ・ 2023/08/02 ・ ICD10 E11.9</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+    </aside>
+
+    <!-- ----- Center pane (履歴) ----- -->
+    <section class="pane center">
+      <div class="center-inner">
+
+        <div class="center-actions">
+          <button class="add-record-btn">
+            <span class="plus">+</span>
+            本日の記載
+          </button>
+          <button class="btn btn-secondary">テンプレート挿入</button>
+          <button class="btn btn-ghost">前回複写</button>
+        </div>
+
+        <!-- 過去カルテ 1 (selected) -->
+        <article class="chart-card selected">
+          <header class="chart-card-head">
+            <div>
+              <span class="chart-date">2026年4月24日（木）</span>
+              <span class="chart-dept-tag">循環器内科</span>
+            </div>
+            <span class="chart-meta">田中 太郎 ・ v3 ・ 14:25:00</span>
+          </header>
+
+          <div class="soap-block">
+            <span class="soap-label">S)</span>
+            <span class="soap-text">血圧・血糖コントロール目的で来院。動悸・胸痛なし。自覚症状の悪化なし。</span>
+          </div>
+          <div class="soap-block">
+            <span class="soap-label">O)</span>
+            <span class="soap-text">BP 138/82 mmHg / HR 74 / BT 36.5 / 体重 74.3kg。下腿浮腫なし。心音整、呼吸音清。</span>
+          </div>
+          <div class="soap-block">
+            <span class="soap-label">A)</span>
+            <span class="soap-text">高血圧症・2型糖尿病ともに継続管理。HbA1c 7.0% で目標範囲内。</span>
+          </div>
+          <div class="soap-block">
+            <span class="soap-label">P)</span>
+            <span class="soap-text">同処方継続。次回1か月後、採血再検 (HbA1c, eGFR) を予定。</span>
+          </div>
+
+          <div class="chart-extras">
+            <div class="extra-row">
+              <span class="extra-label">処方</span>
+              <span class="extra-content">アムロジピンOD錠 5mg 1回1錠 1日1回 朝食後 / メトホルミン錠 250mg 1回1錠 1日3回 毎食後 ・ 30日分</span>
+            </div>
+            <div class="extra-row">
+              <span class="extra-label">検査</span>
+              <span class="extra-content">血算 / 生化学（AST <span class="lab-abnormal">42 H</span>, ALT 35, HbA1c 7.0%, eGFR 68） / 尿一般</span>
+            </div>
+            <div class="extra-row">
+              <span class="extra-label">病名</span>
+              <span class="extra-content">本態性高血圧症、2型糖尿病</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- 過去カルテ 2 -->
+        <article class="chart-card">
+          <header class="chart-card-head">
+            <div>
+              <span class="chart-date">2026年3月27日（金）</span>
+              <span class="chart-dept-tag">循環器内科</span>
+            </div>
+            <span class="chart-meta">田中 太郎 ・ v2 ・ 11:12:00</span>
+          </header>
+          <div class="soap-block">
+            <span class="soap-label">S)</span>
+            <span class="soap-text">前回より自覚症状の変化なし。血圧手帳記録持参、自宅平均 132/78。</span>
+          </div>
+          <div class="soap-block">
+            <span class="soap-label">P)</span>
+            <span class="soap-text">同処方継続。次回1か月後採血。</span>
+          </div>
+        </article>
+
+        <!-- 過去カルテ 3 -->
+        <article class="chart-card">
+          <header class="chart-card-head">
+            <div>
+              <span class="chart-date">2026年2月28日（土）</span>
+              <span class="chart-dept-tag">循環器内科</span>
+            </div>
+            <span class="chart-meta">田中 太郎 ・ v1 ・ 10:45:00</span>
+          </header>
+          <div class="soap-block">
+            <span class="soap-label">S)</span>
+            <span class="soap-text">数日前から軽い頭重感。動悸なし。睡眠は安定。</span>
+          </div>
+          <div class="soap-block">
+            <span class="soap-label">P)</span>
+            <span class="soap-text">同処方継続。塩分摂取の確認。次回 4 週後。</span>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ----- Right pane (今日のキュー) ----- -->
+    <aside class="pane">
+
+      <div class="queue-section">
+        <div class="queue-head">
+          <span class="queue-title">本日のオーダ</span>
+          <span class="chart-meta" style="font-size: 11px;">2026/04/30</span>
+        </div>
+      </div>
+
+      <div class="queue-section">
+        <div class="queue-head">
+          <span class="queue-title">処方 ( 2 )</span>
+          <button class="add-btn-mini">+ 追加</button>
+        </div>
+        <div class="queue-item">
+          <div class="queue-item-name">アムロジピンOD錠 5mg</div>
+          <div class="queue-item-meta">1回1錠 1日1回 朝食後 ・ 30日分</div>
+        </div>
+        <div class="queue-item">
+          <div class="queue-item-name">メトホルミン錠 250mg</div>
+          <div class="queue-item-meta">1回1錠 1日3回 毎食後 ・ 30日分</div>
+        </div>
+      </div>
+
+      <div class="queue-section">
+        <div class="queue-head">
+          <span class="queue-title">検査 ( 1 )</span>
+          <button class="add-btn-mini">+ 追加</button>
+        </div>
+        <div class="queue-item">
+          <div class="queue-item-name">採血セット A</div>
+          <div class="queue-item-meta">血算・生化・HbA1c ・ 通常</div>
+        </div>
+      </div>
+
+      <div class="queue-section">
+        <div class="queue-head">
+          <span class="queue-title">画像 ( 0 )</span>
+          <button class="add-btn-mini">+ 追加</button>
+        </div>
+        <div class="queue-empty">未追加</div>
+      </div>
+
+      <div class="queue-section">
+        <div class="queue-head">
+          <span class="queue-title">処置 ( 0 )</span>
+          <button class="add-btn-mini">+ 追加</button>
+        </div>
+        <div class="queue-empty">未追加</div>
+      </div>
+
+      <div class="queue-section">
+        <div class="queue-head">
+          <span class="queue-title">次回予約</span>
+          <button class="add-btn-mini">+ 設定</button>
+        </div>
+        <div class="queue-empty">未設定</div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <span class="footer-dot"></span>
+    接続中
+    <span style="color: var(--text-tertiary);">・</span>
+    田中 太郎
+    <span style="color: var(--text-tertiary);">・</span>
+    佐藤 次郎 のカルテを表示中
+    <span class="footer-saved">保存済み ・ 0 文字未保存</span>
+  </footer>
+
+  <!-- ===== Palette info ===== -->
+  <section class="palette-info">
+    <div class="swatch-group">
+      <span style="font-weight: 700; color: var(--text-primary); margin-right: 4px;">背景</span>
+      <span class="swatch" style="background: var(--bg)"></span>
+      <span id="info-bg">#FAFAF9</span>
+    </div>
+    <div class="swatch-group">
+      <span style="font-weight: 700; color: var(--text-primary); margin-right: 4px;">アクセント</span>
+      <span class="swatch" style="background: var(--accent)"></span>
+      <span id="info-accent">#4A7AAF</span>
+    </div>
+    <div class="swatch-group">
+      <span style="font-weight: 700; color: var(--text-primary); margin-right: 4px;">警告</span>
+      <span class="swatch" style="background: var(--warning)"></span>
+      <span id="info-warning">#C58A3F</span>
+    </div>
+    <div class="swatch-group">
+      <span style="font-weight: 700; color: var(--text-primary); margin-right: 4px;">緊急</span>
+      <span class="swatch" style="background: var(--destructive)"></span>
+      <span id="info-destructive">#B0492C</span>
+    </div>
+    <div class="swatch-group">
+      <span style="font-weight: 700; color: var(--text-primary); margin-right: 4px;">正常</span>
+      <span class="swatch" style="background: var(--success)"></span>
+      <span id="info-success">#6A9A6E</span>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const PALETTE_INFO = {
+    apple:   { bg: '#f5f5f7', accent: '#0071e3', warning: '#FF9500', destructive: '#FF3B30', success: '#34C759' },
+    notion:  { bg: '#FAFAF9', accent: '#4A7AAF', warning: '#C58A3F', destructive: '#B0492C', success: '#6A9A6E' },
+    linear:  { bg: '#FAFAFA', accent: '#5E6AD2', warning: '#F59E0B', destructive: '#EF4444', success: '#10B981' },
+    medical: { bg: '#FAF9F7', accent: '#5A7B8B', warning: '#B5894A', destructive: '#A05A4A', success: '#7A9B7A' },
+  };
+
+  const buttons = document.querySelectorAll('.switcher button');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.dataset.set;
+      document.body.dataset.theme = theme;
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const info = PALETTE_INFO[theme];
+      document.getElementById('info-bg').textContent = info.bg;
+      document.getElementById('info-accent').textContent = info.accent;
+      document.getElementById('info-warning').textContent = info.warning;
+      document.getElementById('info-destructive').textContent = info.destructive;
+      document.getElementById('info-success').textContent = info.success;
+    });
+  });
+
+  // Keyboard shortcut: 1-4 to switch themes
+  document.addEventListener('keydown', (e) => {
+    const map = { '1': 'apple', '2': 'notion', '3': 'linear', '4': 'medical' };
+    if (map[e.key]) {
+      const target = document.querySelector(`.switcher button[data-set="${map[e.key]}"]`);
+      target?.click();
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
-  "$description": "StyleSeed - Typography Tokens",
+  "$description": "Manta typography tokens. Apple JP system-font stack, compressed for dense EMR screens.",
   "fontFamily": {
-    "sans": "'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    "sans": "\"SF Pro JP\", \"SF Pro Text\", \"SF Pro Icons\", \"Hiragino Kaku Gothic Pro\", \"ヒラギノ角ゴ Pro W3\", メイリオ, Meiryo, \"ＭＳ Ｐゴシック\", -apple-system, BlinkMacSystemFont, \"Helvetica Neue\", Helvetica, Arial, sans-serif",
     "mono": "'JetBrains Mono', 'Fira Code', monospace"
   },
   "fontSize": {
@@ -41,17 +41,18 @@
     "caption (10-13px)": "normal (1.5) or relaxed (1.65) — small text needs more leading"
   },
   "letterSpacing": {
-    "tighter": "-0.02em",
-    "tight": "-0.01em",
+    "body": "-0.012em",
+    "heading": "-0.015em",
+    "caption": "0em",
     "normal": "0em",
     "wide": "0.05em",
     "wider": "0.1em"
   },
   "letterSpacingBySize": {
     "$description": "Recommended letter-spacing per font-size tier",
-    "display (36-48px)": "tighter (-0.02em) — large text looks better tightly spaced",
-    "heading (18-24px)": "tight (-0.01em)",
-    "body (14-17px)": "normal (0em)",
+    "display (24px+)": "heading (-0.015em) — Apple JP heading tracking",
+    "body (15-17px)": "body (-0.012em)",
+    "caption (10-14px)": "caption (0em)",
     "caption-uppercase (10-13px)": "wide (0.05em) or wider (0.1em)"
   }
 }
