@@ -32,6 +32,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 - `docs/PDF_ACTION_BACKLOG.md` — PDFを実装単位に落とした作業一覧
 - `docs/PMDA_SYNC_STRATEGY.md` — PMDA電子添文の同期方針
 - `docs/PRESCRIPTION_SEARCH_UX.md` — 処方検索 / サジェスト UX 方針
+- `docs/RECEIPT_GATEWAY_STRATEGY.md` — レセコン連携 / AI算定補助 / Receipt Gateway 方針
 - `docs/DESIGN_REVIEW_KARTE_UX.md` — カルテ UI / UX 再検討メモ
 - `docs/DEVELOPMENT_GUIDELINES.md` — 開発指針
 - `docs/DESIGN_GUIDELINES.md` — デザインガイドライン
@@ -154,6 +155,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 | 処方チェック強化 | 5.1（禁忌・重複・用量） |
 | 放射線検査オーダ | 10.1 |
 | 生理検査オーダ | 11.1 |
+| 算定候補レビュー / AI算定補助 | 独自（Receipt Gateway の送信前レビュー。レセコン送信は後続 adapter） |
 | 患者検索強化 | 2.3 カナ検索 |
 | FHIR R4 基盤 | 独自（Patient / Encounter / Composition / Condition / Observation / DiagnosticReport / ServiceRequest / MedicationRequest / Appointment は Phase 1-2 で先行実装済み） |
 
@@ -191,7 +193,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 | DPC | 29 |
 | 看護支援（フル） | 看護支援システム全体 |
 | チーム医療 | 28 |
-| レセプト連携 | 外部連携 |
+| レセプト連携 | Receipt Gateway + ORCA adapter / 外部レセコン連携 |
 | マルチテナント | 独自 |
 
 ---
@@ -216,3 +218,4 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 - 既存EMRがどう解決しているかの知見として活用する
 - ただし、仕様をそのまま実装するのではなく、**モダンなUXで再解釈**する
 - 仕様書にない独自機能（AI統合等）は ADR で意思決定を記録する
+- レセコン連携と AI 算定補助は [ADR 0004](decisions/0004-receipt-gateway-and-ai-claims-assist.md) と [RECEIPT_GATEWAY_STRATEGY.md](RECEIPT_GATEWAY_STRATEGY.md) を正とする
