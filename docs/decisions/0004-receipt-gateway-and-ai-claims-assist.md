@@ -28,7 +28,7 @@ Manta は最終的に **Mantaレセコン** を正式モジュールとして持
 
 - **Mantaカルテ**: 診療録、オーダ、病名、患者安全、医師向けAI
 - **Mantaレセコン**: 算定、会計、レセプト、返戻 / 査定レビュー、医事向けAI
-- **Manta外部連携**: ORCA、他社レセコン、RIS/LIS/PACS、FHIR/API 連携
+- **Manta外部連携**: ORCA、他社レセコン、RIS/LIS/PACS、FHIR/API 連携。コード上は `gateway` と呼ぶ。
 
 実装上は Manta 内部に **Billing Core** と **レセコン連携層** を置き、ORCA は最初の外部 adapter として実装する。`Receipt Gateway` は内部アーキテクチャ用語として使ってよいが、ユーザー向けには「レセコン連携」と呼ぶ。
 
@@ -52,7 +52,7 @@ Mantaカルテ / Order UI
 
 AI は最終請求を自動確定しない。AI の役割は **候補生成とレビュー補助** に限定し、会計送信・レセプト請求の確定前には人間の確認を必須にする。
 
-backend は最初から物理分割しない。既存の FastAPI / PostgreSQL を維持し、モジュラーモノリスとして `chart`, `rececon`, `integrations` の境界を作る。Mantaレセコンを単体販売する、レセコン側のリリースサイクルが独立する、月次請求バッチや改定対応の負荷特性が分かれる、などの条件が来た時点で `manta-rececon-api` として物理分割する。
+backend は最初から物理分割しない。既存の FastAPI / PostgreSQL を維持し、モジュラーモノリスとして `karte`, `rececon`, `gateway` の境界を作る。Mantaレセコンを単体販売する、レセコン側のリリースサイクルが独立する、月次請求バッチや改定対応の負荷特性が分かれる、などの条件が来た時点で `manta-rececon-api` として物理分割する。
 
 ## Consequences（帰結）
 

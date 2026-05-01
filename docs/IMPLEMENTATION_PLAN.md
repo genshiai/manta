@@ -96,7 +96,7 @@ backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_REST
 ### Wave 4.6: backend モジュール再編
 
 - `main.py`, `models.py`, `schemas.py` に集約された実装を段階的に分割する
-- `modules/chart`, `modules/orders`, `modules/masters`, `modules/order_catalog`, `modules/rececon`, `modules/integrations` の境界を作る
+- `modules/karte`, `modules/master_data`, `modules/order_catalog`, `modules/rececon`, `modules/gateway` の境界を作る
 - 既存 API の URL と response は維持し、router 分割から始める
 - 物理サーバー分割は行わず、FastAPI / PostgreSQL のモジュラーモノリスを維持する
 
@@ -195,7 +195,7 @@ backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_REST
 - `GET /api/patients/{patient_id}/lab-trends` を追加し、FHIR Observation 正本から項目別の長期検査トレンド、最新値、前回差分、異常回数を返すようにした
 - 結果タブの検査推移パネルは長期検査トレンド API を優先し、選択項目ごとの全履歴推移と異常回数を確認できるようにした
 - レセコン連携は ORCA 直結ではなく Mantaレセコン / Billing Core / レセコン連携層 / ORCA adapter に分離する方針を採用し、AI は最終請求確定ではなく算定候補レビューを補助する位置づけにした
-- backend は当面 1 FastAPI app のまま、`modules/chart`, `modules/orders`, `modules/masters`, `modules/order_catalog`, `modules/rececon`, `modules/integrations` に分割する方針にした
+- backend は当面 1 FastAPI app のまま、`modules/karte`, `modules/master_data`, `modules/order_catalog`, `modules/rececon`, `modules/gateway` に分割する方針にした
 - `scripts/verify_local.py` を追加し、pytest / lint / build / migration / compose / preview smoke を 1 コマンドで確認できるようにした
 - backend test は更新系テスト後に cleanup するように直し、開発 DB を汚さずに繰り返し回せるようにした
 - 次の主課題は外部 preview への公開と、マスタの更新者 / 更新日時表示、レビュー運用の整備

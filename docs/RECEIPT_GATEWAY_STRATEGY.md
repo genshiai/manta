@@ -16,7 +16,7 @@ Manta は最終的に **Mantaカルテ** と **Mantaレセコン** を持つ。�
 ## レイヤー
 
 ```txt
-Frontend Chart / Order UI
+Frontend Mantaカルテ / Order UI
   -> Clinical Order API
   -> Order Catalog
   -> Billing Core
@@ -29,9 +29,9 @@ Frontend Chart / Order UI
 
 - **Mantaカルテ**: 診療録、オーダ、病名、患者安全、医師向けAI
 - **Mantaレセコン**: 算定、会計、レセプト作成、返戻 / 査定レビュー、月次請求、医事向けAI
-- **Manta外部連携**: ORCA、他社レセコン、RIS/LIS/PACS、FHIR/API 連携
+- **Manta外部連携**: ORCA、他社レセコン、RIS/LIS/PACS、FHIR/API 連携。コード上は `gateway` と呼ぶ。
 
-開発者向けには `receipt_gateway` や `claims` という名前を使ってよいが、ユーザー向け UI / ドキュメントでは「レセコン」「レセコン連携」を優先する。
+開発者向けには `gateway` や `adapter` という名前を使ってよいが、ユーザー向け UI / ドキュメントでは「レセコン」「レセコン連携」「外部連携」を優先する。
 
 ### Order Catalog
 
@@ -131,6 +131,8 @@ AI がやらないこと:
 - レセコンからのエラーを Manta 共通エラーに正規化
 - 会計結果、請求状態、未送信 / 送信済 / 要修正を返す
 - 監査ログを残す
+
+FHIR は同じ `gateway` の考え方で扱う。FHIR はカルテ正本ではなく、外部公開・外部入力・標準形式変換の層なので、実装上は `gateway/fhir` に置く。FHIR mapper は `karte` と `rececon` の read model を参照するが、FHIR 層が患者・診療録・会計の正本を所有しない。
 
 ### ORCA Adapter
 
