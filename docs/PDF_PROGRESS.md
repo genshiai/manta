@@ -2,7 +2,9 @@
 
 `docs/requirements/karte-system.pdf` を基準に、Manta がどこまで到達しているかを追うためのスナップショットです。
 
-更新日: 2026-04-28
+> **全体の現在地は [Plan.md の「現在地ダッシュボード」](Plan.md#現在地ダッシュボード2026-05-02) を参照**。本ドキュメントは仕様書（karte-system.pdf）に対する実装進捗に特化したスナップショット。UI Refresh や FHIR の進捗は対応する計画書を正とする。
+
+更新日: 2026-05-02
 
 ## サマリ
 
@@ -11,7 +13,9 @@
   - 完了: 7
   - 部分実装: 6
   - 未着手: 0
-- 直近の重点:
+- UI Refresh は Phase 1-5 完了 + Phase 6 初期完了（Apple HIG 移行済み、[IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) 参照）
+- backend モジュール分割は未着手（[BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) を正とし、Wave 4.6 として優先実施予定）
+- 直近の重点（PDF 仕様書ベース）:
   - 3.7 病名ツールの標準病名 master import と ICD10 検索
   - 6.1 処方オーダの検索性と過去処方複写
   - 24.1 / 24.3 結果・薬歴の時系列参照

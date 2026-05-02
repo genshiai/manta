@@ -15,7 +15,7 @@ Manta は、日本の電子カルテ市場の以下の問題を解決するた�
 
 - ベンダーロックイン → **オープンソース（AGPL-3.0）**
 - 不透明な料金 → **無料**
-- 2000年代のUI → **デジタル庁デザインシステム準拠**
+- 2000年代のUI → **モダン SaaS 設計言語（Apple HIG + StyleSeed Notion skin）**
 - AI非対応 → **LLM統合前提の設計**
 
 ### 判断の基準
@@ -32,64 +32,71 @@ Manta は、日本の電子カルテ市場の以下の問題を解決するた�
 
 ## 2. デザイン指針
 
+詳細・カラー値・トークン定義は [`docs/DESIGN_GUIDELINES.md`](DESIGN_GUIDELINES.md) を正とする。本セクションはエンジニア向けの要点のみ。
+
 ### 準拠するガイドライン
 
 | ガイドライン | 用途 | 参照先 |
 |---|---|---|
-| **デジタル庁デザインシステム** | カラー・タイポグラフィ・コンポーネント | `docs/design-system/` |
-| Apple Human Interface Guidelines | 設計原則（Clarity/Deference/Depth） | developer.apple.com |
+| **Apple Human Interface Guidelines (apple.com/jp 実測値)** | カラー・タイポ・ボタン形状 | [ADR 0003](decisions/0003-color-system-apple-hig.md) |
+| **StyleSeed Notion skin + Tailwind v4** | コンポーネント基盤・設計ルール | [ADR 0002](decisions/0002-styleseed-adoption.md) |
 | WCAG 2.2 AA | アクセシビリティ基準 | w3.org/TR/WCAG22 |
+
+旧デジタル庁系デザインシステムからの離脱は [ADR 0001](decisions/0001-design-system-digital-cho-and-pivot.md) を参照。
 
 ### フォント
 
-```
-本文: Noto Sans JP (400, 500, 600, 700)
-等幅: Noto Sans Mono (400, 700)
+システムフォント only（ネット通信ゼロ、Apple HIG 準拠）:
+
+```css
+font-family:
+  "SF Pro JP", "SF Pro Text", "SF Pro Icons",
+  "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3",
+  メイリオ, Meiryo, "ＭＳ Ｐゴシック",
+  -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+letter-spacing: -0.012em;       /* 本文（負トラッキング） */
+font-feature-settings: normal;
 ```
 
-他のフォントは使用しない。
+Google Fonts / 外部 font link は使用しない。ヒラギノ角ゴは **Pro**（**ProN ではない**）。
 
 ### カラー
 
-デジタル庁プリミティブカラーをそのまま使用する。
-カスタムカラーは追加しない。
+Apple HIG (apple.com/jp 実測値) を [`frontend/src/styles/theme.css`](../frontend/src/styles/theme.css) のトークンとして実装。直接 hex を書かず、必ずトークン参照を使う。
 
 ```
-プライマリ:  Blue-600  #3460FB
-テキスト:   Gray-900  #1A1A1A
-ラベル:    Gray-536  #767676
-背景:      #F5F6FA（ページ） / #FFFFFF（カード）
-成功:      Green-600 #259D63
-エラー:    Red-900   #CE0000
-警告:      Yellow-700 #B78F00
+プライマリ:    Apple CTA Blue   #0071e3  (--brand)
+ホバー/リンク:  Apple Link Blue  #0066cc  (--brand-hover)
+テキスト主:    Apple Near Black #1d1d1f  (--text-primary)
+背景:         Apple Section    #f5f5f7  (--background) / #ffffff (--card)
+警告:         iOS Orange       #FF9500  (--warning)
+エラー:       iOS Red          #FF3B30  (--destructive)
+成功:         iOS Green        #34C759  (--success)
+境界:         Apple Border     #D2D2D7  (--border)
 ```
 
-詳細は `docs/DESIGN_GUIDELINES.md` を参照。
+純黒 (`#000000`)・純白背景 (`#ffffff`) + 純黒寄り文字の組み合わせは禁止。
 
-### 医療情報のカラーコーディング
+### 医療情報のカラーコーディングはしない
 
-| 情報タイプ | カラー | 理由 |
-|---|---|---|
-| 処方（内服） | Blue | 既存カルテの慣例を踏襲 |
-| 検体検査 | Green | 同上 |
-| 画像検査 | Cyan | 同上 |
-| 注射 | Orange | 同上 |
-| 処置 | Purple | 同上 |
-| アラート/禁忌 | Red | 安全上の強調 |
+旧 EMR の慣例（処方=青 / 検査=緑 / 画像=シアン …）は**採用しない**。情報タイプ別のカラーコーディングは絶対原則違反（[`DESIGN_GUIDELINES.md`](DESIGN_GUIDELINES.md) セクション 0）。
+
+情報識別はアイコン・ラベル・タイポグラフィで行う。状態色（warning / destructive / success）は **状態通知専用**で、情報分類には使わない。
 
 ### コンポーネント設計
 
-- デジタル庁の `design-system/react-components/` を優先的に利用する
-- 足りないものだけ自作し、デジタル庁のトークンに合わせる
-- Tailwind CSS + `design-system/tailwind-theme/` で統一する
-- 独自のデザイントークンを作らない
+- StyleSeed の Radix ベース UI プリミティブ（`frontend/src/components/ui/`）を基盤に
+- StyleSeed のトークン名（`--brand`, `--text-primary` 等）は維持し、値のみ Apple HIG に置換
+- Tailwind CSS v4 の CSS-first 設定（`@theme inline`）でトークンをエイリアス
+- 旧デジタル庁系コンポーネント（`frontend/src/vendor/dads/`）は新規開発で使用しない（後続 PR で削除予定）
 
 ### アクセシビリティ
 
 - コントラスト比 4.5:1 以上（テキスト）
 - タッチターゲット 44px 以上
 - キーボード操作完全対応
-- フォーカスインジケータ明示（デジタル庁準拠: 4px black outline + yellow shadow）
+- フォーカスインジケータ明示（Apple HIG: `box-shadow: 0 0 0 3px rgba(0,113,227,0.2)`）
 - 色だけで情報を伝えない（アイコン・テキスト併用）
 - WAI-ARIA 1.2 準拠
 
@@ -203,20 +210,36 @@ Manta は、日本の電子カルテ市場の以下の問題を解決するた�
 
 ```
 docs/
-├── Plan.md                          # 開発計画（本ドキュメントと対）
-├── DEVELOPMENT_GUIDELINES.md        # 本ドキュメント
-├── DESIGN_GUIDELINES.md             # デザイン詳細（カラーコード等）
+├── Plan.md                                  # 開発計画（4軸の現在地ダッシュボード含む）
+├── DEVELOPMENT_GUIDELINES.md                # 本ドキュメント
+├── DESIGN_GUIDELINES.md                     # デザイン詳細（Apple HIG カラーコード等）
+├── IMPLEMENTATION_PLAN.md                   # PDF準拠の実装実行計画（Wave 0-5）
+├── IMPLEMENTATION_PLAN_UI_REFRESH.md        # UI リフレッシュ計画（Phase 1-5 完了済み）
+├── BACKEND_MODULE_RESTRUCTURE_PLAN.md       # backend モジュール分割方針
+├── RECEIPT_GATEWAY_STRATEGY.md              # Mantaレセコン / レセコン連携 / AI算定補助
+├── FHIR_MIGRATION_PLAN.md                   # FHIR R4 (JP Core) 移行計画
+├── PDF_PROGRESS.md                          # 仕様書ベースの実装進捗スナップショット
+├── PDF_ACTION_BACKLOG.md                    # 仕様書を実装単位に落とした作業一覧
+├── AUTH_DECISION.md                         # FastAPI 自前認証の方針
+├── PMDA_SYNC_STRATEGY.md                    # PMDA電子添文の同期方針
+├── PRESCRIPTION_SEARCH_UX.md                # 処方検索 / サジェスト UX 方針
+├── DESIGN_REVIEW_KARTE_UX.md                # カルテ UI / UX 再検討メモ
+├── decisions/                               # ADR（技術・設計の意思決定記録）
+│   ├── 0001-design-system-digital-cho-and-pivot.md   # デジタル庁系離脱（Superseded）
+│   ├── 0002-styleseed-adoption.md                    # StyleSeed + Notion skin + Tailwind v4
+│   ├── 0003-color-system-apple-hig.md                # Apple HIG カラー / タイポ / ボタン
+│   └── 0004-receipt-gateway-and-ai-claims-assist.md  # Mantaレセコン 3 層設計
 ├── requirements/
-│   ├── karte-system.pdf             # 原本仕様書（170ページ）
-│   └── PHASE_REQUIREMENTS.md        # Phase別要件一覧
-├── design-system/
-│   ├── html-components/             # デジタル庁 HTMLコンポーネント
-│   ├── react-components/            # デジタル庁 Reactコンポーネント
-│   └── tailwind-theme/              # デジタル庁 Tailwindテーマ
-├── karte-images/                    # 既存カルテUI参照画像
+│   ├── karte-system.pdf                     # 原本仕様書（170ページ）
+│   └── PHASE_REQUIREMENTS.md                # Phase別要件一覧
+├── design-reference/
+│   └── apple-jp-design.md                   # apple.com/jp 実測値仕様
+├── mock-html/                               # UIプロトタイプ・比較モック
+├── karte-images/                            # 既存カルテUI参照画像
 └── first/
-    ├── ARCHITECTURE.md              # 技術アーキテクチャ
-    ├── CONTRIBUTING.md              # コントリビューションガイド
-    ├── README.md                    # プロジェクト概要
-    └── 0001-*.md ... 0004-*.md      # ADR（技術意思決定記録）
+    ├── ARCHITECTURE.md                      # 技術アーキテクチャ
+    ├── CONTRIBUTING.md                      # コントリビューションガイド
+    └── README.md                            # プロジェクト概要
 ```
+
+注: `docs/design-system/`（旧デジタル庁系コンポーネント実装）は履歴として残置。frontend からの参照は切れている（[ADR 0002](decisions/0002-styleseed-adoption.md)）。

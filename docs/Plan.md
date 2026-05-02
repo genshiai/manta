@@ -12,6 +12,36 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 
 ---
 
+## 現在地ダッシュボード（2026-05-02）
+
+進捗は **5 軸並走**で進んでいる。各軸の現在地を一目で把握するための表。詳細は各リンク先を正とする。
+
+| 軸 | 現在地 | 出典 |
+|---|---|---|
+| **Phase（機能）** | Phase 1 実装中 — カルテUI 大半完了、優先度A 残作業あり | [Phase 1](#phase-1--mvp外来診療1ループ) |
+| **Wave（PDF実装計画）** | Wave 0-5 完了 / **Wave 4.5・4.6 未着手** | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) |
+| **UI Refresh** | Phase 1-5 完了（Apple HIG 移行）+ Phase 6 初期完了 | [IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) |
+| **FHIR Step** | Step 0-9 read adapter 完了 / Write は途中 | [FHIR_MIGRATION_PLAN.md](FHIR_MIGRATION_PLAN.md) |
+| **backend 構造** | **未着手**（`main.py` / `models.py` / `schemas.py` 集約） | [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) |
+
+### 直近の着手順
+
+1. **backend モジュール分割**（Wave 4.6） — `auth` + `master_data` の router 切り出しから。これを先にやらないと rececon が `main.py` にさらに肥大化する
+2. **Wave 4.5 Mantaレセコン skeleton** — ClaimDraft / BillingCandidate / ReviewIssue / AI Claims Assist の骨組み
+3. **PDF_ACTION_BACKLOG 優先度A** — 病名 ICD10・処方 PMDA 同期・テンプレ管理（並行実施可）
+
+### 運用ルール
+
+- 進捗があったら **このダッシュボード表だけ更新**する。詳細は対応する計画書側で記録
+- 各軸の意味:
+  - **Phase**: ユーザーストーリー単位の機能進捗（Phase 0 → 1 → 2 → 3 → 4）
+  - **Wave**: PDF 仕様書を実装単位に落とした実行計画（Wave 0 〜 5）
+  - **UI Refresh**: デザイン刷新の段階（Phase 1 〜 6、UI に閉じる）
+  - **FHIR Step**: FHIR R4 (JP Core) 移行のリソース別段階（Step 0 〜 9）
+  - **backend 構造**: モジュラーモノリス化の進捗（karte / rececon / gateway 等）
+
+---
+
 ## Phase 0 — 基盤構築（現在）
 
 **目標**: 開発環境・設計基盤・UIプロトタイプの確立
@@ -19,27 +49,32 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 | 項目 | 状態 |
 |------|------|
 | リポジトリ・CI 基盤 | 設計済（docs/first/） |
-| デザインシステム選定 | 完了（デジタル庁準拠） |
+| デザインシステム選定 | 完了（Apple HIG + StyleSeed Notion skin、ADR 0001-0003） |
 | デザインガイドライン | 完了（docs/DESIGN_GUIDELINES.md） |
 | mock HTML（カルテ画面） | 完了（mock-html/） |
-| 技術スタック ADR | 完了（docs/first/adr/） |
+| 技術スタック ADR | 完了（docs/decisions/ + docs/first/adr/） |
 | Phase 1 要件定義 | **本ドキュメント** |
 
 ### Phase 0 の成果物
 - `docs/Plan.md` — 本ドキュメント
-- `docs/IMPLEMENTATION_PLAN.md` — PDF準拠の実装実行計画
+- `docs/IMPLEMENTATION_PLAN.md` — PDF準拠の実装実行計画（Wave 0-5）
+- `docs/IMPLEMENTATION_PLAN_UI_REFRESH.md` — UI リフレッシュ計画（Phase 1-5 完了済み）
 - `docs/PDF_PROGRESS.md` — PDF基準の実装進捗スナップショット
 - `docs/PDF_ACTION_BACKLOG.md` — PDFを実装単位に落とした作業一覧
 - `docs/PMDA_SYNC_STRATEGY.md` — PMDA電子添文の同期方針
 - `docs/PRESCRIPTION_SEARCH_UX.md` — 処方検索 / サジェスト UX 方針
 - `docs/RECEIPT_GATEWAY_STRATEGY.md` — Mantaレセコン / レセコン連携 / AI算定補助方針
 - `docs/BACKEND_MODULE_RESTRUCTURE_PLAN.md` — Mantaカルテ / Mantaレセコン / Manta外部連携の backend 分割方針
+- `docs/FHIR_MIGRATION_PLAN.md` — FHIR R4 (JP Core) 移行計画
+- `docs/AUTH_DECISION.md` — FastAPI 自前認証の方針
 - `docs/DESIGN_REVIEW_KARTE_UX.md` — カルテ UI / UX 再検討メモ
 - `docs/DEVELOPMENT_GUIDELINES.md` — 開発指針
-- `docs/DESIGN_GUIDELINES.md` — デザインガイドライン
+- `docs/DESIGN_GUIDELINES.md` — デザインガイドライン（Apple HIG + StyleSeed）
+- `docs/decisions/0001-0004` — ADR（デジタル庁離脱 / StyleSeed採用 / Apple HIG カラー / レセコン3層）
+- `docs/design-reference/apple-jp-design.md` — apple.com/jp 実測値仕様
 - `docs/requirements/PHASE_REQUIREMENTS.md` — Phase別要件一覧
 - `docs/requirements/karte-system.pdf` — 原本仕様書（参照用）
-- `mock-html/` — UIプロトタイプ
+- `docs/mock-html/` — UIプロトタイプ・比較モック
 
 ---
 
@@ -126,7 +161,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 
 1. **バックエンド基盤**: FastAPI + PostgreSQL + 認証
 2. **ドメインモデル**: Patient, SOAPNote, Prescription, LabOrder, LabResult
-3. **フロントエンド基盤**: Vite + React + TanStack + デジタル庁デザインシステム
+3. **フロントエンド基盤**: Vite + React + TanStack + Apple HIG + StyleSeed Notion skin（Tailwind v4）
 4. **外来ワークフロー結合**: 受付 → カルテ → 処方 → 検査 → 保存 → 予約
 5. **監査ログ**: 全操作記録
 6. **デモサイト公開**
