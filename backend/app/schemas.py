@@ -500,6 +500,8 @@ class PrescriptionRead(BaseModel):
     drug_name: str
     dosage: str
     created_at: datetime
+    warnings: list[str] = []
+    warning_details: list[dict[str, str | None]] = []
 
 
 class PrescriptionHistoryGroupRead(BaseModel):

@@ -363,6 +363,7 @@ const PrescriptionTab = ({
   const [dosage, setDosage] = useState('');
   const [days, setDays] = useState('14日分');
   const [setPreview, setSetPreview] = useState<PrescriptionSetMaster | null>(null);
+  const [warningDetail, setWarningDetail] = useState<PrescriptionEntry | null>(null);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -544,6 +545,24 @@ const PrescriptionTab = ({
                 <p className="text-[12px] text-text-tertiary">
                   {p.dosage} ・ {p.days}
                 </p>
+                {p.warnings && p.warnings.length > 0 ? (
+                  <ul className="mt-2 space-y-1 border-l-2 border-amber-400 pl-2">
+                    {p.warnings.map((warning) => (
+                      <li className="text-[11px] leading-snug text-amber-700" key={warning}>
+                        {warning}
+                      </li>
+                    ))}
+                    <li>
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-amber-800 underline-offset-2 hover:underline"
+                        onClick={() => setWarningDetail(p)}
+                      >
+                        根拠を表示
+                      </button>
+                    </li>
+                  </ul>
+                ) : null}
               </li>
             ))
           ) : (
@@ -568,9 +587,68 @@ const PrescriptionTab = ({
           }}
         />
       ) : null}
+      {warningDetail ? (
+        <WarningDetailSheet prescription={warningDetail} onClose={() => setWarningDetail(null)} />
+      ) : null}
     </div>
   );
 };
+
+const WarningDetailSheet = ({
+  prescription,
+  onClose,
+}: {
+  prescription: PrescriptionEntry;
+  onClose: () => void;
+}) => (
+  <div
+    className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+    onClick={onClose}
+    onKeyDown={(e) => {
+      if (e.key === 'Escape') onClose();
+    }}
+    role="dialog"
+    aria-modal="true"
+    tabIndex={-1}
+  >
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label="閉じる"
+      className="absolute inset-0 cursor-default"
+      onClick={onClose}
+    />
+    <div className="relative max-h-[82vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-card p-6 shadow-modal sm:rounded-xl">
+      <header className="mb-4 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-[18px] font-bold leading-snug text-text-primary">警告根拠</h3>
+          <p className="mt-1 text-[12px] text-text-tertiary">{prescription.drugName}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-text-tertiary hover:bg-surface-subtle"
+        >
+          <X size={16} />
+        </button>
+      </header>
+      <ul className="space-y-3">
+        {(prescription.warningDetails && prescription.warningDetails.length > 0
+          ? prescription.warningDetails
+          : (prescription.warnings ?? []).map((warning) => ({ message: warning, source: 'Manta safety rule', evidence: warning }))
+        ).map((detail) => (
+          <li className="rounded-lg border border-border bg-surface-subtle p-3" key={`${detail.source}-${detail.message}`}>
+            <p className="text-[13px] font-bold text-text-primary">{detail.message}</p>
+            {detail.source ? <p className="mt-1 text-[11px] text-text-tertiary">根拠: {detail.source}</p> : null}
+            {detail.evidence && detail.evidence !== detail.message ? (
+              <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">{detail.evidence}</p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+);
 
 // === セット展開プレビュー sheet ===
 

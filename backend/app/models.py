@@ -285,6 +285,51 @@ class DiagnosisMaster(Base):
     updated_at_master: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
+class DiagnosisAliasMaster(Base):
+    __tablename__ = "diagnosis_alias_masters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    management_number: Mapped[str] = mapped_column(ForeignKey("diagnosis_masters.management_number"), index=True)
+    alias: Mapped[str] = mapped_column(String(255), index=True)
+    alias_kana: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    alias_type: Mapped[str] = mapped_column(String(32), default="index")
+    target_management_number: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    updated_at_master: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+
+class PmdaPackageInsertSection(Base):
+    __tablename__ = "pmda_package_insert_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    yj_code: Mapped[str] = mapped_column(String(64), index=True)
+    package_insert_no: Mapped[str] = mapped_column(String(64), index=True)
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    generic_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    section_code: Mapped[str] = mapped_column(String(64), index=True)
+    section_heading: Mapped[str] = mapped_column(String(128))
+    severity: Mapped[str] = mapped_column(String(32), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    source_xml: Mapped[str] = mapped_column(String(255))
+    source_updated_at: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class PmdaDrugInteraction(Base):
+    __tablename__ = "pmda_drug_interactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    yj_code: Mapped[str] = mapped_column(String(64), index=True)
+    package_insert_no: Mapped[str] = mapped_column(String(64), index=True)
+    brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    interacting_drug: Mapped[str] = mapped_column(String(255), index=True)
+    clinical_effects: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mechanism: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_xml: Mapped[str] = mapped_column(String(255))
+    source_updated_at: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

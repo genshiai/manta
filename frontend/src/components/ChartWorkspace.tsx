@@ -192,7 +192,7 @@ export function ChartWorkspace({
     try {
       const [workspace, nextOrderConfig, timeline, longTrends] = await Promise.all([
         getChartWorkspace(patient.id),
-        getChartOrderConfig(),
+        getChartOrderConfig({ department: patient.department }),
         getPrescriptionTimeline(patient.id),
         getLabLongTrends(patient.id),
       ]);
@@ -242,7 +242,7 @@ export function ChartWorkspace({
     } finally {
       setIsLoading(false);
     }
-  }, [onAuthExpired, patient.id]);
+  }, [onAuthExpired, patient.department, patient.id]);
 
   useEffect(() => {
     if (initializedPatientIdRef.current === patient.id) return;
@@ -317,7 +317,7 @@ export function ChartWorkspace({
     if (!drug) return;
     setIsMutating(true);
     try {
-      await addPrescription(patient.id, {
+      const created = await addPrescription(patient.id, {
         type: drug.category ?? '内服',
         days,
         drugName: drug.drugName,
@@ -325,9 +325,22 @@ export function ChartWorkspace({
         actor: currentUser.displayName,
       });
       const refreshed = await getChartWorkspace(patient.id);
-      setPrescriptions(refreshed.prescriptions);
+      let attachedWarning = false;
+      setPrescriptions(
+        refreshed.prescriptions.map((item) => {
+          if (!attachedWarning && item.drugName === created.drugName) {
+            attachedWarning = true;
+            return { ...item, warnings: created.warnings };
+          }
+          return item;
+        }),
+      );
       setPrescriptionTimeline(await getPrescriptionTimeline(patient.id));
-      setOrderMessage(`処方を追加しました: ${drug.drugName}`);
+      setOrderMessage(
+        created.warnings && created.warnings.length > 0
+          ? `処方を追加しました: ${drug.drugName} / 警告 ${created.warnings.length}件`
+          : `処方を追加しました: ${drug.drugName}`,
+      );
       onDataChanged();
     } catch (error) {
       if (isUnauthorizedError(error)) {

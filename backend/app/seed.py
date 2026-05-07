@@ -126,7 +126,7 @@ CHART_ORDER_MASTER_DATA = {
             "generic_name": "ロキソプロフェンナトリウム水和物",
             "name_kana": "ロキソプロフェンジョウ",
             "aliases": ["ロキソニン", "鎮痛薬"],
-            "yj_code": "DEMO-YJ-LOXOPROFEN-60",
+            "yj_code": "1149019F1560",
             "hot_code": "DEMO-HOT-LOXOPROFEN-60",
             "dosage_form": "錠剤",
             "strength": "60mg",

@@ -9,9 +9,12 @@ from app.db import SessionLocal
 from app.main import app
 from app.models import (
     ChartTemplateMaster,
+    DiagnosisAliasMaster,
     DiagnosisMaster,
     LabSetMaster,
     Patient,
+    PmdaPackageInsertSection,
+    PmdaDrugInteraction,
     PrescriptionCatalogMaster,
     PrescriptionOrder,
     PrescriptionSetMaster,
@@ -81,10 +84,16 @@ def cleanup_chart_order_masters(
 
 def cleanup_diagnosis_master(management_number: str) -> None:
     with SessionLocal() as db:
+        aliases = db.scalars(
+            select(DiagnosisAliasMaster).where(DiagnosisAliasMaster.management_number == management_number)
+        ).all()
+        for alias in aliases:
+            db.delete(alias)
+
         diagnosis = db.get(DiagnosisMaster, management_number)
         if diagnosis is not None:
             db.delete(diagnosis)
-            db.commit()
+        db.commit()
 
 
 def restore_patient_workspace(patient_id: str) -> None:
@@ -115,6 +124,21 @@ def cleanup_prescription_orders(patient_id: str, drug_name: str) -> None:
         db.commit()
 
 
+def cleanup_pmda_sections(package_insert_no: str) -> None:
+    with SessionLocal() as db:
+        rows = db.scalars(
+            select(PmdaPackageInsertSection).where(PmdaPackageInsertSection.package_insert_no == package_insert_no)
+        ).all()
+        for row in rows:
+            db.delete(row)
+        interactions = db.scalars(
+            select(PmdaDrugInteraction).where(PmdaDrugInteraction.package_insert_no == package_insert_no)
+        ).all()
+        for row in interactions:
+            db.delete(row)
+        db.commit()
+
+
 def test_healthcheck() -> None:
     with TestClient(app) as client:
         response = client.get("/health")
@@ -134,6 +158,10 @@ def test_login_and_list_patients() -> None:
             "/api/masters/chart-order-config",
             headers={"Authorization": f"Bearer {token}"},
         )
+        internal_master_response = client.get(
+            "/api/masters/chart-order-config?department=内科",
+            headers={"Authorization": f"Bearer {token}"},
+        )
         me_response = client.get(
             "/api/auth/me",
             headers={"Authorization": f"Bearer {token}"},
@@ -141,6 +169,7 @@ def test_login_and_list_patients() -> None:
 
     assert patients_response.status_code == 200
     assert master_response.status_code == 200
+    assert internal_master_response.status_code == 200
     assert me_response.status_code == 200
     assert me_response.json()["display_name"] == "田中 太郎"
     assert len(patients_response.json()) >= 4
@@ -150,6 +179,11 @@ def test_login_and_list_patients() -> None:
     assert len(master_response.json()["lab_set_options"]) >= 3
     assert len(master_response.json()["reservation_slots"]) >= 4
     assert len(master_response.json()["chart_templates"]) >= 3
+    assert all(
+        item["department"] in {"内科", "共通"} for item in internal_master_response.json()["prescription_sets"]
+    )
+    assert all(item["department"] == "内科" for item in internal_master_response.json()["reservation_slots"])
+    assert all(item["department"] in {"内科", "共通"} for item in internal_master_response.json()["chart_templates"])
 
 
 def test_reject_patients_without_token() -> None:
@@ -552,6 +586,53 @@ def test_diagnosis_master_search_requires_auth_and_supports_name_and_code() -> N
     assert any((item["icd10_code"] or "").startswith("E11") for item in code_search_response.json())
 
 
+def test_diagnosis_master_search_supports_alias_hits() -> None:
+    management_number = f"T{uuid4().hex[:15]}"
+    alias = f"テスト同義語{uuid4().hex[:6]}"
+
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+
+            with SessionLocal() as db:
+                db.add(
+                    DiagnosisMaster(
+                        management_number=management_number,
+                        change_type="0",
+                        disease_name="標準テスト病名",
+                        disease_name_kana="ヒョウジュンテストビョウメイ",
+                        adoption_level="1",
+                        exchange_code="TALIAS",
+                        icd10_code="A09",
+                        icd10_subcode=None,
+                        claim_code="1234567",
+                        is_deleted=False,
+                        updated_at_master="20260505",
+                    )
+                )
+                db.flush()
+                db.add(
+                    DiagnosisAliasMaster(
+                        management_number=management_number,
+                        alias=alias,
+                        alias_kana="テストドウギゴ",
+                        alias_type="synonym",
+                        is_deleted=False,
+                    )
+                )
+                db.commit()
+
+            response = client.get(
+                f"/api/masters/diagnoses/search?q={alias}",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+
+        assert response.status_code == 200
+        assert any(item["management_number"] == management_number for item in response.json())
+    finally:
+        cleanup_diagnosis_master(management_number)
+
+
 def test_doctor_can_update_patient_context() -> None:
     unique_problem_name = f"#9 テスト病名 {uuid4().hex[:6]}"
 
@@ -745,6 +826,105 @@ def test_doctor_can_represcribe_same_drug_on_later_day() -> None:
 
     assert response.status_code == 200
     assert response.json()["drug_name"] == drug_name
+
+
+def test_add_prescription_returns_safety_warnings() -> None:
+    drug_name = "ロスバスタチン錠 2.5mg"
+
+    try:
+        cleanup_prescription_orders("0009900041", drug_name)
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            response = client.post(
+                "/api/patients/0009900041/prescriptions",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "type": "内服",
+                    "days": "90日分",
+                    "drug_name": drug_name,
+                    "dosage": "1回2錠 1日2回 朝夕食後",
+                    "actor": "田中 太郎",
+                },
+            )
+    finally:
+        cleanup_prescription_orders("0009900041", drug_name)
+
+    assert response.status_code == 200
+    assert response.json()["drug_name"] == drug_name
+    assert any("関連病名" in warning for warning in response.json()["warnings"])
+    assert any("標準用法候補" in warning for warning in response.json()["warnings"])
+    assert any("標準日数" in warning for warning in response.json()["warnings"])
+
+
+def test_add_prescription_returns_pmda_pregnancy_warning() -> None:
+    suffix = uuid4().hex[:8]
+    drug_id = f"pmda-preg-{suffix}"
+    drug_name = f"PMDA妊婦注意薬 {suffix}"
+    yj_code = f"PMDA{suffix.upper()}"
+    package_insert_no = f"PMDA-TEST-{suffix}"
+
+    try:
+        with SessionLocal() as db:
+            db.add(
+                PrescriptionCatalogMaster(
+                    id=drug_id,
+                    sort_order=9999,
+                    is_active=True,
+                    drug_name=drug_name,
+                    category="内服",
+                    dosage_options=["1回1錠 1日1回 朝食後"],
+                    generic_name="PMDAテスト一般名",
+                    name_kana="PMDAテスト",
+                    aliases=[],
+                    yj_code=yj_code,
+                    hot_code=None,
+                    dosage_form="錠剤",
+                    strength="1mg",
+                    standard_usage_code=None,
+                    default_days="7",
+                    pmda_info_url=None,
+                    allergy_conflict_label=None,
+                    related_problem=None,
+                )
+            )
+            db.add(
+                PmdaPackageInsertSection(
+                    yj_code=yj_code,
+                    package_insert_no=package_insert_no,
+                    brand_name=drug_name,
+                    generic_name="PMDAテスト一般名",
+                    section_code="pregnancy",
+                    section_heading="妊婦",
+                    severity="contraindication",
+                    text="妊娠後期の女性には投与しないこと。",
+                    source_xml="pmda-test.xml",
+                    source_updated_at="2026-05",
+                )
+            )
+            db.commit()
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            response = client.post(
+                "/api/patients/0005520007/prescriptions",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "type": "内服",
+                    "days": "7日分",
+                    "drug_name": drug_name,
+                    "dosage": "1回1錠 1日1回 朝食後",
+                    "actor": "田中 太郎",
+                },
+            )
+    finally:
+        cleanup_prescription_orders("0005520007", drug_name)
+        cleanup_pmda_sections(package_insert_no)
+        cleanup_chart_order_masters(drug_id, "unused-lab-set", "unused-slot")
+
+    assert response.status_code == 200
+    assert any("PMDA妊婦注意" in warning for warning in response.json()["warnings"])
+    assert any(detail["source"] == "PMDA 電子添文" for detail in response.json()["warning_details"])
 
 
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:

@@ -38,6 +38,10 @@ def main() -> int:
         f"total={summary.total} created={summary.created} updated={summary.updated} "
         f"unchanged={summary.unchanged} deactivated={summary.deactivated} dry_run={summary.dry_run}"
     )
+    if summary.invalid_yj_codes:
+        print("invalid yj codes:")
+        for item in summary.invalid_yj_codes:
+            print(f"  {item}")
     return 0
 
 

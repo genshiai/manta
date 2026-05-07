@@ -38,12 +38,16 @@ zip を展開済みなら、`ttl_main.txt` と `nmain*.txt` を直接渡して�
 cd backend
 uv run python scripts/import_standard_disease_master.py \
   --title-file /path/to/ttl_main.txt \
-  --main-file /path/to/nmain517.txt
+  --main-file /path/to/nmain517.txt \
+  --alias-title-file /path/to/ttl_idx.txt \
+  --alias-file /path/to/nidx517.txt \
+  --alias-type index
 ```
 
 ## 現在の実装範囲
 
 - DB: `diagnosis_masters`
+- DB: `diagnosis_alias_masters`（索引用語 / 同義語 / 廃止病名移行候補）
 - API: `GET /api/masters/diagnoses/search?q=...`
 - chart UI:
   - 病名検索
@@ -51,10 +55,11 @@ uv run python scripts/import_standard_disease_master.py \
   - `ICD10 / 病名管理番号 / 主病名 / 副病名` を保持
 - preview 用に少量の demo disease master を seed している
 - 2026-04-17 時点で `byomei517.zip` を取り込み、ローカル DB に 27,687 件の病名基本テーブルを投入済み
+- `ttl_idx.txt` / `nidx*.txt` 形式の索引テーブルを import し、索引用語や同義語で標準病名を検索できる
 - 公式 master が入った場合は demo diagnosis rows を除去し、既存 patient problem の `management_number / icd10_code` を公式 master に再対応付けする
 
 ## 運用上の注意
 
 - raw master データは repo に commit しない
 - preview の demo seed は説明用であり、実運用では必ず公式配布物を import する
-- 将来的には `索引テーブル` と `履歴マスター` も取り込み、同義語検索と廃止病名移行を扱う
+- 履歴マスターも `diagnosis_alias_masters.alias_type=history` と `target_management_number` で受けられる設計にした。実データ投入時に title/data の列名揺れを確認して importer の alias を追加する

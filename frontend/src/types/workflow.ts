@@ -201,6 +201,13 @@ export type PrescriptionEntry = {
   drugName: string;
   dosage: string;
   createdAt?: string;
+  warnings?: string[];
+  warningDetails?: Array<{
+    message: string;
+    source?: string;
+    severity?: string;
+    evidence?: string;
+  }>;
 };
 
 export type PrescriptionTimelineEntry = PrescriptionEntry & {

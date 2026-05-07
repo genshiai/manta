@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
+import re
 import unicodedata
 from zoneinfo import ZoneInfo
 
@@ -15,7 +16,20 @@ from .db import SessionLocal, get_db
 from .drug_import import build_pmda_drug_info_url
 from .fhir.router import router as fhir_router
 from .migrations import run_migrations
-from .models import AuditLog, ChartNote, DiagnosisMaster, LabOrder, Observation, Patient, PrescriptionOrder, Reservation, User
+from .models import (
+    AuditLog,
+    ChartNote,
+    DiagnosisAliasMaster,
+    DiagnosisMaster,
+    LabOrder,
+    Observation,
+    Patient,
+    PmdaPackageInsertSection,
+    PmdaDrugInteraction,
+    PrescriptionOrder,
+    Reservation,
+    User,
+)
 from .models import (
     ChartTemplateMaster,
     LabSetMaster,
@@ -335,6 +349,175 @@ def _catalog_by_drug_name(db: Session) -> dict[str, PrescriptionCatalogMaster]:
     return {row.drug_name: row for row in rows}
 
 
+def _parse_prescription_days(value: str | None) -> int | None:
+    if not value:
+        return None
+    match = re.search(r"\d+", value)
+    if match is None:
+        return None
+    return int(match.group(0))
+
+
+def build_prescription_safety_warnings(
+    *,
+    patient: Patient,
+    drug_name: str,
+    dosage: str,
+    days: str,
+    catalog: PrescriptionCatalogMaster | None,
+    latest_duplicate: PrescriptionOrder | None = None,
+    current_prescriptions: list[PrescriptionOrder] | None = None,
+    pmda_sections: list[PmdaPackageInsertSection] | None = None,
+    pmda_interactions: list[PmdaDrugInteraction] | None = None,
+) -> list[str]:
+    warnings: list[str] = []
+    active_problem_names = _patient_problem_names(patient)
+    patient_alert_labels = _patient_alert_labels(patient)
+
+    if (
+        latest_duplicate is not None
+        and latest_duplicate.created_at.astimezone(TOKYO_TZ).date() == datetime.now(TOKYO_TZ).date()
+    ):
+        warnings.append("本日すでに同一薬剤を処方済み")
+
+    if catalog:
+        if (
+            catalog.allergy_conflict_label
+            and any(catalog.allergy_conflict_label in label for label in patient_alert_labels if label)
+        ):
+            warnings.append(f"{catalog.allergy_conflict_label} に注意")
+
+        if catalog.related_problem and catalog.related_problem not in active_problem_names:
+            warnings.append(f"関連病名 {catalog.related_problem} を確認")
+
+        if catalog.dosage_options and dosage not in catalog.dosage_options:
+            warnings.append("選択した用法が薬剤マスタの標準用法候補にありません")
+
+        requested_days = _parse_prescription_days(days)
+        default_days = _parse_prescription_days(catalog.default_days)
+        if requested_days is not None and default_days is not None and requested_days > default_days * 2:
+            warnings.append(f"処方日数が標準日数 {catalog.default_days} を大きく超えています")
+    elif drug_name:
+        warnings.append("薬剤マスタ未登録のため安全チェックが限定されています")
+
+    warnings.extend(
+        build_pmda_safety_warnings(
+            patient=patient,
+            current_prescriptions=current_prescriptions or [],
+            pmda_sections=pmda_sections or [],
+            pmda_interactions=pmda_interactions or [],
+        )
+    )
+
+    return warnings
+
+
+def _patient_safety_keywords(patient: Patient) -> set[str]:
+    keywords: set[str] = set()
+    for value in [*_patient_problem_names(patient), *_patient_alert_labels(patient)]:
+        normalized = re.sub(r"^#\d+\s*", "", value).strip()
+        if normalized:
+            keywords.add(normalized)
+    for item in patient.profile_items or []:
+        if not isinstance(item, dict):
+            continue
+        value = item.get("value")
+        if isinstance(value, str) and value:
+            keywords.add(value)
+    return keywords
+
+
+def _has_patient_keyword(patient: Patient, patterns: tuple[str, ...]) -> bool:
+    haystack = " ".join(_patient_safety_keywords(patient))
+    return any(pattern in haystack for pattern in patterns)
+
+
+def _pmda_text_excerpt(text: str, max_length: int = 56) -> str:
+    normalized = " ".join(text.split())
+    return normalized if len(normalized) <= max_length else f"{normalized[:max_length]}..."
+
+
+def build_pmda_safety_warnings(
+    *,
+    patient: Patient,
+    current_prescriptions: list[PrescriptionOrder],
+    pmda_sections: list[PmdaPackageInsertSection],
+    pmda_interactions: list[PmdaDrugInteraction],
+) -> list[str]:
+    warnings: list[str] = []
+    patient_keywords = _patient_safety_keywords(patient)
+    has_pregnancy_context = _has_patient_keyword(patient, ("妊娠", "妊婦", "妊娠中"))
+    has_renal_context = _has_patient_keyword(patient, ("腎", "CKD", "eGFR", "クレアチニン"))
+    current_drug_names = {item.drug_name for item in current_prescriptions}
+
+    for section in pmda_sections:
+        text = section.text
+        if section.section_code == "contraindications":
+            if any(keyword and keyword in text for keyword in patient_keywords):
+                warnings.append(f"PMDA禁忌: {_pmda_text_excerpt(text)}")
+            continue
+
+        if section.section_code == "pregnancy" and has_pregnancy_context:
+            warnings.append(f"PMDA妊婦注意: {_pmda_text_excerpt(text)}")
+            continue
+
+        if section.section_code == "renal_impairment" and has_renal_context:
+            warnings.append(f"PMDA腎機能注意: {_pmda_text_excerpt(text)}")
+            continue
+
+    for interaction in pmda_interactions:
+        matched_drugs = [
+            name
+            for name in current_drug_names
+            if name and (name in interaction.interacting_drug or interaction.interacting_drug in name)
+        ]
+        if matched_drugs:
+            warnings.append(
+                f"PMDA相互作用: {interaction.interacting_drug} / "
+                f"{_pmda_text_excerpt(interaction.clinical_effects or interaction.mechanism or '')}"
+            )
+
+    return list(dict.fromkeys(warnings))
+
+
+def get_pmda_sections_for_catalog(db: Session, catalog: PrescriptionCatalogMaster | None) -> list[PmdaPackageInsertSection]:
+    if catalog is None or not catalog.yj_code:
+        return []
+    return db.scalars(
+        select(PmdaPackageInsertSection)
+        .where(PmdaPackageInsertSection.yj_code == catalog.yj_code)
+        .where(
+            PmdaPackageInsertSection.section_code.in_(
+                ["contraindications", "pregnancy", "renal_impairment", "interactions"]
+            )
+        )
+        .order_by(PmdaPackageInsertSection.section_code, PmdaPackageInsertSection.id)
+    ).all()
+
+
+def get_pmda_interactions_for_catalog(db: Session, catalog: PrescriptionCatalogMaster | None) -> list[PmdaDrugInteraction]:
+    if catalog is None or not catalog.yj_code:
+        return []
+    return db.scalars(
+        select(PmdaDrugInteraction)
+        .where(PmdaDrugInteraction.yj_code == catalog.yj_code)
+        .order_by(PmdaDrugInteraction.interacting_drug, PmdaDrugInteraction.id)
+    ).all()
+
+
+def build_warning_details(warnings: list[str]) -> list[dict[str, str | None]]:
+    details: list[dict[str, str | None]] = []
+    for warning in warnings:
+        if warning.startswith("PMDA"):
+            source = "PMDA 電子添文"
+            severity = "contraindication" if "禁忌" in warning else "warning"
+        else:
+            source = "Manta safety rule"
+            severity = "warning"
+        details.append({"message": warning, "source": source, "severity": severity, "evidence": warning})
+    return details
+
+
 def build_prescription_timeline(
     *,
     patient: Patient,
@@ -347,10 +530,12 @@ def build_prescription_timeline(
             latest_by_drug[prescription.drug_name] = prescription
 
     today = _prescription_today()
-    active_problem_names = _patient_problem_names(patient)
-    patient_alert_labels = _patient_alert_labels(patient)
     grouped: dict[str, list[PrescriptionTimelineItemRead]] = {}
     ordered_dates: list[str] = []
+    pmda_sections_by_yj: dict[str, list[PmdaPackageInsertSection]] = {}
+    for catalog in catalog_by_drug.values():
+        if catalog.yj_code and catalog.yj_code not in pmda_sections_by_yj:
+            pmda_sections_by_yj[catalog.yj_code] = []
 
     for prescription in prescriptions:
         local_date = _prescription_local_date(prescription)
@@ -359,21 +544,25 @@ def build_prescription_timeline(
             ordered_dates.append(local_date)
 
         catalog = catalog_by_drug.get(prescription.drug_name)
-        warnings: list[str] = []
-        if (
-            catalog
-            and catalog.allergy_conflict_label
-            and any(catalog.allergy_conflict_label in label for label in patient_alert_labels if label)
-        ):
-            warnings.append(f"{catalog.allergy_conflict_label} に注意")
-        if catalog and catalog.related_problem and catalog.related_problem not in active_problem_names:
-            warnings.append(f"関連病名 {catalog.related_problem} を確認")
+        if catalog and catalog.yj_code and not pmda_sections_by_yj[catalog.yj_code]:
+            # Timeline checks are best-effort; create endpoint performs authoritative DB lookup.
+            pmda_sections_by_yj[catalog.yj_code] = []
+        warnings = build_prescription_safety_warnings(
+            patient=patient,
+            drug_name=prescription.drug_name,
+            dosage=prescription.dosage,
+            days=prescription.days,
+            catalog=catalog,
+            current_prescriptions=prescriptions,
+            pmda_sections=pmda_sections_by_yj.get(catalog.yj_code, []) if catalog and catalog.yj_code else [],
+            pmda_interactions=[],
+        )
         if local_date == today:
             warnings.append("本日処方済み")
 
         grouped[local_date].append(
             PrescriptionTimelineItemRead(
-                **PrescriptionRead.model_validate(prescription).model_dump(),
+                **PrescriptionRead.model_validate(prescription).model_dump(exclude={"warnings", "warning_details"}),
                 is_current=latest_by_drug.get(prescription.drug_name) is prescription,
                 catalog_id=catalog.id if catalog else None,
                 pmda_info_url=resolve_pmda_info_url(
@@ -604,7 +793,12 @@ def build_lab_long_trends(rows: list[Observation]) -> list[LabLongTrendItem]:
     return sorted(trends, key=lambda item: (item.abnormal_count == 0, item.item))
 
 
-def get_chart_order_masters_read(db: Session, *, include_inactive: bool = False) -> ChartOrderMasterRead:
+def get_chart_order_masters_read(
+    db: Session,
+    *,
+    include_inactive: bool = False,
+    department: str | None = None,
+) -> ChartOrderMasterRead:
     prescription_catalog_query = select(PrescriptionCatalogMaster).order_by(
         PrescriptionCatalogMaster.sort_order, PrescriptionCatalogMaster.id
     )
@@ -622,6 +816,10 @@ def get_chart_order_masters_read(db: Session, *, include_inactive: bool = False)
     )
     if not include_inactive:
         prescription_set_query = prescription_set_query.where(PrescriptionSetMaster.is_active.is_(True))
+    if department:
+        prescription_set_query = prescription_set_query.where(
+            or_(PrescriptionSetMaster.department == department, PrescriptionSetMaster.department == "共通")
+        )
     prescription_sets = db.scalars(prescription_set_query).all()
 
     lab_set_options_query = select(LabSetMaster).order_by(LabSetMaster.sort_order, LabSetMaster.id)
@@ -634,6 +832,8 @@ def get_chart_order_masters_read(db: Session, *, include_inactive: bool = False)
     )
     if not include_inactive:
         reservation_slots_query = reservation_slots_query.where(ReservationSlotMaster.is_active.is_(True))
+    if department:
+        reservation_slots_query = reservation_slots_query.where(ReservationSlotMaster.department == department)
     reservation_slots = db.scalars(reservation_slots_query).all()
 
     chart_templates_query = select(ChartTemplateMaster).order_by(
@@ -641,6 +841,10 @@ def get_chart_order_masters_read(db: Session, *, include_inactive: bool = False)
     )
     if not include_inactive:
         chart_templates_query = chart_templates_query.where(ChartTemplateMaster.is_active.is_(True))
+    if department:
+        chart_templates_query = chart_templates_query.where(
+            or_(ChartTemplateMaster.department == department, ChartTemplateMaster.department == "共通")
+        )
     chart_templates = db.scalars(chart_templates_query).all()
 
     return ChartOrderMasterRead(
@@ -714,13 +918,14 @@ def get_authenticated_user(
 @app.get("/api/masters/chart-order-config", response_model=ChartOrderMasterRead)
 def get_chart_order_config(
     include_inactive: bool = Query(default=False),
+    department: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ChartOrderMasterRead:
     if include_inactive and current_user.role != "管理者":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    return get_chart_order_masters_read(db, include_inactive=include_inactive)
+    return get_chart_order_masters_read(db, include_inactive=include_inactive, department=department)
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])
@@ -742,7 +947,7 @@ def search_diagnosis_masters(
     kana_contains = f"%{kana_query}%"
     code_prefix = f"{normalized_code_query}%"
 
-    statement = (
+    direct_statement = (
         select(DiagnosisMaster)
         .where(DiagnosisMaster.is_deleted.is_(False))
         .where(
@@ -767,9 +972,43 @@ def search_diagnosis_masters(
             DiagnosisMaster.disease_name,
             DiagnosisMaster.management_number,
         )
-        .limit(limit)
+        .limit(limit * 2)
     )
-    items = db.scalars(statement).all()
+    direct_items = db.scalars(direct_statement).all()
+
+    alias_statement = (
+        select(DiagnosisMaster)
+        .join(DiagnosisAliasMaster, DiagnosisAliasMaster.management_number == DiagnosisMaster.management_number)
+        .where(DiagnosisMaster.is_deleted.is_(False))
+        .where(DiagnosisAliasMaster.is_deleted.is_(False))
+        .where(
+            or_(
+                DiagnosisAliasMaster.alias.ilike(name_contains),
+                DiagnosisAliasMaster.alias_kana.ilike(kana_contains),
+            )
+        )
+        .order_by(
+            case(
+                (DiagnosisAliasMaster.alias == normalized_query, 0),
+                (DiagnosisAliasMaster.alias.ilike(name_prefix), 1),
+                (DiagnosisAliasMaster.alias_kana.ilike(kana_prefix), 2),
+                (DiagnosisAliasMaster.alias.ilike(name_contains), 3),
+                (DiagnosisAliasMaster.alias_kana.ilike(kana_contains), 4),
+                else_=5,
+            ),
+            DiagnosisAliasMaster.alias,
+            DiagnosisMaster.disease_name,
+            DiagnosisMaster.management_number,
+        )
+        .limit(limit * 2)
+    )
+    alias_items = db.scalars(alias_statement).all()
+
+    items_by_management_number: dict[str, DiagnosisMaster] = {}
+    for item in [*direct_items, *alias_items]:
+        items_by_management_number.setdefault(item.management_number, item)
+
+    items = list(items_by_management_number.values())[:limit]
     return [DiagnosisMasterRead.model_validate(item) for item in items]
 
 
@@ -1557,6 +1796,9 @@ def create_prescription(
     db: Session = Depends(get_db),
 ) -> PrescriptionRead:
     patient = get_patient_or_404(db, patient_id)
+    catalog = db.scalars(
+        select(PrescriptionCatalogMaster).where(PrescriptionCatalogMaster.drug_name == payload.drug_name)
+    ).first()
     latest_duplicate = db.scalar(
         select(PrescriptionOrder)
         .where(
@@ -1570,7 +1812,25 @@ def create_prescription(
         and latest_duplicate.created_at.astimezone(TOKYO_TZ).date() == datetime.now(TOKYO_TZ).date()
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate prescription")
-    if "ペニシリンアレルギー" in _patient_alert_labels(patient) and "アモキシシリン" in payload.drug_name:
+    current_prescriptions = db.scalars(
+        select(PrescriptionOrder)
+        .where(PrescriptionOrder.patient_id == patient_id)
+        .order_by(desc(PrescriptionOrder.created_at))
+    ).all()
+    pmda_sections = get_pmda_sections_for_catalog(db, catalog)
+    pmda_interactions = get_pmda_interactions_for_catalog(db, catalog)
+    warnings = build_prescription_safety_warnings(
+        patient=patient,
+        drug_name=payload.drug_name,
+        dosage=payload.dosage,
+        days=payload.days,
+        catalog=catalog,
+        latest_duplicate=latest_duplicate,
+        current_prescriptions=current_prescriptions,
+        pmda_sections=pmda_sections,
+        pmda_interactions=pmda_interactions,
+    )
+    if any("アレルギー" in warning for warning in warnings):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allergy conflict")
 
     order = PrescriptionOrder(
@@ -1586,12 +1846,14 @@ def create_prescription(
         actor=current_user.display_name,
         action="処方追加",
         scope="order",
-        detail=f"{payload.drug_name} を追加しました。",
+        detail=f"{payload.drug_name} を追加しました。警告: {len(warnings)}件。",
         patient=patient,
     )
     db.commit()
     db.refresh(order)
-    return order
+    return PrescriptionRead.model_validate(order).model_copy(
+        update={"warnings": warnings, "warning_details": build_warning_details(warnings)}
+    )
 
 
 @app.post("/api/patients/{patient_id}/lab-orders", response_model=LabOrderRead)

@@ -106,6 +106,13 @@ type ApiPrescription = {
   drug_name: string;
   dosage: string;
   created_at: string;
+  warnings?: string[];
+  warning_details?: Array<{
+    message: string;
+    source?: string | null;
+    severity?: string | null;
+    evidence?: string | null;
+  }>;
 };
 
 type ApiPrescriptionTimelineItem = ApiPrescription & {
@@ -442,6 +449,13 @@ const mapPrescription = (item: ApiPrescription): ChartWorkspaceData['prescriptio
   drugName: item.drug_name,
   dosage: item.dosage,
   createdAt: formatTimestamp(item.created_at),
+  warnings: item.warnings ?? [],
+  warningDetails: (item.warning_details ?? []).map((detail) => ({
+    message: detail.message,
+    source: detail.source ?? undefined,
+    severity: detail.severity ?? undefined,
+    evidence: detail.evidence ?? undefined,
+  })),
 });
 
 const mapPrescriptionHistory = (
@@ -874,10 +888,16 @@ export const getLabLongTrends = async (patientId: string): Promise<LabLongTrendI
   return mapLabLongTrends(trends);
 };
 
-export const getChartOrderConfig = async (options?: { includeInactive?: boolean }): Promise<ChartOrderConfig> => {
+export const getChartOrderConfig = async (options?: {
+  includeInactive?: boolean;
+  department?: string;
+}): Promise<ChartOrderConfig> => {
   const searchParams = new URLSearchParams();
   if (options?.includeInactive) {
     searchParams.set('include_inactive', 'true');
+  }
+  if (options?.department) {
+    searchParams.set('department', options.department);
   }
   const response = await request<ApiChartOrderConfig>(
     `/api/masters/chart-order-config${searchParams.size > 0 ? `?${searchParams.toString()}` : ''}`,
@@ -1331,8 +1351,8 @@ export const addPrescription = async (
     dosage: string;
     actor: string;
   },
-) =>
-  request<ApiPrescription>(`/api/patients/${patientId}/prescriptions`, {
+) => {
+  const response = await request<ApiPrescription>(`/api/patients/${patientId}/prescriptions`, {
     method: 'POST',
     body: JSON.stringify({
       type: payload.type,
@@ -1342,6 +1362,8 @@ export const addPrescription = async (
       actor: payload.actor,
     }),
   });
+  return mapPrescription(response);
+};
 
 export const getPrescriptionTimeline = async (patientId: string): Promise<PrescriptionTimelineGroup[]> => {
   const timeline = await request<ApiPrescriptionTimelineGroup[]>(

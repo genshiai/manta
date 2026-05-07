@@ -219,6 +219,7 @@ def test_sync_drug_master_records_supports_dry_run_and_deactivate_missing(tmp_pa
 
             assert summary.created == 1
             assert summary.deactivated >= 1
+            assert summary.invalid_yj_codes == []
             assert incoming is not None
             assert incoming.drug_name == "継続取込テスト薬 10mg"
             assert missing is not None

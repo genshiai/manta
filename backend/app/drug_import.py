@@ -98,6 +98,7 @@ class DrugImportSummary:
     updated: int
     unchanged: int
     deactivated: int
+    invalid_yj_codes: list[str] | None = None
     dry_run: bool = False
 
 
@@ -303,6 +304,13 @@ def sync_drug_master_records(
     """
 
     record_list = list(records)
+    invalid_yj_codes = sorted(
+        {
+            f"{record.drug_name}:{record.yj_code}"
+            for record in record_list
+            if record.yj_code and build_pmda_drug_info_url(record.yj_code) is None
+        }
+    )
     incoming_ids = {record.id for record in record_list}
     created = updated = unchanged = deactivated = 0
 
@@ -341,5 +349,6 @@ def sync_drug_master_records(
         updated=updated,
         unchanged=unchanged,
         deactivated=deactivated,
+        invalid_yj_codes=invalid_yj_codes,
         dry_run=dry_run,
     )
