@@ -31,6 +31,49 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 
 このうち、厚労省薬価 Excel と PMDA XML importer は実装済み。次に必要なのは支払基金と HOT。
 
+## 取得・実装ステータス
+
+原本は repo 外に保存する。推奨置き場は `/Users/daichi/Downloads/manta-master-data/YYYYMMDD/`。
+
+| 優先 | データ | 取得状況 | 実装状況 | 次アクション |
+| --- | --- | --- | --- | --- |
+| A | 厚労省 薬価基準収載品目リスト 内用薬 | 取得済み: `/Users/daichi/Downloads/tp20260415-01_01.xlsx` | importer 実装済み | 注射薬、外用薬、歯科用薬剤、後発医薬品の有無 Excel も取得する |
+| A | PMDA 医療用医薬品添付文書 XML | ロキソニン XML で検証済み。全件/採用薬分は未取得 | importer 実装済み | PMDA メディナビから XML 全件または採用薬分を取得する |
+| A | 支払基金 レセプト電算 医薬品マスター | 検証用に `/tmp/manta-receipt-master/y_ALL20260414.zip` を取得済み。恒久保存は未 | importer 実装済み | `y_ALL20260414.zip` とファイル仕様 PDF を Downloads 配下に保存する |
+| A | MEDIS 医薬品 HOT コードマスター | 未取得 | importer 未実装 | `A_20260331_1.txt`, `A_20260331_2.txt`, `DLFileLayout.pdf` を取得する |
+| B | 支払基金 経過措置医薬品一覧 | 未取得 | importer 未実装 | `keikasoti_R08_20260305.xlsx` を取得する |
+| B | 支払基金 長期収載品の選定療養対象一覧 | 未取得 | importer 未実装 | `sentei_20260312.xlsx` を取得する |
+| B | 厚労省 一般名処方マスター | 未取得 | importer 未実装 | 一般名処方 Excel を取得する |
+| B | 検査項目マスター | 未取得 | importer 未実装 | JLAC10/LOINC/施設検査項目 CSV の候補を決める |
+| C | 標準病名マスター履歴 | main/index は対応済み。履歴ファイルは未検証 | importer 一部実装済み | MEDIS 標準病名 master の履歴ファイルを取得して列確認する |
+
+## 推奨保存構成
+
+```text
+/Users/daichi/Downloads/manta-master-data/
+  20260415-mhlw-drug-price/
+    tp20260415-01_01.xlsx
+    tp20260415-01_02.xlsx
+    tp20260415-01_03.xlsx
+    tp20260401-01_04.xlsx
+    tp20260415-01_05.xlsx
+  20260414-ssk-receipt-drug/
+    y_ALL20260414.zip
+    y_20260414.csv
+    r08kaitei_20260414y.pdf
+    master_3_20260501.pdf
+  20260331-medis-hot/
+    A_20260331_1.txt
+    A_20260331_2.txt
+    DLFileLayout.pdf
+  20260312-ssk-long-term-listed/
+    sentei_20260312.xlsx
+  20260305-ssk-transitional-drugs/
+    keikasoti_R08_20260305.xlsx
+  pmda-package-inserts/
+    xml/
+```
+
 ## コードの違い
 
 | コード | 何のコードか | 主な用途 | Manta での扱い |
@@ -319,3 +362,26 @@ Manta 実装メモ:
    - 入力: MEDIS `A_*.txt`
    - 出力: YJ / HOT / レセ電対応テーブル
    - 目的: コード変換の安定化
+
+4. `import_receipt_transitional_drugs.py` 未実装
+   - 入力: 支払基金 `keikasoti_R08_*.xlsx`
+   - 出力: 経過措置薬テーブル、または `receipt_drug_masters` の補助カラム
+   - 目的: 経過措置期限切れ薬の表示・warning
+
+5. `import_receipt_long_term_listed_drugs.py` 未実装
+   - 入力: 支払基金 `sentei_*.xlsx`
+   - 出力: 長期収載品・選定療養対象テーブル
+   - 目的: 選定療養対象表示と請求コード選択
+
+6. `import_generic_prescription_master.py` 未実装
+   - 入力: 厚労省 一般名処方 master Excel
+   - 出力: 一般名処方 master
+   - 目的: 一般名処方、後発品提案、薬剤検索補助
+
+## 直近の作業順
+
+1. HOT CSV を取得して `drug_code_mappings` importer を作る。
+2. 支払基金 `keikasoti_R08_20260305.xlsx` と `sentei_20260312.xlsx` を取得して UI warning 用の master を作る。
+3. PMDA 相互作用の `interacting_drug` を薬剤 master / HOT / 支払基金 master に照合する。
+4. 処方入力 UI に薬価、先発/後発、経過措置、選定療養、レセ電候補を出す。
+5. 注射薬・外用薬の厚労省 Excel importer 対応を広げる。現在の UI は `内服`, `外用`, `頓服` なので、注射薬はカテゴリ設計を追加してから取り込む。
