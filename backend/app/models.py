@@ -406,6 +406,22 @@ class PmdaDrugInteraction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
+class PmdaDrugInteractionMatch(Base):
+    __tablename__ = "pmda_drug_interaction_matches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    interaction_id: Mapped[int] = mapped_column(
+        ForeignKey("pmda_drug_interactions.id", ondelete="CASCADE"), index=True
+    )
+    interacting_drug_normalized: Mapped[str] = mapped_column(String(255))
+    matched_yj_code: Mapped[str] = mapped_column(String(64), index=True)
+    matched_drug_name: Mapped[str] = mapped_column(String(255))
+    match_source: Mapped[str] = mapped_column(String(32))
+    match_confidence: Mapped[int] = mapped_column(Integer)
+    source_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

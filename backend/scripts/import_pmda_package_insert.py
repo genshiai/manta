@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
 from app.db import SessionLocal
 from app.migrations import run_migrations
 from app.pmda_import import parse_pmda_package_insert_xml_records, upsert_pmda_package_insert_data
+from app.pmda_interaction_match import sync_pmda_interaction_matches
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,6 +19,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--xml-file", type=Path, action="append", default=[], help="Path to a PMDA package insert XML")
     parser.add_argument("--directory", type=Path, help="Directory containing PMDA package insert XML files")
     parser.add_argument("--dry-run", action="store_true", help="Parse files but do not write to DB")
+    parser.add_argument(
+        "--skip-match",
+        action="store_true",
+        help="Skip resolving imported interaction drug names to local drug masters",
+    )
     return parser.parse_args()
 
 
@@ -66,6 +72,10 @@ def main() -> int:
             sections=all_sections,
             interactions=all_interactions,
         )
+        match_summary = None
+        if not args.skip_match:
+            db.flush()
+            match_summary = sync_pmda_interaction_matches(db)
         db.commit()
 
     print(
@@ -74,6 +84,12 @@ def main() -> int:
         f"sections_inserted={inserted} sections_replaced={deleted} "
         f"interactions_inserted={interaction_inserted} interactions_replaced={interaction_deleted}"
     )
+    if match_summary is not None:
+        print(
+            "pmda interaction match completed: "
+            f"interactions={match_summary.interactions} created={match_summary.created} "
+            f"replaced={match_summary.deleted}"
+        )
     return 1 if failed_files else 0
 
 

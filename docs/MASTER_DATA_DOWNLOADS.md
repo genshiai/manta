@@ -334,8 +334,16 @@ Manta 実装メモ:
 
 実装上の不足:
 
-- `pmda_drug_interactions.interacting_drug` は相手名の文字列なので、今は処方中薬剤との照合が弱い。
-- 次は `interacting_drug_normalized`, `matched_yj_code`, `matched_drug_name`, `match_confidence`, `match_source` を持つ照合テーブルを作る。
+- `backend/scripts/resolve_pmda_interaction_matches.py` で `pmda_drug_interactions.interacting_drug` を薬剤 catalog / HOT / 支払基金 master に照合する。
+- 照合結果は `pmda_drug_interaction_matches` に `interacting_drug_normalized`, `matched_yj_code`, `matched_drug_name`, `match_confidence`, `match_source` として保持する。
+- 処方追加時の PMDA 相互作用 warning は、文字列一致より先に照合済み YJ を使う。
+
+取り込み後の照合例:
+
+```bash
+cd backend
+uv run python scripts/resolve_pmda_interaction_matches.py --dry-run
+```
 
 ### 経過措置・後発品表示 UI
 
@@ -391,6 +399,5 @@ Manta 実装メモ:
 ## 直近の作業順
 
 1. 支払基金 `keikasoti_R08_20260305.xlsx` と `sentei_20260312.xlsx` を取得して UI warning 用の master を作る。
-2. PMDA 相互作用の `interacting_drug` を薬剤 master / HOT / 支払基金 master に照合する。
-3. 処方入力 UI に薬価、先発/後発、経過措置、選定療養、レセ電候補を出す。
-4. 注射薬・外用薬の厚労省 Excel importer 対応を広げる。現在の UI は `内服`, `外用`, `頓服` なので、注射薬はカテゴリ設計を追加してから取り込む。
+2. 処方入力 UI に薬価、先発/後発、経過措置、選定療養、レセ電候補を出す。
+3. 注射薬・外用薬の厚労省 Excel importer 対応を広げる。現在の UI は `内服`, `外用`, `頓服` なので、注射薬はカテゴリ設計を追加してから取り込む。

@@ -15,6 +15,7 @@ from app.models import (
     Patient,
     PmdaPackageInsertSection,
     PmdaDrugInteraction,
+    PmdaDrugInteractionMatch,
     PrescriptionCatalogMaster,
     PrescriptionOrder,
     PrescriptionSetMaster,
@@ -925,6 +926,124 @@ def test_add_prescription_returns_pmda_pregnancy_warning() -> None:
     assert response.status_code == 200
     assert any("PMDA妊婦注意" in warning for warning in response.json()["warnings"])
     assert any(detail["source"] == "PMDA 電子添文" for detail in response.json()["warning_details"])
+
+
+def test_add_prescription_uses_resolved_pmda_interaction_match() -> None:
+    suffix = uuid4().hex[:8]
+    patient_id = "0009900041"
+    base_drug_id = f"warfarin-{suffix}"
+    base_drug_name = f"ワルファリン錠1mg {suffix}"
+    base_yj_code = f"7654321C{suffix[:4].upper()}"
+    new_drug_id = f"pmda-int-{suffix}"
+    new_drug_name = f"PMDA相互作用テスト薬 {suffix}"
+    new_yj_code = f"1234567D{suffix[:4].upper()}"
+    package_insert_no = f"PMDA-INT-{suffix}"
+
+    try:
+        with SessionLocal() as db:
+            db.add(
+                PrescriptionCatalogMaster(
+                    id=base_drug_id,
+                    sort_order=9998,
+                    is_active=True,
+                    drug_name=base_drug_name,
+                    category="内服",
+                    dosage_options=["1回1錠 1日1回 朝食後"],
+                    generic_name="ワルファリン",
+                    name_kana=None,
+                    aliases=[],
+                    yj_code=base_yj_code,
+                    hot_code=None,
+                    dosage_form="錠剤",
+                    strength="1mg",
+                    standard_usage_code=None,
+                    default_days="7",
+                    pmda_info_url=None,
+                    allergy_conflict_label=None,
+                    related_problem=None,
+                )
+            )
+            db.add(
+                PrescriptionCatalogMaster(
+                    id=new_drug_id,
+                    sort_order=9999,
+                    is_active=True,
+                    drug_name=new_drug_name,
+                    category="内服",
+                    dosage_options=["1回1錠 1日1回 朝食後"],
+                    generic_name="PMDA相互作用テスト一般名",
+                    name_kana=None,
+                    aliases=[],
+                    yj_code=new_yj_code,
+                    hot_code=None,
+                    dosage_form="錠剤",
+                    strength="1mg",
+                    standard_usage_code=None,
+                    default_days="7",
+                    pmda_info_url=None,
+                    allergy_conflict_label=None,
+                    related_problem=None,
+                )
+            )
+            interaction = PmdaDrugInteraction(
+                yj_code=new_yj_code,
+                package_insert_no=package_insert_no,
+                brand_name=new_drug_name,
+                interacting_drug="ワルファリン",
+                clinical_effects="出血傾向が増強することがある。",
+                mechanism="抗凝固作用が増強する。",
+                source_xml="pmda-test.xml",
+                source_updated_at="2026-05",
+            )
+            db.add(interaction)
+            db.flush()
+            db.add(
+                PmdaDrugInteractionMatch(
+                    interaction_id=interaction.id,
+                    interacting_drug_normalized="ワルファリン",
+                    matched_yj_code=base_yj_code,
+                    matched_drug_name=base_drug_name,
+                    match_source="catalog",
+                    match_confidence=100,
+                    source_code=base_drug_id,
+                )
+            )
+            db.commit()
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            base_response = client.post(
+                f"/api/patients/{patient_id}/prescriptions",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "type": "内服",
+                    "days": "7日分",
+                    "drug_name": base_drug_name,
+                    "dosage": "1回1錠 1日1回 朝食後",
+                    "actor": "田中 太郎",
+                },
+            )
+            response = client.post(
+                f"/api/patients/{patient_id}/prescriptions",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "type": "内服",
+                    "days": "7日分",
+                    "drug_name": new_drug_name,
+                    "dosage": "1回1錠 1日1回 朝食後",
+                    "actor": "田中 太郎",
+                },
+            )
+    finally:
+        cleanup_prescription_orders(patient_id, base_drug_name)
+        cleanup_prescription_orders(patient_id, new_drug_name)
+        cleanup_pmda_sections(package_insert_no)
+        cleanup_chart_order_masters(base_drug_id, "unused-lab-set", "unused-slot")
+        cleanup_chart_order_masters(new_drug_id, "unused-lab-set", "unused-slot")
+
+    assert base_response.status_code == 200
+    assert response.status_code == 200
+    assert any("PMDA相互作用" in warning and "照合:" in warning for warning in response.json()["warnings"])
 
 
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:

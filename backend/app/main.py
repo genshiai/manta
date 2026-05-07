@@ -24,8 +24,9 @@ from .models import (
     LabOrder,
     Observation,
     Patient,
-    PmdaPackageInsertSection,
     PmdaDrugInteraction,
+    PmdaDrugInteractionMatch,
+    PmdaPackageInsertSection,
     PrescriptionOrder,
     Reservation,
     User,
@@ -369,6 +370,8 @@ def build_prescription_safety_warnings(
     current_prescriptions: list[PrescriptionOrder] | None = None,
     pmda_sections: list[PmdaPackageInsertSection] | None = None,
     pmda_interactions: list[PmdaDrugInteraction] | None = None,
+    pmda_interaction_matches: dict[int, list[PmdaDrugInteractionMatch]] | None = None,
+    current_catalogs_by_drug: dict[str, PrescriptionCatalogMaster] | None = None,
 ) -> list[str]:
     warnings: list[str] = []
     active_problem_names = _patient_problem_names(patient)
@@ -406,6 +409,8 @@ def build_prescription_safety_warnings(
             current_prescriptions=current_prescriptions or [],
             pmda_sections=pmda_sections or [],
             pmda_interactions=pmda_interactions or [],
+            pmda_interaction_matches=pmda_interaction_matches or {},
+            current_catalogs_by_drug=current_catalogs_by_drug or {},
         )
     )
 
@@ -443,12 +448,19 @@ def build_pmda_safety_warnings(
     current_prescriptions: list[PrescriptionOrder],
     pmda_sections: list[PmdaPackageInsertSection],
     pmda_interactions: list[PmdaDrugInteraction],
+    pmda_interaction_matches: dict[int, list[PmdaDrugInteractionMatch]],
+    current_catalogs_by_drug: dict[str, PrescriptionCatalogMaster],
 ) -> list[str]:
     warnings: list[str] = []
     patient_keywords = _patient_safety_keywords(patient)
     has_pregnancy_context = _has_patient_keyword(patient, ("妊娠", "妊婦", "妊娠中"))
     has_renal_context = _has_patient_keyword(patient, ("腎", "CKD", "eGFR", "クレアチニン"))
     current_drug_names = {item.drug_name for item in current_prescriptions}
+    current_yj_codes = {
+        catalog.yj_code
+        for drug_name, catalog in current_catalogs_by_drug.items()
+        if drug_name in current_drug_names and catalog.yj_code
+    }
 
     for section in pmda_sections:
         text = section.text
@@ -466,15 +478,27 @@ def build_pmda_safety_warnings(
             continue
 
     for interaction in pmda_interactions:
-        matched_drugs = [
-            name
+        resolved_matches = pmda_interaction_matches.get(interaction.id, [])
+        resolved_yj_codes = {match.matched_yj_code for match in resolved_matches}
+        has_resolved_match = bool(current_yj_codes & resolved_yj_codes)
+        has_name_match = any(
+            name and (name in interaction.interacting_drug or interaction.interacting_drug in name)
             for name in current_drug_names
-            if name and (name in interaction.interacting_drug or interaction.interacting_drug in name)
-        ]
-        if matched_drugs:
+        )
+        if has_resolved_match or has_name_match:
+            evidence = _pmda_text_excerpt(interaction.clinical_effects or interaction.mechanism or "")
+            if has_resolved_match:
+                matched_names = sorted(
+                    {
+                        match.matched_drug_name
+                        for match in resolved_matches
+                        if match.matched_yj_code in current_yj_codes
+                    }
+                )
+                evidence = f"照合: {', '.join(matched_names[:3])} / {evidence}"
             warnings.append(
                 f"PMDA相互作用: {interaction.interacting_drug} / "
-                f"{_pmda_text_excerpt(interaction.clinical_effects or interaction.mechanism or '')}"
+                f"{evidence}"
             )
 
     return list(dict.fromkeys(warnings))
@@ -503,6 +527,24 @@ def get_pmda_interactions_for_catalog(db: Session, catalog: PrescriptionCatalogM
         .where(PmdaDrugInteraction.yj_code == catalog.yj_code)
         .order_by(PmdaDrugInteraction.interacting_drug, PmdaDrugInteraction.id)
     ).all()
+
+
+def get_pmda_interaction_matches(
+    db: Session,
+    interactions: list[PmdaDrugInteraction],
+) -> dict[int, list[PmdaDrugInteractionMatch]]:
+    interaction_ids = [interaction.id for interaction in interactions]
+    if not interaction_ids:
+        return {}
+    rows = db.scalars(
+        select(PmdaDrugInteractionMatch)
+        .where(PmdaDrugInteractionMatch.interaction_id.in_(interaction_ids))
+        .order_by(PmdaDrugInteractionMatch.match_confidence.desc(), PmdaDrugInteractionMatch.matched_drug_name)
+    ).all()
+    grouped: dict[int, list[PmdaDrugInteractionMatch]] = {}
+    for row in rows:
+        grouped.setdefault(row.interaction_id, []).append(row)
+    return grouped
 
 
 def build_warning_details(warnings: list[str]) -> list[dict[str, str | None]]:
@@ -556,6 +598,8 @@ def build_prescription_timeline(
             current_prescriptions=prescriptions,
             pmda_sections=pmda_sections_by_yj.get(catalog.yj_code, []) if catalog and catalog.yj_code else [],
             pmda_interactions=[],
+            pmda_interaction_matches={},
+            current_catalogs_by_drug=catalog_by_drug,
         )
         if local_date == today:
             warnings.append("本日処方済み")
@@ -1833,6 +1877,14 @@ def create_prescription(
     ).all()
     pmda_sections = get_pmda_sections_for_catalog(db, catalog)
     pmda_interactions = get_pmda_interactions_for_catalog(db, catalog)
+    pmda_interaction_matches = get_pmda_interaction_matches(db, pmda_interactions)
+    current_drug_names = {prescription.drug_name for prescription in current_prescriptions}
+    current_catalogs_by_drug = {
+        item.drug_name: item
+        for item in db.scalars(
+            select(PrescriptionCatalogMaster).where(PrescriptionCatalogMaster.drug_name.in_(current_drug_names))
+        ).all()
+    }
     warnings = build_prescription_safety_warnings(
         patient=patient,
         drug_name=payload.drug_name,
@@ -1843,6 +1895,8 @@ def create_prescription(
         current_prescriptions=current_prescriptions,
         pmda_sections=pmda_sections,
         pmda_interactions=pmda_interactions,
+        pmda_interaction_matches=pmda_interaction_matches,
+        current_catalogs_by_drug=current_catalogs_by_drug,
     )
     if any("アレルギー" in warning for warning in warnings):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allergy conflict")
