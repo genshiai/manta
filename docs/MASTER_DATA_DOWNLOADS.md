@@ -40,7 +40,7 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 | A | 厚労省 薬価基準収載品目リスト 内用薬 | 取得済み: `/Users/daichi/Downloads/tp20260415-01_01.xlsx` | importer 実装済み | 注射薬、外用薬、歯科用薬剤、後発医薬品の有無 Excel も取得する |
 | A | PMDA 医療用医薬品添付文書 XML | ロキソニン XML で検証済み。全件/採用薬分は未取得 | importer 実装済み | PMDA メディナビから XML 全件または採用薬分を取得する |
 | A | 支払基金 レセプト電算 医薬品マスター | 検証用に `/tmp/manta-receipt-master/y_ALL20260414.zip` を取得済み。恒久保存は未 | importer 実装済み | `y_ALL20260414.zip` とファイル仕様 PDF を Downloads 配下に保存する |
-| A | MEDIS 医薬品 HOT コードマスター | 未取得 | importer 未実装 | `A_20260331_1.txt`, `A_20260331_2.txt`, `DLFileLayout.pdf` を取得する |
+| A | MEDIS 医薬品 HOT コードマスター | 検証用に `/tmp/manta-hot-master/A_20260331_1.txt`, `/tmp/manta-hot-master/A_20260331_2.txt`, `/tmp/manta-hot-master/DLFileLayout.pdf` を取得済み。恒久保存は未 | importer 実装済み | HOT CSV 一式を Downloads 配下に保存する |
 | B | 支払基金 経過措置医薬品一覧 | 未取得 | importer 未実装 | `keikasoti_R08_20260305.xlsx` を取得する |
 | B | 支払基金 長期収載品の選定療養対象一覧 | 未取得 | importer 未実装 | `sentei_20260312.xlsx` を取得する |
 | B | 厚労省 一般名処方マスター | 未取得 | importer 未実装 | 一般名処方 Excel を取得する |
@@ -249,9 +249,19 @@ uv run python scripts/import_receipt_drug_master.py \
 
 Manta 実装メモ:
 
-- `drug_code_mappings` のような別テーブルを作り、`yj_code`, `dispensing_package_code`, `sales_package_code`, `carton_package_code`, `jan_code`, `brand_name`, `package_name` を保持する。
+- `backend/scripts/import_hot_drug_master.py` で `A_YYYYMMDD_1.txt` または `A_YYYYMMDD_2.txt` を直接 import する。
+- `hot_drug_code_mappings` に `yj_code`, `dispensing_package_code`, `sales_package_code`, `carton_package_code`, `jan_code`, `brand_name`, `package_name` を保持する。
 - `prescription_catalog_masters` に直接全部持たせるより、包装単位ごとに複数行になるため別テーブルがよい。
 - 処方安全チェックでは、処方薬名と PMDA 相互作用相手名の照合補助に使う。
+
+取り込み例:
+
+```bash
+cd backend
+uv run python scripts/import_hot_drug_master.py \
+  /path/to/A_20260331_2.txt \
+  --dry-run
+```
 
 ## 5. 厚労省 一般名処方マスター
 
@@ -358,9 +368,9 @@ Manta 実装メモ:
    - 出力: `receipt_drug_masters`
    - 目的: レセプト請求コードの正規化
 
-3. `import_hot_drug_master.py` 未実装
+3. `import_hot_drug_master.py` 実装済み
    - 入力: MEDIS `A_*.txt`
-   - 出力: YJ / HOT / レセ電対応テーブル
+   - 出力: `hot_drug_code_mappings`
    - 目的: コード変換の安定化
 
 4. `import_receipt_transitional_drugs.py` 未実装
@@ -380,8 +390,7 @@ Manta 実装メモ:
 
 ## 直近の作業順
 
-1. HOT CSV を取得して `drug_code_mappings` importer を作る。
-2. 支払基金 `keikasoti_R08_20260305.xlsx` と `sentei_20260312.xlsx` を取得して UI warning 用の master を作る。
-3. PMDA 相互作用の `interacting_drug` を薬剤 master / HOT / 支払基金 master に照合する。
-4. 処方入力 UI に薬価、先発/後発、経過措置、選定療養、レセ電候補を出す。
-5. 注射薬・外用薬の厚労省 Excel importer 対応を広げる。現在の UI は `内服`, `外用`, `頓服` なので、注射薬はカテゴリ設計を追加してから取り込む。
+1. 支払基金 `keikasoti_R08_20260305.xlsx` と `sentei_20260312.xlsx` を取得して UI warning 用の master を作る。
+2. PMDA 相互作用の `interacting_drug` を薬剤 master / HOT / 支払基金 master に照合する。
+3. 処方入力 UI に薬価、先発/後発、経過措置、選定療養、レセ電候補を出す。
+4. 注射薬・外用薬の厚労省 Excel importer 対応を広げる。現在の UI は `内服`, `外用`, `頓服` なので、注射薬はカテゴリ設計を追加してから取り込む。

@@ -243,6 +243,43 @@ class ReceiptDrugMaster(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class HotDrugCodeMapping(Base):
+    __tablename__ = "hot_drug_code_mappings"
+
+    id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    update_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    updated_at_master: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    brand_name: Mapped[str] = mapped_column(String(255))
+    brand_name_kana_1: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    brand_name_kana_2: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    brand_name_kana_3: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    listing_classification: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    yj_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    listed_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    listed_at: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    transitional_expiry: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    approval_specification: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    drug_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    dosage_form: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    package_form: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    package_quantity: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    package_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    total_quantity: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    total_quantity_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    dispensing_package_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    dispensing_package_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    dispensing_package_subdivision: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sales_package_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    carton_package_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    jan_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    sales_discontinued_at: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    last_lot_expiry: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    source_file: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class StandardUsageMaster(Base):
     __tablename__ = "standard_usage_masters"
 
