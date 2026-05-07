@@ -59,8 +59,7 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 Manta 実装メモ:
 
 - `backend/scripts/import_mhlw_drug_price_master.py` で Excel を直接読んで `prescription_catalog_masters` に upsert する。
-- まずは `drug_name`, `generic_name`, `strength`, `yj_code`, `category` を投入する。
-- `manufacturer`, `drug_price`, `generic_flag`, `brand_flag`, `transitional_expiry` は DB カラム追加後に保持する。
+- `drug_name`, `generic_name`, `strength`, `yj_code`, `category`, `manufacturer`, `drug_price`, `generic_reimbursement_flag`, `brand_flag`, `has_generic`, `transitional_expiry`, `source_note` を保持する。
 
 取り込み例:
 

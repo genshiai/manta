@@ -1044,6 +1044,13 @@ def create_prescription_catalog_item(
         pmda_info_url=resolve_pmda_info_url(payload.pmda_info_url, payload.yj_code),
         allergy_conflict_label=payload.allergy_conflict_label,
         related_problem=payload.related_problem,
+        manufacturer=payload.manufacturer,
+        drug_price=payload.drug_price,
+        generic_reimbursement_flag=payload.generic_reimbursement_flag,
+        brand_flag=payload.brand_flag,
+        has_generic=payload.has_generic,
+        transitional_expiry=payload.transitional_expiry,
+        source_note=payload.source_note,
     )
     db.add(master)
     log_audit(
@@ -1083,6 +1090,13 @@ def update_prescription_catalog_item(
     master.pmda_info_url = resolve_pmda_info_url(payload.pmda_info_url, payload.yj_code)
     master.allergy_conflict_label = payload.allergy_conflict_label
     master.related_problem = payload.related_problem
+    master.manufacturer = payload.manufacturer
+    master.drug_price = payload.drug_price
+    master.generic_reimbursement_flag = payload.generic_reimbursement_flag
+    master.brand_flag = payload.brand_flag
+    master.has_generic = payload.has_generic
+    master.transitional_expiry = payload.transitional_expiry
+    master.source_note = payload.source_note
     log_audit(
         db,
         actor=current_user.display_name,

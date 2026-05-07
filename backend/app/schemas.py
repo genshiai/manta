@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -142,6 +143,13 @@ class PrescriptionCatalogItemRead(BaseModel):
     pmda_info_url: str | None = None
     allergy_conflict_label: str | None = None
     related_problem: str | None = None
+    manufacturer: str | None = None
+    drug_price: Decimal | None = None
+    generic_reimbursement_flag: str | None = None
+    brand_flag: str | None = None
+    has_generic: bool | None = None
+    transitional_expiry: str | None = None
+    source_note: str | None = None
 
 
 class PrescriptionCatalogItemCreateRequest(BaseModel):
@@ -163,6 +171,13 @@ class PrescriptionCatalogItemCreateRequest(BaseModel):
     pmda_info_url: str | None = None
     allergy_conflict_label: str | None = None
     related_problem: str | None = None
+    manufacturer: str | None = None
+    drug_price: Decimal | None = None
+    generic_reimbursement_flag: str | None = None
+    brand_flag: str | None = None
+    has_generic: bool | None = None
+    transitional_expiry: str | None = None
+    source_note: str | None = None
 
 
 class PrescriptionCatalogItemUpdateRequest(BaseModel):
@@ -183,6 +198,13 @@ class PrescriptionCatalogItemUpdateRequest(BaseModel):
     pmda_info_url: str | None = None
     allergy_conflict_label: str | None = None
     related_problem: str | None = None
+    manufacturer: str | None = None
+    drug_price: Decimal | None = None
+    generic_reimbursement_flag: str | None = None
+    brand_flag: str | None = None
+    has_generic: bool | None = None
+    transitional_expiry: str | None = None
+    source_note: str | None = None
 
 
 class StandardUsageMasterRead(BaseModel):

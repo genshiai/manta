@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -114,6 +115,29 @@ def _normalize_yj_code(value: str | None) -> str | None:
     return normalized or None
 
 
+def _normalize_drug_price(value: str | None) -> Decimal | None:
+    if not value:
+        return None
+    normalized = unicodedata.normalize("NFKC", value).strip().replace(",", "")
+    if not normalized:
+        return None
+    try:
+        return Decimal(normalized)
+    except InvalidOperation:
+        return None
+
+
+def _normalize_has_generic(value: str | None) -> bool | None:
+    if not value:
+        return None
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    if normalized in {"○", "◯", "あり", "有"}:
+        return True
+    if normalized in {"-", "なし", "無"}:
+        return False
+    return None
+
+
 def iter_mhlw_drug_price_records(*, xlsx_file: Path) -> list[DrugImportRecord]:
     rows = _read_first_sheet_rows(xlsx_file)
     if not rows:
@@ -155,6 +179,13 @@ def iter_mhlw_drug_price_records(*, xlsx_file: Path) -> list[DrugImportRecord]:
                 pmda_info_url=build_pmda_drug_info_url(yj_code, audience="medical"),
                 allergy_conflict_label=None,
                 related_problem=None,
+                manufacturer=values.get("manufacturer") or None,
+                drug_price=_normalize_drug_price(values.get("drug_price")),
+                generic_reimbursement_flag=values.get("generic_reimbursement_flag") or None,
+                brand_flag=values.get("brand_flag") or None,
+                has_generic=_normalize_has_generic(values.get("has_generic_flag")),
+                transitional_expiry=values.get("transitional_expiry") or None,
+                source_note=values.get("note") or None,
             )
         )
 

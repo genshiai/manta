@@ -280,6 +280,13 @@ type ApiChartOrderConfig = {
     pmda_info_url: string | null;
     allergy_conflict_label: string | null;
     related_problem: string | null;
+    manufacturer: string | null;
+    drug_price: number | string | null;
+    generic_reimbursement_flag: string | null;
+    brand_flag: string | null;
+    has_generic: boolean | null;
+    transitional_expiry: string | null;
+    source_note: string | null;
   }>;
   standard_usage_masters: Array<{
     id: string;
@@ -662,6 +669,13 @@ const mapPrescriptionCatalog = (
     pmdaInfoUrl: item.pmda_info_url ?? undefined,
     allergyConflictLabel: item.allergy_conflict_label ?? undefined,
     relatedProblem: item.related_problem ?? undefined,
+    manufacturer: item.manufacturer ?? undefined,
+    drugPrice: item.drug_price ?? undefined,
+    genericReimbursementFlag: item.generic_reimbursement_flag ?? undefined,
+    brandFlag: item.brand_flag ?? undefined,
+    hasGeneric: item.has_generic ?? undefined,
+    transitionalExpiry: item.transitional_expiry ?? undefined,
+    sourceNote: item.source_note ?? undefined,
   }));
 
 const mapStandardUsageMasters = (
@@ -943,6 +957,13 @@ export const createPrescriptionCatalogItem = async (payload: {
   pmdaInfoUrl?: string;
   allergyConflictLabel?: string;
   relatedProblem?: string;
+  manufacturer?: string;
+  drugPrice?: number | string;
+  genericReimbursementFlag?: string;
+  brandFlag?: string;
+  hasGeneric?: boolean;
+  transitionalExpiry?: string;
+  sourceNote?: string;
 }) =>
   request<ApiChartOrderConfig['prescription_catalog'][number]>('/api/admin/masters/prescription-catalog', {
     method: 'POST',
@@ -965,6 +986,13 @@ export const createPrescriptionCatalogItem = async (payload: {
       pmda_info_url: payload.pmdaInfoUrl ?? null,
       allergy_conflict_label: payload.allergyConflictLabel ?? null,
       related_problem: payload.relatedProblem ?? null,
+      manufacturer: payload.manufacturer ?? null,
+      drug_price: payload.drugPrice ?? null,
+      generic_reimbursement_flag: payload.genericReimbursementFlag ?? null,
+      brand_flag: payload.brandFlag ?? null,
+      has_generic: payload.hasGeneric ?? null,
+      transitional_expiry: payload.transitionalExpiry ?? null,
+      source_note: payload.sourceNote ?? null,
     }),
   });
 
@@ -988,6 +1016,13 @@ export const updatePrescriptionCatalogItem = async (
     pmdaInfoUrl?: string;
     allergyConflictLabel?: string;
     relatedProblem?: string;
+    manufacturer?: string;
+    drugPrice?: number | string;
+    genericReimbursementFlag?: string;
+    brandFlag?: string;
+    hasGeneric?: boolean;
+    transitionalExpiry?: string;
+    sourceNote?: string;
   },
 ) =>
   request<ApiChartOrderConfig['prescription_catalog'][number]>(
@@ -1012,6 +1047,13 @@ export const updatePrescriptionCatalogItem = async (
         pmda_info_url: payload.pmdaInfoUrl ?? null,
         allergy_conflict_label: payload.allergyConflictLabel ?? null,
         related_problem: payload.relatedProblem ?? null,
+        manufacturer: payload.manufacturer ?? null,
+        drug_price: payload.drugPrice ?? null,
+        generic_reimbursement_flag: payload.genericReimbursementFlag ?? null,
+        brand_flag: payload.brandFlag ?? null,
+        has_generic: payload.hasGeneric ?? null,
+        transitional_expiry: payload.transitionalExpiry ?? null,
+        source_note: payload.sourceNote ?? null,
       }),
     },
   );

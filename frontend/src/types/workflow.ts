@@ -163,6 +163,13 @@ export type PrescriptionCatalogItem = {
   pmdaInfoUrl?: string;
   allergyConflictLabel?: string;
   relatedProblem?: string;
+  manufacturer?: string;
+  drugPrice?: number | string;
+  genericReimbursementFlag?: string;
+  brandFlag?: string;
+  hasGeneric?: boolean;
+  transitionalExpiry?: string;
+  sourceNote?: string;
 };
 
 export type StandardUsageMaster = {

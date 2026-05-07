@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from zipfile import ZipFile
 
 from app.db import SessionLocal
@@ -103,6 +104,9 @@ def test_iter_mhlw_drug_price_records_maps_internal_drugs(tmp_path) -> None:
     assert records[0].category == "内服"
     assert records[0].generic_name == "ロキソプロフェンナトリウム水和物"
     assert records[0].aliases == ["ロキソプロフェンナトリウム水和物"]
+    assert records[0].manufacturer == "第一三共"
+    assert records[0].drug_price == Decimal("10.8")
+    assert records[0].brand_flag == "先発品"
     assert records[0].pmda_info_url == "https://www.pmda.go.jp/PmdaSearch/rdSearch/02/1149019F1560?user=1"
 
 
@@ -127,6 +131,7 @@ def test_sync_mhlw_drug_price_records(tmp_path) -> None:
         assert item is not None
         assert item.drug_name == "取込テスト薬10mg"
         assert item.yj_code == "7777777A7777"
+        assert item.generic_name == "取込テスト成分"
     finally:
         with SessionLocal() as db:
             item = db.get(PrescriptionCatalogMaster, master_id)

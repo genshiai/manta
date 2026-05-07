@@ -5,6 +5,7 @@ import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable, Literal
 
@@ -64,6 +65,21 @@ HEADER_ALIASES = {
     "関連病名": "related_problem",
     "allergy_conflict_label": "allergy_conflict_label",
     "禁忌ラベル": "allergy_conflict_label",
+    "manufacturer": "manufacturer",
+    "メーカー": "manufacturer",
+    "メーカー名": "manufacturer",
+    "drug_price": "drug_price",
+    "薬価": "drug_price",
+    "generic_reimbursement_flag": "generic_reimbursement_flag",
+    "後発医薬品区分": "generic_reimbursement_flag",
+    "brand_flag": "brand_flag",
+    "先発医薬品": "brand_flag",
+    "has_generic": "has_generic",
+    "後発医薬品あり": "has_generic",
+    "transitional_expiry": "transitional_expiry",
+    "経過措置期限": "transitional_expiry",
+    "source_note": "source_note",
+    "備考": "source_note",
 }
 
 REQUIRED_FIELDS = {"drug_name"}
@@ -89,6 +105,13 @@ class DrugImportRecord:
     pmda_info_url: str | None
     allergy_conflict_label: str | None
     related_problem: str | None
+    manufacturer: str | None = None
+    drug_price: Decimal | None = None
+    generic_reimbursement_flag: str | None = None
+    brand_flag: str | None = None
+    has_generic: bool | None = None
+    transitional_expiry: str | None = None
+    source_note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -160,7 +183,7 @@ def _normalize_bool(value: str | None, *, default: bool = True) -> bool:
     normalized = unicodedata.normalize("NFKC", value).strip().lower()
     if normalized in {"", "-"}:
         return default
-    if normalized in {"1", "true", "yes", "on", "active", "公開", "有効"}:
+    if normalized in {"1", "true", "yes", "on", "active", "公開", "有効", "○", "◯", "あり", "有"}:
         return True
     if normalized in {"0", "false", "no", "off", "inactive", "非公開", "無効"}:
         return False
@@ -184,6 +207,18 @@ def _generate_master_id(*, drug_name: str, yj_code: str | None, hot_code: str | 
 
     digest = hashlib.sha1(drug_name.encode("utf-8")).hexdigest()[:12]
     return f"drug-{digest}"
+
+
+def _normalize_decimal(value: str | None) -> Decimal | None:
+    if value is None:
+        return None
+    normalized = unicodedata.normalize("NFKC", value).strip().replace(",", "")
+    if not normalized:
+        return None
+    try:
+        return Decimal(normalized)
+    except InvalidOperation:
+        return None
 
 
 def iter_drug_master_records(*, csv_file: Path) -> Iterable[DrugImportRecord]:
@@ -221,6 +256,13 @@ def iter_drug_master_records(*, csv_file: Path) -> Iterable[DrugImportRecord]:
             pmda_info_url=values.get("pmda_info_url") or build_pmda_drug_info_url(yj_code, audience="medical"),
             allergy_conflict_label=values.get("allergy_conflict_label") or None,
             related_problem=values.get("related_problem") or None,
+            manufacturer=values.get("manufacturer") or None,
+            drug_price=_normalize_decimal(values.get("drug_price")),
+            generic_reimbursement_flag=values.get("generic_reimbursement_flag") or None,
+            brand_flag=values.get("brand_flag") or None,
+            has_generic=_normalize_bool(values.get("has_generic"), default=False) if values.get("has_generic") else None,
+            transitional_expiry=values.get("transitional_expiry") or None,
+            source_note=values.get("source_note") or None,
         )
 
 
@@ -248,6 +290,13 @@ def upsert_drug_master_records(db: Session, records: Iterable[DrugImportRecord])
             "pmda_info_url": record.pmda_info_url,
             "allergy_conflict_label": record.allergy_conflict_label,
             "related_problem": record.related_problem,
+            "manufacturer": record.manufacturer,
+            "drug_price": record.drug_price,
+            "generic_reimbursement_flag": record.generic_reimbursement_flag,
+            "brand_flag": record.brand_flag,
+            "has_generic": record.has_generic,
+            "transitional_expiry": record.transitional_expiry,
+            "source_note": record.source_note,
         }
 
         if existing is None:
@@ -285,6 +334,13 @@ def _record_payload(record: DrugImportRecord) -> dict[str, object]:
         "pmda_info_url": record.pmda_info_url,
         "allergy_conflict_label": record.allergy_conflict_label,
         "related_problem": record.related_problem,
+        "manufacturer": record.manufacturer,
+        "drug_price": record.drug_price,
+        "generic_reimbursement_flag": record.generic_reimbursement_flag,
+        "brand_flag": record.brand_flag,
+        "has_generic": record.has_generic,
+        "transitional_expiry": record.transitional_expiry,
+        "source_note": record.source_note,
     }
 
 

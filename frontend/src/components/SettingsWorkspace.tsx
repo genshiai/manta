@@ -107,6 +107,13 @@ type PrescriptionCreateFormState = {
   pmdaInfoUrl: string;
   relatedProblem: string;
   allergyConflictLabel: string;
+  manufacturer: string;
+  drugPrice: string;
+  genericReimbursementFlag: string;
+  brandFlag: string;
+  hasGeneric: boolean | null;
+  transitionalExpiry: string;
+  sourceNote: string;
 };
 
 type PrescriptionEditFormState = {
@@ -127,6 +134,13 @@ type PrescriptionEditFormState = {
   pmdaInfoUrl: string;
   relatedProblem: string;
   allergyConflictLabel: string;
+  manufacturer: string;
+  drugPrice: string;
+  genericReimbursementFlag: string;
+  brandFlag: string;
+  hasGeneric: boolean | null;
+  transitionalExpiry: string;
+  sourceNote: string;
 };
 
 type StandardUsageCreateFormState = {
@@ -309,6 +323,13 @@ const createPrescriptionCreateForm = (
   pmdaInfoUrl: '',
   relatedProblem: '',
   allergyConflictLabel: '',
+  manufacturer: '',
+  drugPrice: '',
+  genericReimbursementFlag: '',
+  brandFlag: '',
+  hasGeneric: null,
+  transitionalExpiry: '',
+  sourceNote: '',
 });
 
 const createPrescriptionEditForm = (
@@ -331,6 +352,13 @@ const createPrescriptionEditForm = (
   pmdaInfoUrl: item.pmdaInfoUrl ?? '',
   relatedProblem: item.relatedProblem ?? '',
   allergyConflictLabel: item.allergyConflictLabel ?? '',
+  manufacturer: item.manufacturer ?? '',
+  drugPrice: item.drugPrice == null ? '' : String(item.drugPrice),
+  genericReimbursementFlag: item.genericReimbursementFlag ?? '',
+  brandFlag: item.brandFlag ?? '',
+  hasGeneric: item.hasGeneric ?? null,
+  transitionalExpiry: item.transitionalExpiry ?? '',
+  sourceNote: item.sourceNote ?? '',
 });
 
 const createStandardUsageCreateForm = (values: StandardUsageMaster[]): StandardUsageCreateFormState => ({
@@ -1019,6 +1047,13 @@ export const SettingsWorkspace = ({
         pmdaInfoUrl: prescriptionCreateForm.pmdaInfoUrl.trim() || undefined,
         allergyConflictLabel: prescriptionCreateForm.allergyConflictLabel.trim() || undefined,
         relatedProblem: prescriptionCreateForm.relatedProblem.trim() || undefined,
+        manufacturer: prescriptionCreateForm.manufacturer.trim() || undefined,
+        drugPrice: prescriptionCreateForm.drugPrice.trim() || undefined,
+        genericReimbursementFlag: prescriptionCreateForm.genericReimbursementFlag.trim() || undefined,
+        brandFlag: prescriptionCreateForm.brandFlag.trim() || undefined,
+        hasGeneric: prescriptionCreateForm.hasGeneric ?? undefined,
+        transitionalExpiry: prescriptionCreateForm.transitionalExpiry.trim() || undefined,
+        sourceNote: prescriptionCreateForm.sourceNote.trim() || undefined,
       });
       await loadMasters();
       await loadSystemAuditLogs();
@@ -1072,6 +1107,13 @@ export const SettingsWorkspace = ({
         pmdaInfoUrl: prescriptionEditForm.pmdaInfoUrl.trim() || undefined,
         allergyConflictLabel: prescriptionEditForm.allergyConflictLabel.trim() || undefined,
         relatedProblem: prescriptionEditForm.relatedProblem.trim() || undefined,
+        manufacturer: prescriptionEditForm.manufacturer.trim() || undefined,
+        drugPrice: prescriptionEditForm.drugPrice.trim() || undefined,
+        genericReimbursementFlag: prescriptionEditForm.genericReimbursementFlag.trim() || undefined,
+        brandFlag: prescriptionEditForm.brandFlag.trim() || undefined,
+        hasGeneric: prescriptionEditForm.hasGeneric ?? undefined,
+        transitionalExpiry: prescriptionEditForm.transitionalExpiry.trim() || undefined,
+        sourceNote: prescriptionEditForm.sourceNote.trim() || undefined,
       });
       await loadMasters();
       await loadSystemAuditLogs();

@@ -202,6 +202,13 @@ class PrescriptionCatalogMaster(Base):
     pmda_info_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     allergy_conflict_label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     related_problem: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    drug_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    generic_reimbursement_flag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    brand_flag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    has_generic: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    transitional_expiry: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class StandardUsageMaster(Base):
