@@ -143,10 +143,20 @@ uv run python scripts/import_pmda_package_insert.py \
 
 Manta 実装メモ:
 
-- `receipt_drug_code` を薬剤 master に追加する。
-- `yj_code` が一致する `prescription_catalog_masters` に `receipt_drug_code`, `receipt_name`, `receipt_unit`, `receipt_price`, `receipt_discontinued_at`, `receipt_transitional_expiry`, `generic_prescription_text`, `generic_prescription_code` を付与する。
+- `backend/scripts/import_receipt_drug_master.py` で `y_ALL*.zip` または展開済み CSV を直接 import する。
+- `YJ -> レセ電コード` は 1 対 1 ではないため、`receipt_drug_masters` 別テーブルに全件保持する。
+- `yj_code` で `prescription_catalog_masters` と照合し、請求時に通常コード、選定療養コード、廃止日、経過措置を選ぶ。
 - レセプト送信・会計計算では、厚労省 Excel ではなく支払基金の医薬品コードを優先する。
 - `y_ALL*.zip` は全件同期、`y_*.csv` は差分同期として扱う。
+
+取り込み例:
+
+```bash
+cd backend
+uv run python scripts/import_receipt_drug_master.py \
+  /path/to/y_ALL20260414.zip \
+  --dry-run
+```
 
 ## 4. MEDIS 医薬品 HOT コードマスター
 
@@ -300,9 +310,9 @@ Manta 実装メモ:
    - 出力: `prescription_catalog_masters`
    - 目的: YJ 実コード薬剤 master
 
-2. `import_receipt_drug_master.py` 未実装
+2. `import_receipt_drug_master.py` 実装済み
    - 入力: 支払基金 `y_ALL*.zip` / `y_*.csv`
-   - 出力: 薬剤 master の `receipt_drug_code`
+   - 出力: `receipt_drug_masters`
    - 目的: レセプト請求コードの正規化
 
 3. `import_hot_drug_master.py` 未実装

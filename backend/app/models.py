@@ -211,6 +211,38 @@ class PrescriptionCatalogMaster(Base):
     source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class ReceiptDrugMaster(Base):
+    __tablename__ = "receipt_drug_masters"
+
+    receipt_drug_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    change_type: Mapped[str] = mapped_column(String(8))
+    master_type: Mapped[str] = mapped_column(String(1))
+    name: Mapped[str] = mapped_column(String(255))
+    name_kana: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    unit_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    unit_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    price_type: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    generic_flag: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    dosage_form_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    changed_at: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    discontinued_at: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    yj_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    public_order: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    transitional_expiry: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    base_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    listed_at: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    generic_prescription_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    generic_prescription_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    generic_prescription_addition_flag: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    anti_hiv_flag: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    long_term_listed_related_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    selective_care_flag: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    source_file: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class StandardUsageMaster(Base):
     __tablename__ = "standard_usage_masters"
 
