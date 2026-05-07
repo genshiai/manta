@@ -1,0 +1,180 @@
+# Master Data Downloads
+
+更新日: 2026-05-07
+
+Manta Phase 2 で必要な外部標準データの取得先と使い分け。
+
+原本ファイルは repo に commit しない。`/Users/daichi/Downloads` などに置き、import script で DB へ投入する。
+
+## まず結論
+
+薬剤安全チェックと薬剤検索を前に進めるため、次の順で取得する。
+
+1. 厚労省 薬価基準収載品目リスト
+2. PMDA 医療用医薬品添付文書 XML
+3. 支払基金 レセプト電算 医薬品マスター
+4. MEDIS 医薬品 HOT コードマスター
+5. 厚労省 一般名処方マスター
+
+`/Users/daichi/Downloads/tp20260415-01_01.xlsx` は 1 の「内用薬」。Manta の薬剤 master の YJ 実コード化に使える。
+
+## コードの違い
+
+| コード | 何のコードか | 主な用途 | Manta での扱い |
+| --- | --- | --- | --- |
+| 薬価基準収載医薬品コード | 薬価基準に載っている医薬品の分類コード。一般に YJ コード相当として扱う | 薬剤名、規格、薬価、YJ 連携 | 薬剤検索と PMDA XML 紐付けの主キー候補 |
+| YJ コード | 医療用医薬品を品目単位で識別するコード | PMDA 添文、薬剤安全チェック | Manta の `yj_code` |
+| レセプト電算コード | 診療報酬請求で使うコード | レセプト、会計、請求 | Phase 2 後半から必須 |
+| HOT コード | MEDIS の医薬品コード体系。YJ、レセ電、包装単位などをつなぐ | コード変換、一般名処方、包装単位 | YJ とレセ電の対応表として使う |
+
+重要: PMDA XML には薬剤 master 全体は入っていない。PMDA XML は添付文書、安全性、禁忌、相互作用の原本。薬剤名一覧や薬価、後発品区分は厚労省 Excel、請求コードは支払基金、コード横断は HOT で補う。
+
+## 1. 厚労省 薬価基準収載品目リスト
+
+目的: 薬剤検索、YJ 実コード化、成分名、規格、メーカー、薬価、先発/後発区分の取得。
+
+公式ページ:
+
+- [医療保険が適用される医薬品について](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000078916.html)
+- [薬価基準収載品目リストについて（令和8年4月15日適用）](https://www.mhlw.go.jp/topics/2026/04/tp20260401-01.html)
+
+令和8年4月15日適用の取得対象:
+
+| 区分 | ファイル | URL |
+| --- | --- | --- |
+| 内用薬 | `tp20260415-01_01.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260415-01_01.xlsx` |
+| 注射薬 | `tp20260415-01_02.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260415-01_02.xlsx` |
+| 外用薬 | `tp20260415-01_03.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260415-01_03.xlsx` |
+| 歯科用薬剤 | `tp20260401-01_04.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260401-01_04.xlsx` |
+| 後発医薬品の有無 | `tp20260415-01_05.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260415-01_05.xlsx` |
+
+`/Users/daichi/Downloads/tp20260415-01_01.xlsx` の確認結果:
+
+- 種別: 内用薬
+- 非空行数: 6,984 行
+- データ行数: 6,983 品目
+- 主な列: `区分`, `薬価基準収載医薬品コード`, `成分名`, `規格`, `品名`, `メーカー名`, `後発医薬品区分`, `先発医薬品`, `薬価`, `経過措置による使用期限`, `備考`
+- 例: `1149019C1149` = ロキソニン細粒10%、`1149019F1560` = ロキソニン錠60mg
+
+Manta 実装メモ:
+
+- `backend/scripts/import_mhlw_drug_price_master.py` で Excel を直接読んで `prescription_catalog_masters` に upsert する。
+- まずは `drug_name`, `generic_name`, `strength`, `yj_code`, `category` を投入する。
+- `manufacturer`, `drug_price`, `generic_flag`, `brand_flag`, `transitional_expiry` は DB カラム追加後に保持する。
+
+取り込み例:
+
+```bash
+cd backend
+uv run python scripts/import_mhlw_drug_price_master.py \
+  /Users/daichi/Downloads/tp20260415-01_01.xlsx \
+  --dry-run
+```
+
+## 2. PMDA 医療用医薬品添付文書 XML
+
+目的: 禁忌、用法用量、相互作用、妊婦、高齢者、腎機能など、安全チェックの根拠データ。
+
+公式ページ:
+
+- [マイ医薬品集作成サービスの利用について](https://www.pmda.go.jp/safety/info-services/medi-navi/0012.html)
+
+取得方法:
+
+- PMDA メディナビ登録後、マイ医薬品集作成サービスを利用する。
+- 「医療用医薬品添付文書一括ダウンロードサービス」で `SGML/XML` または `PDF/SGML/XML` を選ぶ。
+- 全件、更新分、登録薬剤分を選べる。
+
+Manta 実装状況:
+
+```bash
+cd backend
+uv run python scripts/import_pmda_package_insert.py \
+  --directory /path/to/pmda-xml-directory
+```
+
+既に XML ディレクトリ一括 import、失敗 XML レポート、添付文書セクション、相互作用テーブル取り込みに対応済み。
+
+## 3. 支払基金 レセプト電算 医薬品マスター
+
+目的: レセプト請求で使う医薬品コードを正にする。
+
+公式ページ:
+
+- [社会保険診療報酬支払基金 基本マスター](https://www.ssk.or.jp/seikyushiharai/tensuhyo/kihonmasta/index.html)
+- [医薬品マスター](https://www.ssk.or.jp/seikyushiharai/tensuhyo/kihonmasta/kihonmasta_04.html)
+
+令和8年の確認時点ファイル:
+
+- 全件: `y_ALL20260414.zip`
+- 改定分: `y_20260414.csv`
+- ファイル仕様: 基本マスターの「レセプト電算処理システムマスターファイル仕様説明書」
+
+Manta 実装メモ:
+
+- レセプト Phase では必須。
+- 薬剤安全チェックだけなら厚労省 Excel + PMDA XML で先に進められる。
+- 将来は `receipt_drug_code` を薬剤 master に追加し、YJ / HOT / レセ電の対応を持つ。
+
+## 4. MEDIS 医薬品 HOT コードマスター
+
+目的: YJ、レセ電、包装単位、販売名、一般名処方の対応を安定させる。
+
+公式ページ:
+
+- [医薬品コード登録システム](https://medhot.medd.jp/)
+- [全件CSVダウンロード](https://medhot.medd.jp/view_download)
+
+確認時点の全件CSV:
+
+- `A_20260331_1.txt`: 全件・販売名・調剤包装単位コードファイル
+- `A_20260331_2.txt`: 全件・調剤包装単位・販売包装単位・元梱包装単位コードファイル
+- `DLFileLayout.pdf`: CSV ダウンロードファイルレイアウト
+
+注意:
+
+- 文字コードは Shift_JIS / CP932 として扱う。
+- HOT は薬剤安全チェックの初期実装には必須ではないが、コード変換と包装単位までやるなら必要。
+
+## 5. 厚労省 一般名処方マスター
+
+目的: 一般名処方、同一成分薬の候補表示、後発品提案。
+
+公式ページ:
+
+- [医療保険が適用される医薬品について](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000078916.html)
+- [処方箋に記載する一般名処方の標準的な記載（一般名処方マスタ）について（令和8年4月1日適用）](https://www.mhlw.go.jp/stf/newpage_56895.html)
+
+Manta 実装メモ:
+
+- Phase 2 の必須ではないが、薬剤検索品質と後発品表示で効く。
+- 厚労省薬価 Excel の成分名だけでは一般名処方の表記として不十分な場合があるため、別 master として扱う。
+
+## 優先順位
+
+| 優先 | データ | 理由 |
+| --- | --- | --- |
+| A1 | 厚労省 薬価基準収載品目リスト | YJ 実コード化と薬剤検索の土台 |
+| A2 | PMDA 添文 XML | 禁忌、相互作用、根拠表示 |
+| A3 | 支払基金 医薬品マスター | レセプト電算コード、請求連携 |
+| B1 | HOT コードマスター | YJ / レセ電 / 包装単位の横断 |
+| B2 | 一般名処方マスター | 一般名処方、後発品提案 |
+
+## 次に実装する importer
+
+次の順で importer を追加する。
+
+1. `import_mhlw_drug_price_master.py` 実装済み
+   - 入力: 厚労省 Excel
+   - 出力: `prescription_catalog_masters`
+   - 目的: YJ 実コード薬剤 master
+
+2. `import_receipt_drug_master.py` 未実装
+   - 入力: 支払基金 `y_ALL*.zip` / `y_*.csv`
+   - 出力: 薬剤 master の `receipt_drug_code`
+   - 目的: レセプト請求コードの正規化
+
+3. `import_hot_drug_master.py` 未実装
+   - 入力: MEDIS `A_*.txt`
+   - 出力: YJ / HOT / レセ電対応テーブル
+   - 目的: コード変換の安定化

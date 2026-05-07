@@ -1,8 +1,10 @@
 # Master Data Requirements
 
-更新日: 2026-05-05
+更新日: 2026-05-07
 
 Phase 2 を完了品質へ近づけるために必要なデータの一覧。
+
+具体的なダウンロード先、ファイル名、コード体系の違いは [MASTER_DATA_DOWNLOADS.md](MASTER_DATA_DOWNLOADS.md) にまとめる。
 
 ここでは次の 2 種類を分けて扱う。
 
