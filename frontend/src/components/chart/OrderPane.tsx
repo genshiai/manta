@@ -654,9 +654,9 @@ const PrescriptionTab = ({
           catalog={orderConfig.prescriptionCatalog}
           isMutating={isMutating}
           onClose={() => setSetPreview(null)}
-          onConfirm={async () => {
+          onConfirm={async (items) => {
             if (!onAddBatch) return;
-            await onAddBatch(setPreview.items);
+            await onAddBatch(items);
             setSetPreview(null);
           }}
         />
@@ -737,26 +737,32 @@ const SetPreviewSheet = ({
   catalog: PrescriptionCatalogItem[];
   isMutating: boolean;
   onClose: () => void;
-  onConfirm: () => void;
-}) => (
-  <div
-    className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
-    onClick={onClose}
-    onKeyDown={(e) => {
-      if (e.key === 'Escape') onClose();
-    }}
-    role="dialog"
-    aria-modal="true"
-    tabIndex={-1}
-  >
-    <button
-      type="button"
-      tabIndex={-1}
-      aria-label="閉じる"
-      className="absolute inset-0 cursor-default"
+  onConfirm: (items: PrescriptionSetItem[]) => void;
+}) => {
+  const [items, setItems] = useState(() => set.items);
+  const updateItem = (index: number, patch: Partial<PrescriptionSetItem>) => {
+    setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
       onClick={onClose}
-    />
-    <div className="relative w-full max-w-md rounded-t-xl bg-card p-6 shadow-modal sm:rounded-xl">
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      tabIndex={-1}
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="閉じる"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-xl rounded-t-xl bg-card p-6 shadow-modal sm:rounded-xl">
       <header className="mb-4 flex items-start justify-between gap-2">
         <div>
           <h3 className="text-[18px] font-bold leading-snug text-text-primary">{set.label}</h3>
@@ -776,19 +782,26 @@ const SetPreviewSheet = ({
 
       <div className="mb-4">
         <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
-          展開される薬剤 ({set.items.length})
+          展開される薬剤 ({items.length})
         </h4>
         <ul className="divide-y divide-border rounded-lg border border-border">
-          {set.items.map((item) => {
+          {items.map((item, index) => {
             const drug = catalog.find((d) => d.id === item.drugId);
             return (
-              <li key={item.drugId} className="flex items-baseline justify-between gap-2 px-3 py-2">
-                <span className="text-[13px] text-text-primary">
+              <li key={item.drugId} className="grid gap-2 px-3 py-2 sm:grid-cols-[1fr_1.2fr_88px]">
+                <span className="min-w-0 truncate text-[13px] font-medium text-text-primary">
                   {drug?.drugName ?? item.drugId}
                 </span>
-                <span className="text-[12px] text-text-tertiary">
-                  {item.dosage} ・ {item.days}
-                </span>
+                <Input
+                  value={item.dosage}
+                  onChange={(event) => updateItem(index, { dosage: event.target.value })}
+                  className="h-8 text-[12px]"
+                />
+                <Input
+                  value={item.days}
+                  onChange={(event) => updateItem(index, { days: event.target.value })}
+                  className="h-8 text-[12px]"
+                />
               </li>
             );
           })}
@@ -805,13 +818,14 @@ const SetPreviewSheet = ({
         <Button variant="ghost" size="sm" onClick={onClose}>
           キャンセル
         </Button>
-        <Button variant="default" size="sm" onClick={onConfirm} disabled={isMutating}>
+        <Button variant="default" size="sm" onClick={() => onConfirm(items)} disabled={isMutating}>
           一括追加
         </Button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // === 検査タブ ===
 
