@@ -990,6 +990,7 @@ def get_chart_order_masters_read(
     if department:
         reservation_slots_query = reservation_slots_query.where(ReservationSlotMaster.department == department)
     reservation_slots = db.scalars(reservation_slots_query).all()
+    reservation_slot_counts = get_reservation_slot_counts(db, [slot.id for slot in reservation_slots])
 
     chart_templates_query = select(ChartTemplateMaster).order_by(
         ChartTemplateMaster.sort_order, ChartTemplateMaster.id
@@ -1007,8 +1008,50 @@ def get_chart_order_masters_read(
         standard_usage_masters=[StandardUsageMasterRead.model_validate(item) for item in standard_usage_masters],
         prescription_sets=[PrescriptionSetMasterRead.model_validate(item) for item in prescription_sets],
         lab_set_options=[LabSetOptionRead.model_validate(item) for item in lab_set_options],
-        reservation_slots=[ReservationSlotRead.model_validate(item) for item in reservation_slots],
+        reservation_slots=[
+            reservation_slot_to_read(item, booked_count=reservation_slot_counts.get(item.id, 0))
+            for item in reservation_slots
+        ],
         chart_templates=[ChartTemplateRead.model_validate(item) for item in chart_templates],
+    )
+
+
+def computed_reservation_slot_state(*, capacity: int, booked_count: int) -> str:
+    if capacity <= 0 or booked_count >= capacity:
+        return "full"
+    remaining_count = capacity - booked_count
+    few_threshold = max(1, capacity // 4)
+    if booked_count > 0 and remaining_count <= few_threshold:
+        return "few"
+    return "available"
+
+
+def get_reservation_slot_counts(db: Session, slot_ids: list[str]) -> dict[str, int]:
+    if not slot_ids:
+        return {}
+    rows = db.execute(
+        select(Reservation.slot_id, func.count(Reservation.id))
+        .where(Reservation.slot_id.in_(slot_ids))
+        .group_by(Reservation.slot_id)
+    ).all()
+    return {str(slot_id): int(count) for slot_id, count in rows if slot_id is not None}
+
+
+def reservation_slot_to_read(slot: ReservationSlotMaster, *, booked_count: int = 0) -> ReservationSlotRead:
+    capacity = max(slot.capacity or 1, 0)
+    remaining_count = max(capacity - booked_count, 0)
+    return ReservationSlotRead(
+        id=slot.id,
+        sort_order=slot.sort_order,
+        is_active=slot.is_active,
+        date=slot.date,
+        time=slot.time,
+        department=slot.department,
+        doctor=slot.doctor,
+        state=computed_reservation_slot_state(capacity=capacity, booked_count=booked_count),
+        capacity=capacity,
+        booked_count=booked_count,
+        remaining_count=remaining_count,
     )
 
 
@@ -1461,6 +1504,7 @@ def create_reservation_slot(
         department=payload.department,
         doctor=payload.doctor,
         state=payload.state,
+        capacity=max(payload.capacity, 0),
     )
     db.add(master)
     log_audit(
@@ -1472,7 +1516,7 @@ def create_reservation_slot(
     )
     db.commit()
     db.refresh(master)
-    return ReservationSlotRead.model_validate(master)
+    return reservation_slot_to_read(master)
 
 
 @app.patch("/api/admin/masters/reservation-slots/{master_id}", response_model=ReservationSlotRead)
@@ -1490,6 +1534,7 @@ def update_reservation_slot(
     master.department = payload.department
     master.doctor = payload.doctor
     master.state = payload.state
+    master.capacity = max(payload.capacity, 0)
     log_audit(
         db,
         actor=current_user.display_name,
@@ -1499,7 +1544,8 @@ def update_reservation_slot(
     )
     db.commit()
     db.refresh(master)
-    return ReservationSlotRead.model_validate(master)
+    booked_count = get_reservation_slot_counts(db, [master.id]).get(master.id, 0)
+    return reservation_slot_to_read(master, booked_count=booked_count)
 
 
 @app.post("/api/admin/masters/chart-templates", response_model=ChartTemplateRead, status_code=status.HTTP_201_CREATED)
@@ -2144,6 +2190,18 @@ def upsert_reservation(
 ) -> ReservationRead:
     patient = get_patient_or_404(db, patient_id)
     reservation = db.scalar(select(Reservation).where(Reservation.patient_id == patient_id))
+    if payload.slot_id:
+        slot = get_reservation_slot_master_or_404(db, payload.slot_id)
+        if not slot.is_active:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reservation slot inactive")
+        booked_count = db.scalar(
+            select(func.count(Reservation.id)).where(
+                Reservation.slot_id == payload.slot_id,
+                Reservation.patient_id != patient_id,
+            )
+        )
+        if int(booked_count or 0) >= max(slot.capacity or 1, 0):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reservation slot full")
     if reservation is None:
         reservation = Reservation(
             patient_id=patient_id,

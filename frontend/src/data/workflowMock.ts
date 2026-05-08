@@ -92,6 +92,9 @@ export const reservationSlots: ReservationSlot[] = [
     department: '内科',
     doctor: '田中 太郎',
     state: 'available',
+    capacity: 4,
+    bookedCount: 1,
+    remainingCount: 3,
   },
   {
     id: '2026-05-11-1030',
@@ -100,6 +103,9 @@ export const reservationSlots: ReservationSlot[] = [
     department: '内科',
     doctor: '田中 太郎',
     state: 'few',
+    capacity: 4,
+    bookedCount: 3,
+    remainingCount: 1,
   },
   {
     id: '2026-05-12-0900',
@@ -108,6 +114,9 @@ export const reservationSlots: ReservationSlot[] = [
     department: '内科',
     doctor: '田中 太郎',
     state: 'full',
+    capacity: 4,
+    bookedCount: 4,
+    remainingCount: 0,
   },
   {
     id: '2026-05-18-1000',
@@ -116,5 +125,8 @@ export const reservationSlots: ReservationSlot[] = [
     department: '内科',
     doctor: '田中 太郎',
     state: 'available',
+    capacity: 4,
+    bookedCount: 0,
+    remainingCount: 4,
   },
 ];

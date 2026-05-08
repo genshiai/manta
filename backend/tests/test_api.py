@@ -1195,6 +1195,101 @@ def test_doctor_can_save_unscheduled_reservation() -> None:
     assert response.json()["scheduled_for"] == "日未定"
 
 
+def test_reservation_slot_state_uses_live_booking_count() -> None:
+    suffix = uuid4().hex[:8]
+    slot_id = f"capacity-{suffix}"
+    patient_id = "0009900041"
+    blocked_patient_id = "0005520007"
+    originals: dict[str, dict[str, str | int | None] | None] = {}
+
+    try:
+        with SessionLocal() as db:
+            db.add(
+                ReservationSlotMaster(
+                    id=slot_id,
+                    sort_order=9999,
+                    is_active=True,
+                    date="2099/12/31（木）",
+                    time="10:00",
+                    department="内科",
+                    doctor="田中 太郎",
+                    state="available",
+                    capacity=1,
+                )
+            )
+            for target_patient_id in [patient_id, blocked_patient_id]:
+                reservation = db.scalar(select(Reservation).where(Reservation.patient_id == target_patient_id))
+                originals[target_patient_id] = (
+                    {
+                        "id": reservation.id,
+                        "slot_id": reservation.slot_id,
+                        "scheduled_for": reservation.scheduled_for,
+                        "department": reservation.department,
+                        "doctor": reservation.doctor,
+                        "note": reservation.note,
+                    }
+                    if reservation is not None
+                    else None
+                )
+            db.commit()
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            first_response = client.post(
+                f"/api/patients/{patient_id}/reservation",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "slot_id": slot_id,
+                    "scheduled_for": "2099/12/31（木） 10:00",
+                    "department": "内科",
+                    "doctor": "田中 太郎",
+                    "note": "",
+                    "actor": "田中 太郎",
+                },
+            )
+            blocked_response = client.post(
+                f"/api/patients/{blocked_patient_id}/reservation",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "slot_id": slot_id,
+                    "scheduled_for": "2099/12/31（木） 10:00",
+                    "department": "内科",
+                    "doctor": "田中 太郎",
+                    "note": "",
+                    "actor": "田中 太郎",
+                },
+            )
+            masters_response = client.get(
+                "/api/masters/chart-order-config?department=内科",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+    finally:
+        with SessionLocal() as db:
+            for target_patient_id, original in originals.items():
+                reservation = db.scalar(select(Reservation).where(Reservation.patient_id == target_patient_id))
+                if reservation is not None:
+                    if original is None:
+                        db.delete(reservation)
+                    else:
+                        reservation.slot_id = original["slot_id"] if isinstance(original["slot_id"], str) else None
+                        reservation.scheduled_for = str(original["scheduled_for"])
+                        reservation.department = str(original["department"])
+                        reservation.doctor = str(original["doctor"])
+                        reservation.note = str(original["note"])
+            slot = db.get(ReservationSlotMaster, slot_id)
+            if slot is not None:
+                db.delete(slot)
+            db.commit()
+
+    assert first_response.status_code == 200
+    assert blocked_response.status_code == 409
+    slot_payload = next(item for item in masters_response.json()["reservation_slots"] if item["id"] == slot_id)
+    assert slot_payload["capacity"] == 1
+    assert slot_payload["booked_count"] == 1
+    assert slot_payload["remaining_count"] == 0
+    assert slot_payload["state"] == "full"
+
+
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:
     try:
         with TestClient(app) as client:

@@ -290,6 +290,9 @@ export type ReservationSlot = {
   department: string;
   doctor: string;
   state: ReservationSlotState;
+  capacity: number;
+  bookedCount: number;
+  remainingCount: number;
 };
 
 export type ChartTemplate = {

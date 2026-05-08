@@ -324,6 +324,9 @@ class ReservationSlotRead(BaseModel):
     department: str
     doctor: str
     state: Literal["available", "few", "full"]
+    capacity: int = 1
+    booked_count: int = 0
+    remaining_count: int = 1
 
 
 class ChartTemplateRead(BaseModel):
@@ -387,6 +390,7 @@ class ReservationSlotCreateRequest(BaseModel):
     department: str
     doctor: str
     state: Literal["available", "few", "full"]
+    capacity: int = 1
 
 
 class ReservationSlotUpdateRequest(BaseModel):
@@ -397,6 +401,7 @@ class ReservationSlotUpdateRequest(BaseModel):
     department: str
     doctor: str
     state: Literal["available", "few", "full"]
+    capacity: int = 1
 
 
 class ChartOrderMasterRead(BaseModel):

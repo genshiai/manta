@@ -642,7 +642,7 @@ const CalendarView = ({
                       key={slot.id}
                       className="truncate rounded-sm bg-surface-subtle px-1.5 py-1 text-[10px] text-text-secondary"
                     >
-                      {slot.time} {slot.department}
+                      {slot.time} {slot.department} {slot.bookedCount}/{slot.capacity}
                     </li>
                   ))}
                   {slots.length > 3 ? (

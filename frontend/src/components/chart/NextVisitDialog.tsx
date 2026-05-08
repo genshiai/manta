@@ -148,7 +148,7 @@ export const NextVisitDialog = ({
                         </p>
                       </div>
                       <span className={`text-[11px] font-medium ${slotStateClass(s.state)}`}>
-                        {slotStateLabel(s.state)}
+                        {slotStateLabel(s.state)} {s.bookedCount}/{s.capacity}
                       </span>
                     </button>
                   </li>

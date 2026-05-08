@@ -221,6 +221,7 @@ type ReservationSlotCreateFormState = {
   department: string;
   doctor: string;
   state: 'available' | 'few' | 'full';
+  capacity: string;
 };
 
 type ReservationSlotEditFormState = {
@@ -231,6 +232,7 @@ type ReservationSlotEditFormState = {
   department: string;
   doctor: string;
   state: 'available' | 'few' | 'full';
+  capacity: string;
 };
 
 type ChartTemplateCreateFormState = {
@@ -452,6 +454,7 @@ const createReservationSlotCreateForm = (
   department: '',
   doctor: '',
   state: 'available',
+  capacity: '1',
 });
 
 const createReservationSlotEditForm = (
@@ -464,6 +467,7 @@ const createReservationSlotEditForm = (
   department: item.department,
   doctor: item.doctor,
   state: item.state,
+  capacity: String(item.capacity ?? 1),
 });
 
 const createChartTemplateCreateForm = (values: ChartTemplate[]): ChartTemplateCreateFormState => ({
@@ -1433,6 +1437,7 @@ export const SettingsWorkspace = ({
         department: reservationSlotCreateForm.department.trim(),
         doctor: reservationSlotCreateForm.doctor.trim(),
         state: reservationSlotCreateForm.state,
+        capacity: Math.max(normalizeSortOrder(reservationSlotCreateForm.capacity), 0),
       });
       await loadMasters();
       await loadSystemAuditLogs();
@@ -1484,6 +1489,7 @@ export const SettingsWorkspace = ({
         department: reservationSlotEditForm.department.trim(),
         doctor: reservationSlotEditForm.doctor.trim(),
         state: reservationSlotEditForm.state,
+        capacity: Math.max(normalizeSortOrder(reservationSlotEditForm.capacity), 0),
       });
       await loadMasters();
       await loadSystemAuditLogs();
@@ -2045,7 +2051,7 @@ export const SettingsWorkspace = ({
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
                         <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
-                          {item.department} / {item.doctor}
+                          {item.department} / {item.doctor} / {item.bookedCount}/{item.capacity}件
                         </p>
                       </button>
                     ))}
@@ -3609,6 +3615,17 @@ export const SettingsWorkspace = ({
                           value={reservationSlotCreateForm.doctor}
                         />
                       </Field>
+                      <Field label='定員'>
+                        <Input
+                          blockSize='md'
+                          min={0}
+                          onChange={(event) =>
+                            setReservationSlotCreateForm((current) => ({ ...current, capacity: event.target.value }))
+                          }
+                          type='number'
+                          value={reservationSlotCreateForm.capacity}
+                        />
+                      </Field>
                       <Field label='空き状態'>
                         <Select
                           blockSize='md'
@@ -3686,6 +3703,19 @@ export const SettingsWorkspace = ({
                               <option value='few'>few</option>
                               <option value='full'>full</option>
                             </Select>
+                          </Field>
+                          <Field label='定員'>
+                            <Input
+                              blockSize='md'
+                              min={0}
+                              onChange={(event) =>
+                                setReservationSlotEditForm((current) =>
+                                  current ? { ...current, capacity: event.target.value } : current,
+                                )
+                              }
+                              type='number'
+                              value={reservationSlotEditForm.capacity}
+                            />
                           </Field>
                           <Field label='日付表示'>
                             <Input

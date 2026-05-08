@@ -362,6 +362,7 @@ class ReservationSlotMaster(Base):
     department: Mapped[str] = mapped_column(String(128))
     doctor: Mapped[str] = mapped_column(String(128))
     state: Mapped[str] = mapped_column(String(32))
+    capacity: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class ChartTemplateMaster(Base):

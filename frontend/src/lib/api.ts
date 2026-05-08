@@ -331,6 +331,9 @@ type ApiChartOrderConfig = {
     department: string;
     doctor: string;
     state: 'available' | 'few' | 'full';
+    capacity: number;
+    booked_count: number;
+    remaining_count: number;
   }>;
   chart_templates: Array<{
     id: string;
@@ -732,6 +735,9 @@ const mapReservationSlots = (
     department: item.department,
     doctor: item.doctor,
     state: item.state,
+    capacity: item.capacity,
+    bookedCount: item.booked_count,
+    remainingCount: item.remaining_count,
   }));
 
 const mapChartTemplates = (items: ApiChartOrderConfig['chart_templates']): ChartTemplate[] =>
@@ -1229,6 +1235,7 @@ export const createReservationSlotMaster = async (payload: {
   department: string;
   doctor: string;
   state: 'available' | 'few' | 'full';
+  capacity?: number;
 }) =>
   request<ApiChartOrderConfig['reservation_slots'][number]>('/api/admin/masters/reservation-slots', {
     method: 'POST',
@@ -1241,6 +1248,7 @@ export const createReservationSlotMaster = async (payload: {
       department: payload.department,
       doctor: payload.doctor,
       state: payload.state,
+      capacity: payload.capacity ?? 1,
     }),
   });
 
@@ -1254,6 +1262,7 @@ export const updateReservationSlotMaster = async (
     department: string;
     doctor: string;
     state: 'available' | 'few' | 'full';
+    capacity?: number;
   },
 ) =>
   request<ApiChartOrderConfig['reservation_slots'][number]>(
@@ -1268,6 +1277,7 @@ export const updateReservationSlotMaster = async (
         department: payload.department,
         doctor: payload.doctor,
         state: payload.state,
+        capacity: payload.capacity ?? 1,
       }),
     },
   );
