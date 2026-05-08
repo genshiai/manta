@@ -223,8 +223,12 @@ def sync_hot_drug_code_mapping_records(
     *,
     dry_run: bool = False,
 ) -> HotDrugImportSummary:
-    created = updated = unchanged = 0
+    records_by_id: dict[str, HotDrugImportRecord] = {}
     for record in records:
+        records_by_id[record.id] = record
+
+    created = updated = unchanged = 0
+    for record in records_by_id.values():
         existing = db.get(HotDrugCodeMapping, record.id)
         payload = _record_payload(record)
         if existing is None:
@@ -244,7 +248,7 @@ def sync_hot_drug_code_mapping_records(
                 setattr(existing, key, value)
 
     return HotDrugImportSummary(
-        total=len(records),
+        total=len(records_by_id),
         created=created,
         updated=updated,
         unchanged=unchanged,

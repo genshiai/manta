@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 UserRole = Literal["医師", "管理者"]
-DrugCategory = Literal["内服", "外用", "頓服"]
+DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
 
 
 class DetailItem(BaseModel):

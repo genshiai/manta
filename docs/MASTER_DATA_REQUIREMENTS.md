@@ -1,6 +1,6 @@
 # Master Data Requirements
 
-更新日: 2026-05-07
+更新日: 2026-05-08
 
 Phase 2 を完了品質へ近づけるために必要なデータの一覧。
 
@@ -47,7 +47,7 @@ Phase 2 を完了品質へ近づけるために必要なデータの一覧。
 - `pregnancy_warning`
 - `insurance_note`
 
-現状: 基本項目の import は実装済み。安全チェック拡張用カラムは次の migration で追加する。
+現状: 厚労省薬価、支払基金、HOT、経過措置、長期収載品は import 済み。公開取得できる薬剤系 master は Phase 2 の最低限を満たしている。
 
 ### 必須度 A: PMDA / 電子添文データ
 
@@ -86,6 +86,8 @@ uv run python scripts/import_pmda_package_insert.py \
 - `text`
 - `source_updated_at`
 - `source_url`
+
+現状: importer、相互作用テーブル構造化、照合 resolver、警告根拠表示は実装済み。全件運用には PMDA メディナビ/マイ医薬品集から XML 全件または採用薬分を出力して `/Users/daichi/Downloads/manta-master-data/pmda-package-inserts/xml/` へ置く。
 
 ### 必須度 A: 標準病名マスタ
 

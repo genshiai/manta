@@ -98,7 +98,7 @@ def test_iter_mhlw_drug_price_records_maps_internal_drugs(tmp_path) -> None:
 
     records = iter_mhlw_drug_price_records(xlsx_file=xlsx_file)
 
-    assert len(records) == 1
+    assert len(records) == 2
     assert records[0].id == "yj-1149019f1560"
     assert records[0].drug_name == "ロキソニン錠60mg"
     assert records[0].category == "内服"
@@ -108,6 +108,8 @@ def test_iter_mhlw_drug_price_records_maps_internal_drugs(tmp_path) -> None:
     assert records[0].drug_price == Decimal("10.8")
     assert records[0].brand_flag == "先発品"
     assert records[0].pmda_info_url == "https://www.pmda.go.jp/PmdaSearch/rdSearch/02/1149019F1560?user=1"
+    assert records[1].id == "yj-9999999a9999"
+    assert records[1].category == "注射"
 
 
 def test_sync_mhlw_drug_price_records(tmp_path) -> None:

@@ -1,5 +1,5 @@
 export type UserRole = '医師' | '管理者';
-export type DrugCategory = '内服' | '外用' | '頓服';
+export type DrugCategory = '内服' | '外用' | '頓服' | '注射' | '歯科';
 
 export type UserAccount = {
   id: string;

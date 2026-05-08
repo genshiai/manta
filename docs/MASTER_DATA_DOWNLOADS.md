@@ -1,10 +1,12 @@
 # Master Data Downloads
 
-更新日: 2026-05-07
+更新日: 2026-05-08
 
 Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 
 原本ファイルは repo に commit しない。`/Users/daichi/Downloads` などに置き、import script で DB へ投入する。
+
+2026-05-08 時点で、公開 URL から直接取得できる薬剤系 master は Codex 側で取得済み。保存先は `/Users/daichi/Downloads/manta-master-data/`。
 
 ## まず結論
 
@@ -20,16 +22,44 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 
 ## 足りないデータ
 
-2026-05-07 時点で、次の実装には追加の外部データが必要。
+2026-05-08 時点で、公開取得できる薬剤系 master は投入済み。残る外部データは、PMDA 全件 XML、一般名処方 master、病名 master 実ファイル、検査項目 master。
 
 | 実装 | 足りないデータ | 必須度 | 理由 |
 | --- | --- | --- | --- |
-| 支払基金 レセプト電算 医薬品マスター importer | 支払基金 `y_ALL20260414.zip` とファイルレイアウト PDF | A | レセプト電算の医薬品コード、請求用名称、薬価、YJ 相当コード、廃止日、経過措置を正にする |
-| HOT コード importer | MEDIS `A_20260331_1.txt`, `A_20260331_2.txt`, `DLFileLayout.pdf` | A | YJ、調剤包装単位コード、販売包装単位コード、元梱包装単位コードをつなぐ |
-| PMDA 相互作用の照合精度改善 | PMDA 添文 XML 全件または採用薬分、厚労省薬価 Excel、可能なら HOT CSV | A | XML の相互作用相手名を、処方薬の販売名・成分名・YJ・包装コードに寄せて照合する |
-| 経過措置・後発品表示 UI | 厚労省薬価 Excel、支払基金医薬品マスター、支払基金経過措置 Excel、支払基金長期収載品 Excel | B | 画面に出すだけなら厚労省 Excel で足りるが、請求・選定療養・経過措置期限まで正にするなら支払基金側も必要 |
+| PMDA 相互作用の全件化 | PMDA 添文 XML 全件または採用薬分 | A | PMDA はメディナビ/マイ医薬品集からの一括出力が必要。XML を置けば importer はディレクトリ単位で投入できる |
+| 一般名処方 master | 厚労省 一般名処方 master Excel | B | 一般名処方、後発品提案、成分ベース検索をさらに正確にする |
+| 標準病名 master 実ファイル | MEDIS 標準病名 master / 索引 / 履歴 | A | ICD10 索引、同義語、廃止病名移行を本番データ化する |
+| 検査項目 master | 施設検査項目 CSV、必要に応じて JLAC10/LOINC | B | 検査時系列の単位、基準値、表示名、軸固定を施設運用に合わせる |
 
-このうち、厚労省薬価 Excel と PMDA XML importer は実装済み。次に必要なのは支払基金と HOT。
+厚労省薬価 Excel、支払基金、HOT、経過措置、長期収載品 importer は実装済みで、2026-05-08 に実 DB へ投入済み。PMDA XML importer も実装済みだが、全件 XML 原本は PMDA 側の一括ダウンロード操作が必要。
+
+## 2026-05-08 実投入結果
+
+保存先:
+
+```text
+/Users/daichi/Downloads/manta-master-data/
+  20260415-mhlw-drug-price/
+  20260414-ssk-receipt-drug/
+  20260331-medis-hot/
+  20260312-ssk-long-term-listed/
+  20260305-ssk-transitional-drugs/
+```
+
+DB 件数:
+
+| テーブル | 件数 | 原本 |
+| --- | ---: | --- |
+| `prescription_catalog_masters` | 12,316 | 厚労省 薬価基準収載品目リスト 内用薬・注射薬・外用薬・歯科用薬剤 |
+| `receipt_drug_masters` | 18,396 | 支払基金 レセプト電算 医薬品マスター |
+| `hot_drug_code_mappings` | 98,724 | MEDIS HOT 全件 CSV 2 ファイル |
+| `receipt_transitional_drugs` | 458 | 支払基金 経過措置医薬品一覧 |
+| `receipt_long_term_listed_drugs` | 776 | 支払基金 長期収載品の選定療養対象一覧 |
+
+取得済みだが importer 未実装:
+
+- `/Users/daichi/Downloads/manta-master-data/20260415-mhlw-drug-price/tp20260415-01_05.xlsx`
+  - 「後発医薬品の有無」ファイル。薬価 Excel 本体にも先発/後発系の列があるため Phase 2 の最低限は足りているが、後発品あり/なし表示を厚労省別表で厳密化するなら importer を追加する。
 
 ## 取得・実装ステータス
 
@@ -37,12 +67,12 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 
 | 優先 | データ | 取得状況 | 実装状況 | 次アクション |
 | --- | --- | --- | --- | --- |
-| A | 厚労省 薬価基準収載品目リスト 内用薬 | 取得済み: `/Users/daichi/Downloads/tp20260415-01_01.xlsx` | importer 実装済み | 注射薬、外用薬、歯科用薬剤、後発医薬品の有無 Excel も取得する |
+| A | 厚労省 薬価基準収載品目リスト 内用薬・注射薬・外用薬・歯科用薬剤 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260415-mhlw-drug-price/` | importer 実装済み・投入済み | 後発医薬品の有無 Excel の追加 importer は必要なら実装する |
 | A | PMDA 医療用医薬品添付文書 XML | ロキソニン XML で検証済み。全件/採用薬分は未取得 | importer 実装済み | PMDA メディナビから XML 全件または採用薬分を取得する |
-| A | 支払基金 レセプト電算 医薬品マスター | 検証用に `/tmp/manta-receipt-master/y_ALL20260414.zip` を取得済み。恒久保存は未 | importer 実装済み | `y_ALL20260414.zip` とファイル仕様 PDF を Downloads 配下に保存する |
-| A | MEDIS 医薬品 HOT コードマスター | 検証用に `/tmp/manta-hot-master/A_20260331_1.txt`, `/tmp/manta-hot-master/A_20260331_2.txt`, `/tmp/manta-hot-master/DLFileLayout.pdf` を取得済み。恒久保存は未 | importer 実装済み | HOT CSV 一式を Downloads 配下に保存する |
-| B | 支払基金 経過措置医薬品一覧 | 検証用に `/tmp/manta-receipt-adj/keikasoti_R08_20260305.xlsx` を取得済み。恒久保存は未 | importer 実装済み | `keikasoti_R08_20260305.xlsx` を Downloads 配下に保存する |
-| B | 支払基金 長期収載品の選定療養対象一覧 | 検証用に `/tmp/manta-receipt-adj/sentei_20260312.xlsx` を取得済み。恒久保存は未 | importer 実装済み | `sentei_20260312.xlsx` を Downloads 配下に保存する |
+| A | 支払基金 レセプト電算 医薬品マスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260414-ssk-receipt-drug/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| A | MEDIS 医薬品 HOT コードマスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260331-medis-hot/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| B | 支払基金 経過措置医薬品一覧 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260305-ssk-transitional-drugs/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| B | 支払基金 長期収載品の選定療養対象一覧 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260312-ssk-long-term-listed/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
 | B | 厚労省 一般名処方マスター | 未取得 | importer 未実装 | 一般名処方 Excel を取得する |
 | B | 検査項目マスター | 未取得 | importer 未実装 | JLAC10/LOINC/施設検査項目 CSV の候補を決める |
 | C | 標準病名マスター履歴 | main/index は対応済み。履歴ファイルは未検証 | importer 一部実装済み | MEDIS 標準病名 master の履歴ファイルを取得して列確認する |
@@ -116,6 +146,7 @@ Manta 実装メモ:
 
 - `backend/scripts/import_mhlw_drug_price_master.py` で Excel を直接読んで `prescription_catalog_masters` に upsert する。
 - `drug_name`, `generic_name`, `strength`, `yj_code`, `category`, `manufacturer`, `drug_price`, `generic_reimbursement_flag`, `brand_flag`, `has_generic`, `transitional_expiry`, `source_note` を保持する。
+- 2026-05-08 に `内服`, `注射`, `外用`, `歯科` を実投入済み。`頓服` は Manta 内の処方運用カテゴリとして残す。
 
 取り込み例:
 
@@ -139,6 +170,7 @@ uv run python scripts/import_mhlw_drug_price_master.py \
 - PMDA メディナビ登録後、マイ医薬品集作成サービスを利用する。
 - 「医療用医薬品添付文書一括ダウンロードサービス」で `SGML/XML` または `PDF/SGML/XML` を選ぶ。
 - 全件、更新分、登録薬剤分を選べる。
+- このデータは通常の公開 XLS/CSV と違い、PMDA メディナビ側の登録・操作で XML を出す。Codex が URL から直接まとめて curl するタイプの配布ではない。
 
 Manta 実装状況:
 

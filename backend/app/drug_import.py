@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from .models import PrescriptionCatalogMaster
 
-DrugCategory = Literal["内服", "外用", "頓服"]
+DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
 PMDA_BASE_URL = "https://www.pmda.go.jp/PmdaSearch/rdSearch/02"
 VALID_YJ_CODE_PATTERN = re.compile(r"^[0-9A-Z]{12}$")
 
@@ -171,7 +171,7 @@ def _split_multi_value_field(value: str) -> list[str]:
 
 
 def _normalize_category(value: str | None) -> DrugCategory:
-    if value in ("内服", "外用", "頓服"):
+    if value in ("内服", "外用", "頓服", "注射", "歯科"):
         return value
     return "内服"
 

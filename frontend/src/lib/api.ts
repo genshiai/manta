@@ -16,6 +16,7 @@ import type {
   ChartVersion,
   ChartWorkspaceData,
   DiagnosisSearchResult,
+  DrugCategory,
   ImagingOrderEntry,
   LabLongTrendItem,
   LabResultEntry,
@@ -957,7 +958,7 @@ export const createPrescriptionCatalogItem = async (payload: {
   sortOrder: number;
   isActive?: boolean;
   drugName: string;
-  category: '内服' | '外用' | '頓服';
+  category: DrugCategory;
   dosageOptions: string[];
   genericName?: string;
   nameKana?: string;
@@ -1016,7 +1017,7 @@ export const updatePrescriptionCatalogItem = async (
     sortOrder: number;
     isActive?: boolean;
     drugName: string;
-    category: '内服' | '外用' | '頓服';
+    category: DrugCategory;
     dosageOptions: string[];
     genericName?: string;
     nameKana?: string;
@@ -1077,7 +1078,7 @@ export const createStandardUsageMaster = async (payload: {
   sortOrder: number;
   isActive?: boolean;
   label: string;
-  category: '内服' | '外用' | '頓服';
+  category: DrugCategory;
   instruction: string;
   defaultDays: string;
   note?: string;
@@ -1102,7 +1103,7 @@ export const updateStandardUsageMaster = async (
     sortOrder: number;
     isActive?: boolean;
     label: string;
-    category: '内服' | '外用' | '頓服';
+    category: DrugCategory;
     instruction: string;
     defaultDays: string;
     note?: string;

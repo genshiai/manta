@@ -52,7 +52,8 @@ def cleanup_adjustment_rows(receipt_drug_code: str, yj_code: str) -> None:
 
 def test_import_receipt_transitional_drug_records(tmp_path) -> None:
     receipt_drug_code = "629999990"
-    yj_code = "1129007F1026"
+    yj_code = "9999999F9901"
+    cleanup_adjustment_rows(receipt_drug_code, yj_code)
     xlsx_file = tmp_path / "keikasoti.xlsx"
     write_minimal_xlsx(
         xlsx_file,
@@ -85,7 +86,8 @@ def test_import_receipt_transitional_drug_records(tmp_path) -> None:
 def test_import_receipt_long_term_listed_drug_records(tmp_path) -> None:
     receipt_drug_code = "629999991"
     selected_code = "679999991"
-    yj_code = "1124001F2029"
+    yj_code = "9999999F9902"
+    cleanup_adjustment_rows(receipt_drug_code, yj_code)
     xlsx_file = tmp_path / "sentei.xlsx"
     write_minimal_xlsx(
         xlsx_file,

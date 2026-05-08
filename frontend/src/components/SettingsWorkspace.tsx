@@ -2388,6 +2388,8 @@ export const SettingsWorkspace = ({
                           <option value='内服'>内服</option>
                           <option value='外用'>外用</option>
                           <option value='頓服'>頓服</option>
+                          <option value='注射'>注射</option>
+                          <option value='歯科'>歯科</option>
                         </Select>
                       </Field>
                       <Field label='標準用法'>
@@ -2588,6 +2590,8 @@ export const SettingsWorkspace = ({
                               <option value='内服'>内服</option>
                               <option value='外用'>外用</option>
                               <option value='頓服'>頓服</option>
+                              <option value='注射'>注射</option>
+                              <option value='歯科'>歯科</option>
                             </Select>
                           </Field>
                           <Field label='薬剤名'>
@@ -2832,6 +2836,8 @@ export const SettingsWorkspace = ({
                           <option value='内服'>内服</option>
                           <option value='外用'>外用</option>
                           <option value='頓服'>頓服</option>
+                          <option value='注射'>注射</option>
+                          <option value='歯科'>歯科</option>
                         </Select>
                       </Field>
                       <Field label='表示名'>
@@ -2928,6 +2934,8 @@ export const SettingsWorkspace = ({
                               <option value='内服'>内服</option>
                               <option value='外用'>外用</option>
                               <option value='頓服'>頓服</option>
+                              <option value='注射'>注射</option>
+                              <option value='歯科'>歯科</option>
                             </Select>
                           </Field>
                           <Field label='表示名'>
