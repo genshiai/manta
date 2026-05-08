@@ -84,6 +84,8 @@ const versionDate = (savedAt: string): string => {
 
 const normalizeDate = (date: string): string => date.replaceAll('-', '/');
 
+const calendarDateKey = (date: string): string => normalizeDate(date.split(' ')[0] ?? date).replace(/（.+$/, '');
+
 const currentMonthDays = (monthDate = new Date()) => {
   const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const start = new Date(first);
@@ -215,11 +217,11 @@ export const RecordPane = ({
   }, [versions, visitByDate, departmentFilter]);
 
   const calendarEventsByDate = useMemo(() => {
-    const map = new Map<string, Set<'chart' | 'lab' | 'rx' | 'image'>>();
-    const add = (date: string | undefined, kind: 'chart' | 'lab' | 'rx' | 'image') => {
+    const map = new Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation'>>();
+    const add = (date: string | undefined, kind: 'chart' | 'lab' | 'rx' | 'image' | 'reservation') => {
       if (!date) return;
-      const key = normalizeDate(date.split(' ')[0] ?? date);
-      const existing = map.get(key) ?? new Set<'chart' | 'lab' | 'rx' | 'image'>();
+      const key = calendarDateKey(date);
+      const existing = map.get(key) ?? new Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation'>();
       existing.add(kind);
       map.set(key, existing);
     };
@@ -227,8 +229,9 @@ export const RecordPane = ({
     for (const order of labOrders) add(order.createdAt ?? formatDateKey(new Date()), 'lab');
     for (const group of prescriptionTimeline) add(group.date, 'rx');
     for (const order of imagingOrders) add(order.scheduledAt || formatDateKey(new Date()), 'image');
+    for (const slot of reservationSlots) add(slot.date, 'reservation');
     return map;
-  }, [versions, labOrders, prescriptionTimeline, imagingOrders]);
+  }, [versions, labOrders, prescriptionTimeline, imagingOrders, reservationSlots]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -460,7 +463,7 @@ export const RecordPane = ({
           ) : null}
 
           {view === 'calendar' ? (
-            <CalendarView eventsByDate={calendarEventsByDate} />
+            <CalendarView eventsByDate={calendarEventsByDate} reservationSlots={reservationSlots} />
           ) : null}
 
           {view === 'labs' ? (
@@ -543,22 +546,33 @@ export const RecordPane = ({
   );
 };
 
-const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image', string> = {
+const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image' | 'reservation', string> = {
   chart: 'bg-brand',
   lab: 'bg-success',
   rx: 'bg-warning',
   image: 'bg-chart-3',
+  reservation: 'bg-cyan-600',
 };
 
 const CalendarView = ({
   eventsByDate,
+  reservationSlots,
 }: {
-  eventsByDate: Map<string, Set<'chart' | 'lab' | 'rx' | 'image'>>;
+  eventsByDate: Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation'>>;
+  reservationSlots: ReservationSlot[];
 }) => {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const days = currentMonthDays(visibleMonth);
   const todayKey = formatDateKey(new Date());
   const monthLabel = `${visibleMonth.getFullYear()}年 ${visibleMonth.getMonth() + 1}月`;
+  const reservationSlotsByDate = useMemo(() => {
+    const map = new Map<string, ReservationSlot[]>();
+    for (const slot of reservationSlots) {
+      const key = calendarDateKey(slot.date);
+      map.set(key, [...(map.get(key) ?? []), slot]);
+    }
+    return map;
+  }, [reservationSlots]);
   const moveMonth = (delta: number) => {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   };
@@ -582,6 +596,7 @@ const CalendarView = ({
           <CalendarLegend className="bg-success" label="検査" />
           <CalendarLegend className="bg-warning" label="処方" />
           <CalendarLegend className="bg-chart-3" label="画像" />
+          <CalendarLegend className="bg-cyan-600" label="予約枠" />
         </div>
       </div>
       <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-border bg-card">
@@ -596,6 +611,7 @@ const CalendarView = ({
         {days.map((day) => {
           const key = formatDateKey(day);
           const events = eventsByDate.get(key);
+          const slots = reservationSlotsByDate.get(key) ?? [];
           const isToday = key === todayKey;
           const muted = day.getMonth() !== visibleMonth.getMonth();
           return (
@@ -618,6 +634,21 @@ const CalendarView = ({
                     <span key={event} className={`size-2 rounded-full ${eventDotClass[event]}`} />
                   ))}
                 </div>
+              ) : null}
+              {slots.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {slots.slice(0, 3).map((slot) => (
+                    <li
+                      key={slot.id}
+                      className="truncate rounded-sm bg-surface-subtle px-1.5 py-1 text-[10px] text-text-secondary"
+                    >
+                      {slot.time} {slot.department}
+                    </li>
+                  ))}
+                  {slots.length > 3 ? (
+                    <li className="text-[10px] text-text-tertiary">他 {slots.length - 3} 件</li>
+                  ) : null}
+                </ul>
               ) : null}
             </div>
           );
