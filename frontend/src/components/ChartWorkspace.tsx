@@ -667,6 +667,8 @@ export function ChartWorkspace({
       right={
         <OrderPane
           orderConfig={orderConfig}
+          patientDepartment={patient.department}
+          activeProblemNames={problems.filter((problem) => problem.status !== 'resolved').map((problem) => problem.name)}
           prescriptions={prescriptions}
           labOrders={labOrders}
           imagingOrders={imagingOrders}

@@ -32,6 +32,8 @@ type LabOrderRow = {
 
 type OrderPaneProps = {
   orderConfig: ChartOrderConfig;
+  patientDepartment: string;
+  activeProblemNames: string[];
   prescriptions: PrescriptionEntry[];
   labOrders: LabOrderRow[];
   imagingOrders: ImagingOrderEntry[];
@@ -54,6 +56,8 @@ type OrderPaneProps = {
  */
 export const OrderPane = ({
   orderConfig,
+  patientDepartment,
+  activeProblemNames,
   prescriptions,
   labOrders,
   imagingOrders,
@@ -263,6 +267,8 @@ export const OrderPane = ({
             <TabsContent value="prescription" className="m-0 pt-3">
               <PrescriptionTab
                 orderConfig={orderConfig}
+                patientDepartment={patientDepartment}
+                activeProblemNames={activeProblemNames}
                 prescriptions={prescriptions}
                 isMutating={isMutating}
                 onAdd={onAddPrescription}
@@ -370,12 +376,16 @@ const describeDrugPolicy = (drug: PrescriptionCatalogItem) => {
 
 const PrescriptionTab = ({
   orderConfig,
+  patientDepartment,
+  activeProblemNames,
   prescriptions,
   isMutating,
   onAdd,
   onAddBatch,
 }: {
   orderConfig: ChartOrderConfig;
+  patientDepartment: string;
+  activeProblemNames: string[];
   prescriptions: PrescriptionEntry[];
   isMutating: boolean;
   onAdd: (drugId: string, dosage: string, days: string) => void;
@@ -402,6 +412,25 @@ const PrescriptionTab = ({
   const dosageOptions = selectedDrug?.dosageOptions ?? [];
   const currentDosage = dosage || dosageOptions[0] || '';
   const pmdaUrl = selectedDrug?.pmdaInfoUrl ?? buildPmdaDrugInfoUrl(selectedDrug?.yjCode);
+  const recommendedSets = useMemo(() => {
+    const problemText = activeProblemNames.join(' ');
+    return orderConfig.prescriptionSets
+      .map((set) => {
+        const departmentMatched = set.department === patientDepartment || set.department === '共通';
+        const problemMatched = Boolean(set.relatedProblem && problemText.includes(set.relatedProblem));
+        const score =
+          (problemMatched ? 20 : 0) +
+          (set.department === patientDepartment ? 10 : 0) +
+          (set.department === '共通' ? 4 : 0);
+        const reason = problemMatched
+          ? `病名: ${set.relatedProblem}`
+          : departmentMatched
+            ? `診療科: ${set.department}`
+            : '';
+        return { set, score, reason };
+      })
+      .sort((a, b) => b.score - a.score || a.set.label.localeCompare(b.set.label, 'ja-JP'));
+  }, [activeProblemNames, orderConfig.prescriptionSets, patientDepartment]);
 
   const handleAddSelected = () => {
     if (!selectedDrug || !currentDosage) return;
@@ -586,15 +615,20 @@ const PrescriptionTab = ({
             処方セット
           </h3>
           <ul className="space-y-1">
-            {orderConfig.prescriptionSets.slice(0, 6).map((s) => (
+            {recommendedSets.slice(0, 6).map(({ set: s, reason }) => (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => setSetPreview(s)}
                   className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-left text-[13px] transition-colors hover:bg-surface-subtle"
                 >
-                  <span className="truncate text-text-primary">{s.label}</span>
-                  <span className="text-[11px] text-text-tertiary">{s.items.length}剤</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-text-primary">{s.label}</span>
+                    {reason ? (
+                      <span className="mt-0.5 block truncate text-[11px] text-brand">{reason}</span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-text-tertiary">{s.items.length}剤</span>
                 </button>
               </li>
             ))}
