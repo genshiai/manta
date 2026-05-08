@@ -19,6 +19,8 @@ from app.models import (
     PrescriptionCatalogMaster,
     PrescriptionOrder,
     PrescriptionSetMaster,
+    ReceiptLongTermListedDrug,
+    ReceiptTransitionalDrug,
     ReservationSlotMaster,
     StandardUsageMaster,
     User,
@@ -1044,6 +1046,98 @@ def test_add_prescription_uses_resolved_pmda_interaction_match() -> None:
     assert base_response.status_code == 200
     assert response.status_code == 200
     assert any("PMDA相互作用" in warning and "照合:" in warning for warning in response.json()["warnings"])
+
+
+def test_add_prescription_returns_receipt_policy_warnings() -> None:
+    suffix = uuid4().hex[:8]
+    patient_id = "0009900041"
+    drug_id = f"receipt-policy-{suffix}"
+    drug_name = f"経過措置選定療養テスト薬 {suffix}"
+    yj_code = f"1124001F{suffix[:4].upper()}"
+    receipt_drug_code = f"62{suffix[:7]}"
+
+    try:
+        with SessionLocal() as db:
+            db.add(
+                PrescriptionCatalogMaster(
+                    id=drug_id,
+                    sort_order=9999,
+                    is_active=True,
+                    drug_name=drug_name,
+                    category="内服",
+                    dosage_options=["1回1錠 1日1回 朝食後"],
+                    generic_name=None,
+                    name_kana=None,
+                    aliases=[],
+                    yj_code=yj_code,
+                    hot_code=None,
+                    dosage_form="錠剤",
+                    strength="1mg",
+                    standard_usage_code=None,
+                    default_days="7",
+                    pmda_info_url=None,
+                    allergy_conflict_label=None,
+                    related_problem=None,
+                )
+            )
+            db.add(
+                ReceiptTransitionalDrug(
+                    receipt_drug_code=receipt_drug_code,
+                    dosage_form="内",
+                    yj_code=yj_code,
+                    name=drug_name,
+                    unit_name="錠",
+                    price=None,
+                    brand_related_flag="0",
+                    non_listed_brand_name=None,
+                    transitional_expiry="20270331",
+                    note="テスト告示",
+                    source_file="keikasoti-test.xlsx",
+                )
+            )
+            db.add(
+                ReceiptLongTermListedDrug(
+                    yj_code=yj_code,
+                    row_number=1,
+                    dosage_form="内",
+                    medical_necessity_receipt_code=receipt_drug_code,
+                    medical_necessity_name=drug_name,
+                    patient_request_receipt_code=f"67{suffix[:7]}",
+                    patient_request_name=f"{drug_name}（選）",
+                    source_file="sentei-test.xlsx",
+                )
+            )
+            db.commit()
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            response = client.post(
+                f"/api/patients/{patient_id}/prescriptions",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "type": "内服",
+                    "days": "7日分",
+                    "drug_name": drug_name,
+                    "dosage": "1回1錠 1日1回 朝食後",
+                    "actor": "田中 太郎",
+                },
+            )
+    finally:
+        cleanup_prescription_orders(patient_id, drug_name)
+        with SessionLocal() as db:
+            transitional = db.get(ReceiptTransitionalDrug, receipt_drug_code)
+            if transitional is not None:
+                db.delete(transitional)
+            long_term = db.get(ReceiptLongTermListedDrug, yj_code)
+            if long_term is not None:
+                db.delete(long_term)
+            db.commit()
+        cleanup_chart_order_masters(drug_id, "unused-lab-set", "unused-slot")
+
+    assert response.status_code == 200
+    warnings = response.json()["warnings"]
+    assert any("経過措置対象" in warning for warning in warnings)
+    assert any("長期収載品・選定療養対象" in warning for warning in warnings)
 
 
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:

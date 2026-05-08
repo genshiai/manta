@@ -41,8 +41,8 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 | A | PMDA 医療用医薬品添付文書 XML | ロキソニン XML で検証済み。全件/採用薬分は未取得 | importer 実装済み | PMDA メディナビから XML 全件または採用薬分を取得する |
 | A | 支払基金 レセプト電算 医薬品マスター | 検証用に `/tmp/manta-receipt-master/y_ALL20260414.zip` を取得済み。恒久保存は未 | importer 実装済み | `y_ALL20260414.zip` とファイル仕様 PDF を Downloads 配下に保存する |
 | A | MEDIS 医薬品 HOT コードマスター | 検証用に `/tmp/manta-hot-master/A_20260331_1.txt`, `/tmp/manta-hot-master/A_20260331_2.txt`, `/tmp/manta-hot-master/DLFileLayout.pdf` を取得済み。恒久保存は未 | importer 実装済み | HOT CSV 一式を Downloads 配下に保存する |
-| B | 支払基金 経過措置医薬品一覧 | 未取得 | importer 未実装 | `keikasoti_R08_20260305.xlsx` を取得する |
-| B | 支払基金 長期収載品の選定療養対象一覧 | 未取得 | importer 未実装 | `sentei_20260312.xlsx` を取得する |
+| B | 支払基金 経過措置医薬品一覧 | 検証用に `/tmp/manta-receipt-adj/keikasoti_R08_20260305.xlsx` を取得済み。恒久保存は未 | importer 実装済み | `keikasoti_R08_20260305.xlsx` を Downloads 配下に保存する |
+| B | 支払基金 長期収載品の選定療養対象一覧 | 検証用に `/tmp/manta-receipt-adj/sentei_20260312.xlsx` を取得済み。恒久保存は未 | importer 実装済み | `sentei_20260312.xlsx` を Downloads 配下に保存する |
 | B | 厚労省 一般名処方マスター | 未取得 | importer 未実装 | 一般名処方 Excel を取得する |
 | B | 検査項目マスター | 未取得 | importer 未実装 | JLAC10/LOINC/施設検査項目 CSV の候補を決める |
 | C | 標準病名マスター履歴 | main/index は対応済み。履歴ファイルは未検証 | importer 一部実装済み | MEDIS 標準病名 master の履歴ファイルを取得して列確認する |
@@ -357,10 +357,20 @@ uv run python scripts/resolve_pmda_interaction_matches.py --dry-run
 - 支払基金 `keikasoti_R08_20260305.xlsx`。経過措置専用の一覧。
 - 支払基金 `sentei_20260312.xlsx`。長期収載品の選定療養対象表示。
 
+取り込み例:
+
+```bash
+cd backend
+uv run python scripts/import_receipt_adjustment_drugs.py \
+  --transitional-xlsx /path/to/keikasoti_R08_20260305.xlsx \
+  --long-term-xlsx /path/to/sentei_20260312.xlsx \
+  --dry-run
+```
+
 実装上の不足:
 
-- 管理画面と処方選択 UI に `薬価`, `メーカー`, `先発/後発`, `経過措置`, `選定療養` を出す。
-- 経過措置期限切れ薬は処方追加時に warning を出す。
+- 処方追加時に `経過措置対象`, `経過措置期限切れ`, `長期収載品・選定療養対象` warning を出す実装は完了。
+- 次は管理画面と処方選択 UI に `薬価`, `メーカー`, `先発/後発`, `経過措置`, `選定療養` を出す。
 
 ## 次に実装する importer
 
@@ -381,14 +391,14 @@ uv run python scripts/resolve_pmda_interaction_matches.py --dry-run
    - 出力: `hot_drug_code_mappings`
    - 目的: コード変換の安定化
 
-4. `import_receipt_transitional_drugs.py` 未実装
+4. `import_receipt_adjustment_drugs.py` 実装済み
    - 入力: 支払基金 `keikasoti_R08_*.xlsx`
-   - 出力: 経過措置薬テーブル、または `receipt_drug_masters` の補助カラム
+   - 出力: `receipt_transitional_drugs`
    - 目的: 経過措置期限切れ薬の表示・warning
 
-5. `import_receipt_long_term_listed_drugs.py` 未実装
+5. `import_receipt_adjustment_drugs.py` 実装済み
    - 入力: 支払基金 `sentei_*.xlsx`
-   - 出力: 長期収載品・選定療養対象テーブル
+   - 出力: `receipt_long_term_listed_drugs`
    - 目的: 選定療養対象表示と請求コード選択
 
 6. `import_generic_prescription_master.py` 未実装

@@ -28,6 +28,8 @@ from .models import (
     PmdaDrugInteractionMatch,
     PmdaPackageInsertSection,
     PrescriptionOrder,
+    ReceiptLongTermListedDrug,
+    ReceiptTransitionalDrug,
     Reservation,
     User,
 )
@@ -372,6 +374,8 @@ def build_prescription_safety_warnings(
     pmda_interactions: list[PmdaDrugInteraction] | None = None,
     pmda_interaction_matches: dict[int, list[PmdaDrugInteractionMatch]] | None = None,
     current_catalogs_by_drug: dict[str, PrescriptionCatalogMaster] | None = None,
+    transitional_drugs: list[ReceiptTransitionalDrug] | None = None,
+    long_term_listed_drug: ReceiptLongTermListedDrug | None = None,
 ) -> list[str]:
     warnings: list[str] = []
     active_problem_names = _patient_problem_names(patient)
@@ -400,6 +404,13 @@ def build_prescription_safety_warnings(
         default_days = _parse_prescription_days(catalog.default_days)
         if requested_days is not None and default_days is not None and requested_days > default_days * 2:
             warnings.append(f"処方日数が標準日数 {catalog.default_days} を大きく超えています")
+
+        warnings.extend(
+            build_receipt_drug_policy_warnings(
+                transitional_drugs=transitional_drugs or [],
+                long_term_listed_drug=long_term_listed_drug,
+            )
+        )
     elif drug_name:
         warnings.append("薬剤マスタ未登録のため安全チェックが限定されています")
 
@@ -430,6 +441,52 @@ def _patient_safety_keywords(patient: Patient) -> set[str]:
         if isinstance(value, str) and value:
             keywords.add(value)
     return keywords
+
+
+def _format_receipt_date(value: str | None) -> str | None:
+    if not value or len(value) != 8 or not value.isdigit():
+        return value
+    return f"{value[:4]}/{value[4:6]}/{value[6:8]}"
+
+
+def build_receipt_drug_policy_warnings(
+    *,
+    transitional_drugs: list[ReceiptTransitionalDrug],
+    long_term_listed_drug: ReceiptLongTermListedDrug | None,
+) -> list[str]:
+    warnings: list[str] = []
+    today = datetime.now(TOKYO_TZ).date()
+    earliest_by_code: dict[str, ReceiptTransitionalDrug] = {}
+    for row in transitional_drugs:
+        current = earliest_by_code.get(row.receipt_drug_code)
+        if current is None or row.transitional_expiry < current.transitional_expiry:
+            earliest_by_code[row.receipt_drug_code] = row
+
+    for row in earliest_by_code.values():
+        label = _format_receipt_date(row.transitional_expiry)
+        expiry_date: date | None = None
+        if row.transitional_expiry and row.transitional_expiry.isdigit() and len(row.transitional_expiry) == 8:
+            expiry_date = date(
+                int(row.transitional_expiry[:4]),
+                int(row.transitional_expiry[4:6]),
+                int(row.transitional_expiry[6:8]),
+            )
+        if expiry_date is not None and expiry_date < today:
+            warnings.append(f"経過措置期限切れ: {row.name} / {label}")
+        else:
+            warnings.append(f"経過措置対象: {row.name} / 使用期限 {label}")
+
+    if long_term_listed_drug is not None:
+        code_note = []
+        if long_term_listed_drug.medical_necessity_receipt_code:
+            code_note.append(f"医療上必要 {long_term_listed_drug.medical_necessity_receipt_code}")
+        if long_term_listed_drug.patient_request_receipt_code:
+            code_note.append(f"患者希望 {long_term_listed_drug.patient_request_receipt_code}")
+        suffix = f" / {' / '.join(code_note)}" if code_note else ""
+        name = long_term_listed_drug.medical_necessity_name or long_term_listed_drug.patient_request_name or ""
+        warnings.append(f"長期収載品・選定療養対象: {name}{suffix}")
+
+    return warnings
 
 
 def _has_patient_keyword(patient: Patient, patterns: tuple[str, ...]) -> bool:
@@ -547,6 +604,28 @@ def get_pmda_interaction_matches(
     return grouped
 
 
+def get_transitional_drugs_for_catalog(
+    db: Session,
+    catalog: PrescriptionCatalogMaster | None,
+) -> list[ReceiptTransitionalDrug]:
+    if catalog is None or not catalog.yj_code:
+        return []
+    return db.scalars(
+        select(ReceiptTransitionalDrug)
+        .where(ReceiptTransitionalDrug.yj_code == catalog.yj_code)
+        .order_by(ReceiptTransitionalDrug.transitional_expiry, ReceiptTransitionalDrug.receipt_drug_code)
+    ).all()
+
+
+def get_long_term_listed_drug_for_catalog(
+    db: Session,
+    catalog: PrescriptionCatalogMaster | None,
+) -> ReceiptLongTermListedDrug | None:
+    if catalog is None or not catalog.yj_code:
+        return None
+    return db.get(ReceiptLongTermListedDrug, catalog.yj_code)
+
+
 def build_warning_details(warnings: list[str]) -> list[dict[str, str | None]]:
     details: list[dict[str, str | None]] = []
     for warning in warnings:
@@ -600,6 +679,8 @@ def build_prescription_timeline(
             pmda_interactions=[],
             pmda_interaction_matches={},
             current_catalogs_by_drug=catalog_by_drug,
+            transitional_drugs=[],
+            long_term_listed_drug=None,
         )
         if local_date == today:
             warnings.append("本日処方済み")
@@ -1878,6 +1959,8 @@ def create_prescription(
     pmda_sections = get_pmda_sections_for_catalog(db, catalog)
     pmda_interactions = get_pmda_interactions_for_catalog(db, catalog)
     pmda_interaction_matches = get_pmda_interaction_matches(db, pmda_interactions)
+    transitional_drugs = get_transitional_drugs_for_catalog(db, catalog)
+    long_term_listed_drug = get_long_term_listed_drug_for_catalog(db, catalog)
     current_drug_names = {prescription.drug_name for prescription in current_prescriptions}
     current_catalogs_by_drug = {
         item.drug_name: item
@@ -1897,6 +1980,8 @@ def create_prescription(
         pmda_interactions=pmda_interactions,
         pmda_interaction_matches=pmda_interaction_matches,
         current_catalogs_by_drug=current_catalogs_by_drug,
+        transitional_drugs=transitional_drugs,
+        long_term_listed_drug=long_term_listed_drug,
     )
     if any("アレルギー" in warning for warning in warnings):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allergy conflict")

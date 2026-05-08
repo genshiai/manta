@@ -243,6 +243,39 @@ class ReceiptDrugMaster(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class ReceiptTransitionalDrug(Base):
+    __tablename__ = "receipt_transitional_drugs"
+
+    receipt_drug_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    dosage_form: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    yj_code: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    unit_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    brand_related_flag: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    non_listed_brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    transitional_expiry: Mapped[str] = mapped_column(String(8), index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_file: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ReceiptLongTermListedDrug(Base):
+    __tablename__ = "receipt_long_term_listed_drugs"
+
+    yj_code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    row_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dosage_form: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    medical_necessity_receipt_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    medical_necessity_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    patient_request_receipt_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    patient_request_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_file: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class HotDrugCodeMapping(Base):
     __tablename__ = "hot_drug_code_mappings"
 
