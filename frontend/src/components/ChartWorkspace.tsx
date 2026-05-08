@@ -186,6 +186,20 @@ export function ChartWorkspace({
     () => labOrders.filter((order) => order.status === 'pending'),
     [labOrders],
   );
+  const activeProblemNames = useMemo(
+    () => problems.filter((problem) => problem.status !== 'resolved').map((problem) => problem.name),
+    [problems],
+  );
+  const prioritizedChartTemplates = useMemo(() => {
+    return [...orderConfig.chartTemplates].sort((a, b) => {
+      const score = (template: ChartTemplate) => {
+        const haystack = [template.label, template.subjective, template.objective, template.assessment, template.plan].join(' ');
+        const problemMatched = activeProblemNames.some((problem) => problem && haystack.includes(problem));
+        return (problemMatched ? 20 : 0) + (template.department === patient.department ? 10 : 0) + (template.department === '共通' ? 4 : 0);
+      };
+      return score(b) - score(a) || a.label.localeCompare(b.label, 'ja-JP');
+    });
+  }, [activeProblemNames, orderConfig.chartTemplates, patient.department]);
 
   // 親コンポーネントへのメタ通知
   useEffect(() => {
@@ -643,7 +657,7 @@ export function ChartWorkspace({
           draft={draft}
           isDirty={isDirty}
           vitals={vitals}
-          templates={orderConfig.chartTemplates}
+          templates={prioritizedChartTemplates}
           selectedTemplateId={selectedTemplateId}
           isMutating={isMutating}
           versions={versions}
@@ -668,7 +682,7 @@ export function ChartWorkspace({
         <OrderPane
           orderConfig={orderConfig}
           patientDepartment={patient.department}
-          activeProblemNames={problems.filter((problem) => problem.status !== 'resolved').map((problem) => problem.name)}
+          activeProblemNames={activeProblemNames}
           prescriptions={prescriptions}
           labOrders={labOrders}
           imagingOrders={imagingOrders}

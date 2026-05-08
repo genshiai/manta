@@ -44,7 +44,10 @@ export const SoapEditor = ({
   onSelectTemplate,
   onApplyTemplate,
   onCopyPrevious,
-}: SoapEditorProps) => (
+}: SoapEditorProps) => {
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
+
+  return (
   <div className="space-y-5">
     {/* テンプレ・複写ツールバー (chrome 最小) */}
     <div className="flex flex-wrap items-center gap-2 text-[12px]">
@@ -74,6 +77,14 @@ export const SoapEditor = ({
         <Copy size={12} />
         前回複写
       </Button>
+      {selectedTemplate ? (
+        <div className="basis-full rounded-md border border-border bg-surface-subtle px-3 py-2 text-[12px] text-text-secondary">
+          <p className="font-bold text-text-primary">{selectedTemplate.label}</p>
+          <p className="mt-1 line-clamp-2">
+            {[selectedTemplate.subjective, selectedTemplate.assessment, selectedTemplate.plan].filter(Boolean).join(' / ')}
+          </p>
+        </div>
+      ) : null}
     </div>
 
     {/* バイタル */}
@@ -117,4 +128,5 @@ export const SoapEditor = ({
       ))}
     </div>
   </div>
-);
+  );
+};
