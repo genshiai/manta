@@ -343,6 +343,29 @@ const QueueEmpty = ({ children }: { children: ReactNode }) => (
   </div>
 );
 
+const formatDrugPrice = (value: PrescriptionCatalogItem['drugPrice']) => {
+  if (value === undefined || value === null || value === '') return null;
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return `${value}円`;
+  return `${numeric.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}円`;
+};
+
+const formatMasterDate = (value?: string) => {
+  if (!value) return null;
+  if (/^\d{8}$/.test(value)) return `${value.slice(0, 4)}/${value.slice(4, 6)}/${value.slice(6, 8)}`;
+  return value;
+};
+
+const describeDrugPolicy = (drug: PrescriptionCatalogItem) => {
+  const labels: string[] = [];
+  if (drug.brandFlag) labels.push(drug.brandFlag);
+  if (drug.hasGeneric !== undefined) labels.push(drug.hasGeneric ? '後発品あり' : '後発品なし');
+  if (drug.genericReimbursementFlag) labels.push(`後発区分 ${drug.genericReimbursementFlag}`);
+  const transitionalExpiry = formatMasterDate(drug.transitionalExpiry);
+  if (transitionalExpiry) labels.push(`経過措置 ${transitionalExpiry}`);
+  return labels;
+};
+
 // === 処方タブ (薬剤検索・PMDA・セット展開) ===
 
 const PrescriptionTab = ({
@@ -423,6 +446,23 @@ const PrescriptionTab = ({
                     {d.genericName ? (
                       <p className="truncate text-[11px] text-text-tertiary">{d.genericName}</p>
                     ) : null}
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {d.yjCode ? (
+                        <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-text-tertiary">
+                          YJ {d.yjCode}
+                        </span>
+                      ) : null}
+                      {formatDrugPrice(d.drugPrice) ? (
+                        <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-text-tertiary">
+                          {formatDrugPrice(d.drugPrice)}
+                        </span>
+                      ) : null}
+                      {d.manufacturer ? (
+                        <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-text-tertiary">
+                          {d.manufacturer}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <span className="text-[10px] text-text-tertiary">{d.category}</span>
                 </button>
@@ -457,6 +497,40 @@ const PrescriptionTab = ({
                 <X size={14} />
               </button>
             </div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-2 text-[11px]">
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">YJ</dt>
+                <dd className="truncate font-medium text-text-primary">{selectedDrug.yjCode ?? '未設定'}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">HOT</dt>
+                <dd className="truncate font-medium text-text-primary">{selectedDrug.hotCode ?? '未設定'}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">薬価</dt>
+                <dd className="truncate font-medium text-text-primary">
+                  {formatDrugPrice(selectedDrug.drugPrice) ?? '未設定'}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">メーカー</dt>
+                <dd className="truncate font-medium text-text-primary">
+                  {selectedDrug.manufacturer ?? '未設定'}
+                </dd>
+              </div>
+            </dl>
+            {describeDrugPolicy(selectedDrug).length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {describeDrugPolicy(selectedDrug).map((label) => (
+                  <span
+                    key={label}
+                    className="rounded border border-amber-200 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <select
               value={currentDosage}
               onChange={(e) => setDosage(e.target.value)}
