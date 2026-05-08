@@ -31,6 +31,7 @@ import type {
   ProblemListItem,
   ProcedureOrderEntry,
   ReservationSlot,
+  ScheduledVisit,
   UserSession,
   VisitHistoryEntry,
   VitalEntry,
@@ -171,6 +172,7 @@ export function ChartWorkspace({
   const [labsSheetOpen, setLabsSheetOpen] = useState(false);
   const [reservationDialogOpen, setReservationDialogOpen] = useState(false);
   const [reservationSlots, setReservationSlots] = useState<ReservationSlot[]>([]);
+  const [scheduledVisit, setScheduledVisit] = useState<ScheduledVisit | null>(null);
 
   const initializedPatientIdRef = useRef<string | null>(null);
 
@@ -218,6 +220,7 @@ export function ChartWorkspace({
       setProcedureOrders(workspace.procedureOrders);
       setPrescriptions(workspace.prescriptions);
       setPrescriptionTimeline(timeline);
+      setScheduledVisit(workspace.reservation);
 
       const latest = workspace.latestNote;
       const nextDraft: SoapDraft = latest
@@ -545,13 +548,20 @@ export function ChartWorkspace({
     const reservationNote = [comment.trim(), linkedLabNote].filter(Boolean).join(' / ');
     setIsMutating(true);
     try {
-      await saveReservation(patient.id, {
+      const saved = await saveReservation(patient.id, {
         slotId: slot?.id,
         scheduledFor: slot ? `${slot.date} ${slot.time}` : '日未定',
         department: slot?.department ?? currentUser.department,
         doctor: slot?.doctor ?? currentUser.displayName,
         note: reservationNote,
         actor: currentUser.displayName,
+      });
+      setScheduledVisit({
+        slotId: saved.slot_id ?? undefined,
+        date: saved.scheduled_for,
+        department: `${saved.department} - ${saved.doctor}`,
+        doctor: saved.doctor,
+        note: saved.note,
       });
       onDataChanged();
     } catch (error) {
@@ -644,6 +654,7 @@ export function ChartWorkspace({
           labOrders={labOrders}
           imagingOrders={imagingOrders}
           procedureOrders={procedureOrders}
+          scheduledVisit={scheduledVisit}
           reservationSlots={reservationSlots}
           workspaceError={workspaceError}
           isLoading={isLoading}

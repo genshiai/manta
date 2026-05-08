@@ -16,6 +16,7 @@ import type {
   PrescriptionTimelineEntry,
   PrescriptionTimelineGroup,
   ReservationSlot,
+  ScheduledVisit,
   VitalEntry,
 } from '../../types/workflow';
 
@@ -54,6 +55,7 @@ type RecordPaneProps = {
   labOrders: LabOrderRow[];
   imagingOrders: ImagingOrderEntry[];
   procedureOrders: ProcedureOrderEntry[];
+  scheduledVisit: ScheduledVisit | null;
   reservationSlots: ReservationSlot[];
   workspaceError: string | null;
   isLoading: boolean;
@@ -159,6 +161,7 @@ export const RecordPane = ({
   labOrders,
   imagingOrders,
   procedureOrders,
+  scheduledVisit,
   reservationSlots,
   workspaceError,
   isLoading,
@@ -217,11 +220,12 @@ export const RecordPane = ({
   }, [versions, visitByDate, departmentFilter]);
 
   const calendarEventsByDate = useMemo(() => {
-    const map = new Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation'>>();
-    const add = (date: string | undefined, kind: 'chart' | 'lab' | 'rx' | 'image' | 'reservation') => {
+    const map = new Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking'>>();
+    const add = (date: string | undefined, kind: 'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking') => {
       if (!date) return;
+      if (date === '日未定') return;
       const key = calendarDateKey(date);
-      const existing = map.get(key) ?? new Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation'>();
+      const existing = map.get(key) ?? new Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking'>();
       existing.add(kind);
       map.set(key, existing);
     };
@@ -230,8 +234,9 @@ export const RecordPane = ({
     for (const group of prescriptionTimeline) add(group.date, 'rx');
     for (const order of imagingOrders) add(order.scheduledAt || formatDateKey(new Date()), 'image');
     for (const slot of reservationSlots) add(slot.date, 'reservation');
+    add(scheduledVisit?.date, 'booking');
     return map;
-  }, [versions, labOrders, prescriptionTimeline, imagingOrders, reservationSlots]);
+  }, [versions, labOrders, prescriptionTimeline, imagingOrders, reservationSlots, scheduledVisit]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -498,14 +503,26 @@ export const RecordPane = ({
 
           {view === 'reservations' ? (
             <OrderListView
-              title="予約枠"
+              title="予約"
               empty="予約枠はありません"
-              items={reservationSlots.map((slot) => ({
-                key: slot.id,
-                title: `${slot.date} ${slot.time}`,
-                meta: `${slot.department} ・ ${slot.doctor} ・ ${slot.state}`,
-                body: '',
-              }))}
+              items={[
+                ...(scheduledVisit
+                  ? [
+                      {
+                        key: `scheduled-${scheduledVisit.slotId ?? scheduledVisit.date}`,
+                        title: `次回予約: ${scheduledVisit.date}`,
+                        meta: scheduledVisit.department,
+                        body: scheduledVisit.note,
+                      },
+                    ]
+                  : []),
+                ...reservationSlots.map((slot) => ({
+                  key: slot.id,
+                  title: `${slot.date} ${slot.time}`,
+                  meta: `${slot.department} ・ ${slot.doctor} ・ ${slot.state} ・ ${slot.bookedCount}/${slot.capacity}件`,
+                  body: '',
+                })),
+              ]}
             />
           ) : null}
 
@@ -546,19 +563,20 @@ export const RecordPane = ({
   );
 };
 
-const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image' | 'reservation', string> = {
+const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking', string> = {
   chart: 'bg-brand',
   lab: 'bg-success',
   rx: 'bg-warning',
   image: 'bg-chart-3',
   reservation: 'bg-cyan-600',
+  booking: 'bg-destructive',
 };
 
 const CalendarView = ({
   eventsByDate,
   reservationSlots,
 }: {
-  eventsByDate: Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation'>>;
+  eventsByDate: Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking'>>;
   reservationSlots: ReservationSlot[];
 }) => {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
@@ -597,6 +615,7 @@ const CalendarView = ({
           <CalendarLegend className="bg-warning" label="処方" />
           <CalendarLegend className="bg-chart-3" label="画像" />
           <CalendarLegend className="bg-cyan-600" label="予約枠" />
+          <CalendarLegend className="bg-destructive" label="次回予約" />
         </div>
       </div>
       <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-border bg-card">
