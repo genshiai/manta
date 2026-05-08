@@ -365,6 +365,80 @@ class ReservationSlotMaster(Base):
     capacity: Mapped[int] = mapped_column(Integer, default=1)
 
 
+class WardMaster(Base):
+    __tablename__ = "ward_masters"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    name: Mapped[str] = mapped_column(String(128))
+    floor: Mapped[str] = mapped_column(String(32))
+    department: Mapped[str] = mapped_column(String(128))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BedMaster(Base):
+    __tablename__ = "bed_masters"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ward_id: Mapped[str] = mapped_column(ForeignKey("ward_masters.id"), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    room_number: Mapped[str] = mapped_column(String(32))
+    bed_number: Mapped[str] = mapped_column(String(32))
+    bed_label: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), default="available", index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Admission(Base):
+    __tablename__ = "admissions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="planned", index=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    admitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    discharge_permitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    discharged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    ward_id: Mapped[str | None] = mapped_column(ForeignKey("ward_masters.id"), nullable=True, index=True)
+    bed_id: Mapped[str | None] = mapped_column(ForeignKey("bed_masters.id"), nullable=True, index=True)
+    attending_doctor: Mapped[str] = mapped_column(String(128))
+    team: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    primary_diagnosis: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    care_level: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class InpatientInstruction(Base):
+    __tablename__ = "inpatient_instructions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admission_id: Mapped[int] = mapped_column(ForeignKey("admissions.id", ondelete="CASCADE"), index=True)
+    category: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_by: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class NursingNote(Base):
+    __tablename__ = "nursing_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admission_id: Mapped[int] = mapped_column(ForeignKey("admissions.id", ondelete="CASCADE"), index=True)
+    note_type: Mapped[str] = mapped_column(String(64), default="SOAP")
+    focus: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    subjective: Mapped[str] = mapped_column(Text, default="")
+    objective: Mapped[str] = mapped_column(Text, default="")
+    assessment: Mapped[str] = mapped_column(Text, default="")
+    plan: Mapped[str] = mapped_column(Text, default="")
+    recorded_by: Mapped[str] = mapped_column(String(128))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class ChartTemplateMaster(Base):
     __tablename__ = "chart_template_masters"
 

@@ -18,6 +18,7 @@ import type {
   DiagnosisSearchResult,
   DrugCategory,
   ImagingOrderEntry,
+  InpatientAdmission,
   LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
@@ -267,7 +268,7 @@ type ApiChartOrderConfig = {
     sort_order: number;
     is_active: boolean;
     drug_name: string;
-    category: '内服' | '外用' | '頓服';
+    category: DrugCategory;
     dosage_options: string[];
     generic_name: string | null;
     name_kana: string | null;
@@ -294,7 +295,7 @@ type ApiChartOrderConfig = {
     sort_order: number;
     is_active: boolean;
     label: string;
-    category: '内服' | '外用' | '頓服';
+    category: DrugCategory;
     instruction: string;
     default_days: string;
     note: string | null;
@@ -347,6 +348,42 @@ type ApiChartOrderConfig = {
     assessment: string;
     plan: string;
   }>;
+};
+
+type ApiInpatientAdmission = {
+  id: number;
+  patient: ApiPatient;
+  status: 'planned' | 'active' | 'discharge_permitted' | 'discharged' | 'cancelled';
+  requested_at: string;
+  admitted_at: string | null;
+  discharge_permitted_at: string | null;
+  discharged_at: string | null;
+  ward: {
+    id: string;
+    name: string;
+    floor: string;
+    department: string;
+  } | null;
+  bed: {
+    id: string;
+    bed_label: string;
+    room_number: string;
+    bed_number: string;
+    status: 'available' | 'occupied' | 'cleaning' | 'blocked';
+  } | null;
+  attending_doctor: string;
+  team: string | null;
+  primary_diagnosis: string | null;
+  care_level: string | null;
+  note: string | null;
+  stay_days: number;
+  pending_instruction_count: number;
+  latest_nursing_note: {
+    focus: string | null;
+    assessment: string;
+    recorded_at: string;
+  } | null;
+  updated_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -782,6 +819,31 @@ const mapDiagnosisSearchResult = (item: ApiDiagnosisSearchResult): DiagnosisSear
   migrationSourceName: item.migration_source_name ?? undefined,
 });
 
+const mapInpatientAdmission = (item: ApiInpatientAdmission): InpatientAdmission => ({
+  id: item.id,
+  patientId: item.patient.id,
+  patientName: item.patient.name,
+  patientKana: item.patient.kana,
+  age: item.patient.age,
+  sex: item.patient.sex,
+  status: item.status,
+  wardId: item.ward?.id,
+  wardName: item.ward?.name,
+  floor: item.ward?.floor,
+  bedId: item.bed?.id,
+  bedLabel: item.bed?.bed_label,
+  attendingDoctor: item.attending_doctor,
+  team: item.team ?? undefined,
+  primaryDiagnosis: item.primary_diagnosis ?? undefined,
+  careLevel: item.care_level ?? undefined,
+  note: item.note ?? undefined,
+  stayDays: item.stay_days,
+  pendingInstructionCount: item.pending_instruction_count,
+  latestNursingFocus: item.latest_nursing_note?.focus ?? undefined,
+  latestNursingAssessment: item.latest_nursing_note?.assessment ?? undefined,
+  admittedAt: item.admitted_at ? formatTimestamp(item.admitted_at) : undefined,
+});
+
 export const login = async (userId: string, password: string): Promise<UserSession> => {
   const response = await request<ApiLoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -888,6 +950,23 @@ export const listPatients = async (params: {
   );
 
   return patients.map(mapPatient);
+};
+
+export const listInpatientAdmissions = async (params?: {
+  status?: 'active' | 'planned' | 'discharge_permitted' | 'discharged' | 'all';
+  searchQuery?: string;
+}): Promise<InpatientAdmission[]> => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('status', params?.status ?? 'active');
+  if (params?.searchQuery?.trim()) {
+    searchParams.set('search', params.searchQuery.trim());
+  }
+
+  const admissions = await request<ApiInpatientAdmission[]>(
+    `/api/inpatient/admissions?${searchParams.toString()}`,
+  );
+
+  return admissions.map(mapInpatientAdmission);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

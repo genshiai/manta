@@ -190,6 +190,22 @@ def test_login_and_list_patients() -> None:
     assert all(item["department"] in {"内科", "共通"} for item in internal_master_response.json()["chart_templates"])
 
 
+def test_list_inpatient_admissions() -> None:
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    admissions = response.json()
+    assert len(admissions) >= 1
+    assert admissions[0]["patient"]["id"]
+    assert admissions[0]["stay_days"] >= 1
+    assert "pending_instruction_count" in admissions[0]
+
+
 def test_reject_patients_without_token() -> None:
     with TestClient(app) as client:
         response = client.get("/api/patients")

@@ -21,11 +21,12 @@ import { departmentOptions, isVisitClosed, type AlertItem, type LabProgress, typ
 import { cn } from '../lib/cn';
 import { type HomeSettings, type HomeView, homeProfileConfigs, homeViewLabels } from '../lib/homeSettings';
 import { readStorage, writeStorage } from '../lib/storage';
-import type { UserSession } from '../types/workflow';
+import type { InpatientAdmission, UserSession } from '../types/workflow';
 
 type ReceptionBoardProps = {
   currentUser: UserSession;
   homeSettings: HomeSettings;
+  inpatientAdmissions: InpatientAdmission[];
   patients: PatientRecord[];
   searchQuery: string;
   statusFilter: ReceptionStatus | 'all';
@@ -82,8 +83,6 @@ const badgeToneClasses: Record<BadgeTone, string> = {
   active: 'border-blue-200 bg-blue-50 text-blue-900',
 };
 
-const wardLocations = ['5東 512', '3西 318', 'ICU 02', '6南 607'];
-const wardTeams = ['内科Aチーム', '皮膚科', '循環器チーム', '内科Bチーム'];
 const emergencySeverity = ['中等症', '軽症', '中等症', '軽症'];
 const emergencyChiefComplaints = ['胸部圧迫感', '血糖高値', '皮疹増悪', '咳嗽'];
 
@@ -152,6 +151,7 @@ const SidebarItem = ({ title, meta, body }: { title: string; meta: string; body:
 export const ReceptionBoard = ({
   currentUser,
   homeSettings,
+  inpatientAdmissions,
   patients,
   searchQuery,
   statusFilter,
@@ -248,7 +248,7 @@ export const ReceptionBoard = ({
     : scopedPatients;
   const viewCounts: Record<HomeView, number> = {
     outpatient: patients.length,
-    inpatient: patients.length,
+    inpatient: inpatientAdmissions.length,
     emergency: Math.min(3, patients.length),
   };
   const scopeOptions: Array<{ value: WorkScope; label: string; count: number }> = [
@@ -257,6 +257,18 @@ export const ReceptionBoard = ({
     { value: 'department', label: '同じ診療科', count: departmentModePatients.length },
   ];
   const isOutpatientView = activeView === 'outpatient';
+  const activeInpatientAdmissions = inpatientAdmissions.filter((admission) => {
+    if (workScope === 'assigned' && admission.attendingDoctor !== currentUser.displayName) {
+      return false;
+    }
+    if (workScope === 'department' && admission.wardName && !admission.wardName.includes(currentUser.department)) {
+      return admission.team?.includes(currentUser.department) ?? false;
+    }
+    if (pendingOnly) {
+      return admission.pendingInstructionCount > 0;
+    }
+    return true;
+  });
   const isClinicProfile = homeSettings.profile === 'clinic';
   const headerLabels =
     activeView === 'inpatient'
@@ -342,28 +354,54 @@ export const ReceptionBoard = ({
     </div>
   );
 
+  const renderInpatientCells = (admission: InpatientAdmission) => (
+    <>
+      <div>
+        <div className='text-[15px] font-bold leading-snug text-solid-gray-900'>
+          {admission.wardName ?? '病棟未定'}
+        </div>
+        <p className='mt-1 text-[12px] text-solid-gray-536'>{admission.bedLabel ?? '病床未定'}</p>
+      </div>
+      <div className='min-w-0'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='text-[16px] font-bold leading-snug text-solid-gray-900'>{admission.patientName}</span>
+          <span className='text-mono-14N-150 text-solid-gray-536'>{admission.patientId}</span>
+        </div>
+        <p className='mt-1 text-[12px] text-solid-gray-536'>
+          {admission.age} / {admission.sex} · {admission.primaryDiagnosis ?? '主病名未設定'}
+        </p>
+      </div>
+      <div>
+        <p className='text-[14px] font-bold leading-snug text-solid-gray-900'>{admission.attendingDoctor}</p>
+        <p className='mt-1 text-[12px] text-solid-gray-536'>{admission.team ?? 'チーム未設定'}</p>
+      </div>
+      <div>
+        <p className='text-[14px] font-bold text-solid-gray-900'>{admission.stayDays}日目</p>
+        <p className='mt-1 text-[12px] text-solid-gray-536'>{admission.careLevel ?? '一般'}</p>
+      </div>
+      <div>
+        {admission.pendingInstructionCount > 0 ? (
+          <WorkBadge icon={ClipboardCheck} label={`未実施 ${admission.pendingInstructionCount}`} tone='progress' />
+        ) : (
+          <WorkBadge icon={CheckCircle2} label='未実施なし' tone='done' />
+        )}
+      </div>
+      <div className='text-[13px] leading-normal text-solid-gray-700'>
+        {admission.latestNursingFocus ? (
+          <>
+            <p className='font-bold text-solid-gray-900'>{admission.latestNursingFocus}</p>
+            <p className='mt-1 line-clamp-2'>{admission.latestNursingAssessment}</p>
+          </>
+        ) : (
+          '看護記録なし'
+        )}
+      </div>
+    </>
+  );
+
   const renderPatientCells = (patient: PatientRecord, index: number) => {
-    const wardLocation = wardLocations[index % wardLocations.length];
-    const wardTeam = wardTeams[index % wardTeams.length];
-    const stayDays = `${index + 3}日目`;
     const severity = emergencySeverity[index % emergencySeverity.length];
     const chiefComplaint = emergencyChiefComplaints[index % emergencyChiefComplaints.length];
-
-    if (activeView === 'inpatient') {
-      return (
-        <>
-          <div className='text-[15px] font-bold leading-snug text-solid-gray-900'>{wardLocation}</div>
-          {renderPatientIdentity(patient)}
-          <div>
-            <p className='text-[14px] font-bold leading-snug text-solid-gray-900'>{patient.doctor}</p>
-            <p className='mt-1 text-[12px] text-solid-gray-536'>{wardTeam}</p>
-          </div>
-          <div className='text-[14px] font-bold text-solid-gray-900'>{stayDays}</div>
-          <div>{renderLabBadge(patient.labProgress)}</div>
-          <div className='text-[13px] leading-normal text-solid-gray-700'>指示確認 / 文書確認</div>
-        </>
-      );
-    }
 
     if (activeView === 'emergency') {
       return (
@@ -638,24 +676,40 @@ export const ReceptionBoard = ({
         </div>
 
         <div className='divide-y divide-solid-gray-200'>
-          {activePatients.map((patient, index) => (
-            <button
-              className={cn(
-                buttonBaseStyle,
-                pressableRowClassName,
-                'grid w-full gap-3 px-5 py-3 text-left lg:px-6',
-                worklistGridClassName,
-              )}
-              key={patient.id}
-              onClick={() => onOpenChart(patient.id)}
-              type='button'
-            >
-              {renderPatientCells(patient, index)}
-            </button>
-          ))}
+          {activeView === 'inpatient'
+            ? activeInpatientAdmissions.map((admission) => (
+                <button
+                  className={cn(
+                    buttonBaseStyle,
+                    pressableRowClassName,
+                    'grid w-full gap-3 px-5 py-3 text-left lg:px-6',
+                    worklistGridClassName,
+                  )}
+                  key={admission.id}
+                  onClick={() => onOpenChart(admission.patientId)}
+                  type='button'
+                >
+                  {renderInpatientCells(admission)}
+                </button>
+              ))
+            : activePatients.map((patient, index) => (
+                <button
+                  className={cn(
+                    buttonBaseStyle,
+                    pressableRowClassName,
+                    'grid w-full gap-3 px-5 py-3 text-left lg:px-6',
+                    worklistGridClassName,
+                  )}
+                  key={patient.id}
+                  onClick={() => onOpenChart(patient.id)}
+                  type='button'
+                >
+                  {renderPatientCells(patient, index)}
+                </button>
+              ))}
         </div>
 
-        {activePatients.length === 0 ? (
+        {(activeView === 'inpatient' ? activeInpatientAdmissions.length === 0 : activePatients.length === 0) ? (
           <div className='px-5 py-10 text-center lg:px-6'>
             <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>該当する患者がいません</p>
             <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-536'>

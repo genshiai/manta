@@ -8,6 +8,7 @@
 PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/genshiai/manta/docs/PMDA_SYNC_STRATEGY.md) を参照してください。
 レセコン連携 / AI 算定補助方針は [RECEIPT_GATEWAY_STRATEGY.md](RECEIPT_GATEWAY_STRATEGY.md) を参照してください。
 backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) を参照してください。
+Phase 3 の入院・病棟進捗は [PHASE3_PROGRESS.md](PHASE3_PROGRESS.md) を参照してください。
 
 前提は以下の通りです。
 
@@ -218,4 +219,6 @@ Mantaカルテ本体は **外来 1 ループの demo MVP はかなり進んで�
 - backend は当面 1 FastAPI app のまま、`modules/karte`, `modules/master_data`, `modules/order_catalog`, `modules/rececon`, `modules/gateway` に分割する方針にした
 - `scripts/verify_local.py` を追加し、pytest / lint / build / migration / compose / preview smoke を 1 コマンドで確認できるようにした
 - backend test は更新系テスト後に cleanup するように直し、開発 DB を汚さずに繰り返し回せるようにした
+- Phase 3 の入院・病棟基盤として、病棟 master、病床 master、入院エピソード、入院指示、看護記録 SOAP、病棟患者一覧 API を追加した
+- ホームの入院タブは mock の病棟/病室ではなく `GET /api/inpatient/admissions` の実データを表示するようにした
 - 次の主課題は外部 preview への公開と、マスタの更新者 / 更新日時表示、レビュー運用の整備

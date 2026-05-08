@@ -17,11 +17,15 @@ from .drug_import import build_pmda_drug_info_url
 from .fhir.router import router as fhir_router
 from .migrations import run_migrations
 from .models import (
+    Admission,
     AuditLog,
+    BedMaster,
     ChartNote,
     DiagnosisAliasMaster,
     DiagnosisMaster,
+    InpatientInstruction,
     LabOrder,
+    NursingNote,
     Observation,
     Patient,
     PmdaDrugInteraction,
@@ -32,6 +36,7 @@ from .models import (
     ReceiptTransitionalDrug,
     Reservation,
     User,
+    WardMaster,
 )
 from .models import (
     ChartTemplateMaster,
@@ -44,6 +49,10 @@ from .models import (
 from .schemas import (
     AuditLogRead,
     AuthTokenRead,
+    AdmissionCreateRequest,
+    AdmissionDischargeRequest,
+    AdmissionRead,
+    AdmissionTransferRequest,
     ChartOrderMasterRead,
     ChartTemplateCreateRequest,
     ChartTemplateRead,
@@ -53,6 +62,8 @@ from .schemas import (
     DiagnosisMasterRead,
     ImagingOrderCreateRequest,
     ImagingOrderItem,
+    InpatientInstructionCreateRequest,
+    InpatientInstructionRead,
     LabLongTrendItem,
     LabLongTrendPoint,
     LabSetOptionCreateRequest,
@@ -61,6 +72,8 @@ from .schemas import (
     LabSetOptionRead,
     LabSetOptionUpdateRequest,
     LoginRequest,
+    NursingNoteCreateRequest,
+    NursingNoteRead,
     PatientStatusUpdateRequest,
     PatientSummaryRead,
     PatientContextRead,
@@ -213,6 +226,27 @@ def get_patient_or_404(db: Session, patient_id: str) -> Patient:
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     return patient
+
+
+def get_admission_or_404(db: Session, admission_id: int) -> Admission:
+    admission = db.get(Admission, admission_id)
+    if admission is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission not found")
+    return admission
+
+
+def get_ward_or_404(db: Session, ward_id: str) -> WardMaster:
+    ward = db.get(WardMaster, ward_id)
+    if ward is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ward not found")
+    return ward
+
+
+def get_bed_or_404(db: Session, bed_id: str) -> BedMaster:
+    bed = db.get(BedMaster, bed_id)
+    if bed is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bed not found")
+    return bed
 
 
 def get_user_or_404(db: Session, user_id: str) -> User:
@@ -1055,6 +1089,62 @@ def reservation_slot_to_read(slot: ReservationSlotMaster, *, booked_count: int =
     )
 
 
+def _admission_stay_days(admission: Admission) -> int:
+    start = admission.admitted_at or admission.requested_at
+    end = admission.discharged_at or utcnow()
+    start_date = start.astimezone(TOKYO_TZ).date()
+    end_date = end.astimezone(TOKYO_TZ).date()
+    return max((end_date - start_date).days + 1, 1)
+
+
+def admission_to_read(
+    db: Session,
+    admission: Admission,
+    *,
+    patient: Patient | None = None,
+    ward: WardMaster | None = None,
+    bed: BedMaster | None = None,
+) -> AdmissionRead:
+    patient = patient or get_patient_or_404(db, admission.patient_id)
+    ward = ward if ward is not None else (db.get(WardMaster, admission.ward_id) if admission.ward_id else None)
+    bed = bed if bed is not None else (db.get(BedMaster, admission.bed_id) if admission.bed_id else None)
+    pending_instruction_count = int(
+        db.scalar(
+            select(func.count(InpatientInstruction.id)).where(
+                InpatientInstruction.admission_id == admission.id,
+                InpatientInstruction.status == "pending",
+            )
+        )
+        or 0
+    )
+    latest_nursing_note = db.scalar(
+        select(NursingNote)
+        .where(NursingNote.admission_id == admission.id)
+        .order_by(desc(NursingNote.recorded_at), desc(NursingNote.id))
+    )
+
+    return AdmissionRead(
+        id=admission.id,
+        patient=patient_to_read(patient),
+        status=admission.status,  # type: ignore[arg-type]
+        requested_at=admission.requested_at,
+        admitted_at=admission.admitted_at,
+        discharge_permitted_at=admission.discharge_permitted_at,
+        discharged_at=admission.discharged_at,
+        ward=ward,
+        bed=bed,
+        attending_doctor=admission.attending_doctor,
+        team=admission.team,
+        primary_diagnosis=admission.primary_diagnosis,
+        care_level=admission.care_level,
+        note=admission.note,
+        stay_days=_admission_stay_days(admission),
+        pending_instruction_count=pending_instruction_count,
+        latest_nursing_note=latest_nursing_note,
+        updated_at=admission.updated_at,
+    )
+
+
 @app.get("/health")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
@@ -1124,6 +1214,293 @@ def get_chart_order_config(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     return get_chart_order_masters_read(db, include_inactive=include_inactive, department=department)
+
+
+@app.get("/api/inpatient/admissions", response_model=list[AdmissionRead])
+def list_inpatient_admissions(
+    status_filter: str | None = Query(default="active", alias="status"),
+    ward_id: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AdmissionRead]:
+    query = select(Admission, Patient, WardMaster, BedMaster).join(Patient, Admission.patient_id == Patient.id)
+    query = query.outerjoin(WardMaster, Admission.ward_id == WardMaster.id).outerjoin(
+        BedMaster, Admission.bed_id == BedMaster.id
+    )
+    if status_filter and status_filter != "all":
+        query = query.where(Admission.status == status_filter)
+    if ward_id:
+        query = query.where(Admission.ward_id == ward_id)
+    if search:
+        like = f"%{search}%"
+        query = query.where(
+            or_(
+                Patient.id.ilike(like),
+                Patient.name.ilike(like),
+                Patient.kana.ilike(like),
+                Admission.attending_doctor.ilike(like),
+                Admission.team.ilike(like),
+                Admission.primary_diagnosis.ilike(like),
+                WardMaster.name.ilike(like),
+                BedMaster.bed_label.ilike(like),
+            )
+        )
+    query = query.order_by(WardMaster.sort_order, BedMaster.sort_order, Admission.admitted_at)
+    rows = db.execute(query).all()
+    return [
+        admission_to_read(db, admission, patient=patient, ward=ward, bed=bed)
+        for admission, patient, ward, bed in rows
+    ]
+
+
+@app.post("/api/patients/{patient_id}/admissions", response_model=AdmissionRead, status_code=status.HTTP_201_CREATED)
+def create_admission(
+    patient_id: str,
+    payload: AdmissionCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdmissionRead:
+    patient = get_patient_or_404(db, patient_id)
+    active_admission = db.scalar(
+        select(Admission).where(
+            Admission.patient_id == patient_id,
+            Admission.status.in_(["planned", "active", "discharge_permitted"]),
+        )
+    )
+    if active_admission is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Active admission already exists")
+
+    ward = get_ward_or_404(db, payload.ward_id) if payload.ward_id else None
+    bed = get_bed_or_404(db, payload.bed_id) if payload.bed_id else None
+    if bed and ward and bed.ward_id != ward.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bed does not belong to ward")
+    if bed and bed.status == "occupied":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bed already occupied")
+
+    admission = Admission(
+        patient_id=patient_id,
+        status=payload.status,
+        admitted_at=payload.admitted_at or (utcnow() if payload.status == "active" else None),
+        ward_id=payload.ward_id,
+        bed_id=payload.bed_id,
+        attending_doctor=payload.attending_doctor,
+        team=payload.team,
+        primary_diagnosis=payload.primary_diagnosis,
+        care_level=payload.care_level,
+        note=payload.note,
+        updated_at=utcnow(),
+    )
+    db.add(admission)
+    if bed and payload.status in ("active", "discharge_permitted"):
+        bed.status = "occupied"
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="入院申込",
+        scope="patient",
+        detail=f"{payload.primary_diagnosis or '入院'} の入院エピソードを作成しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(admission)
+    return admission_to_read(db, admission)
+
+
+@app.post("/api/inpatient/admissions/{admission_id}/transfer", response_model=AdmissionRead)
+def transfer_admission(
+    admission_id: int,
+    payload: AdmissionTransferRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdmissionRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    ward = get_ward_or_404(db, payload.ward_id)
+    bed = get_bed_or_404(db, payload.bed_id)
+    if bed.ward_id != ward.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bed does not belong to ward")
+    if bed.status == "occupied" and bed.id != admission.bed_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bed already occupied")
+
+    if admission.bed_id and admission.bed_id != bed.id:
+        previous_bed = db.get(BedMaster, admission.bed_id)
+        if previous_bed is not None:
+            previous_bed.status = "cleaning"
+    admission.ward_id = ward.id
+    admission.bed_id = bed.id
+    admission.status = "active" if admission.status == "planned" else admission.status
+    admission.admitted_at = admission.admitted_at or utcnow()
+    admission.note = payload.note or admission.note
+    admission.updated_at = utcnow()
+    bed.status = "occupied"
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="転棟・転床",
+        scope="patient",
+        detail=f"{ward.name} {bed.bed_label} へ移動しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(admission)
+    return admission_to_read(db, admission)
+
+
+@app.post("/api/inpatient/admissions/{admission_id}/permit-discharge", response_model=AdmissionRead)
+def permit_discharge(
+    admission_id: int,
+    payload: AdmissionDischargeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdmissionRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    admission.status = "discharge_permitted"
+    admission.discharge_permitted_at = utcnow()
+    admission.note = payload.note or admission.note
+    admission.updated_at = utcnow()
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="退院許可",
+        scope="patient",
+        detail=payload.note or "退院許可を登録しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(admission)
+    return admission_to_read(db, admission)
+
+
+@app.post("/api/inpatient/admissions/{admission_id}/discharge", response_model=AdmissionRead)
+def discharge_admission(
+    admission_id: int,
+    payload: AdmissionDischargeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdmissionRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    admission.status = "discharged"
+    admission.discharged_at = utcnow()
+    admission.note = payload.note or admission.note
+    admission.updated_at = utcnow()
+    if admission.bed_id:
+        bed = db.get(BedMaster, admission.bed_id)
+        if bed is not None:
+            bed.status = "cleaning"
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="退院実施",
+        scope="patient",
+        detail=payload.note or "退院を実施しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(admission)
+    return admission_to_read(db, admission)
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/instructions", response_model=list[InpatientInstructionRead])
+def list_inpatient_instructions(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[InpatientInstructionRead]:
+    get_admission_or_404(db, admission_id)
+    return db.scalars(
+        select(InpatientInstruction)
+        .where(InpatientInstruction.admission_id == admission_id)
+        .order_by(InpatientInstruction.status, InpatientInstruction.due_at, InpatientInstruction.id)
+    ).all()
+
+
+@app.post(
+    "/api/inpatient/admissions/{admission_id}/instructions",
+    response_model=InpatientInstructionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_inpatient_instruction(
+    admission_id: int,
+    payload: InpatientInstructionCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientInstructionRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    instruction = InpatientInstruction(
+        admission_id=admission_id,
+        category=payload.category,
+        title=payload.title,
+        status="pending",
+        due_at=payload.due_at,
+        created_by=current_user.display_name,
+    )
+    db.add(instruction)
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="入院指示追加",
+        scope="order",
+        detail=f"{payload.category}: {payload.title}",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(instruction)
+    return instruction
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/nursing-notes", response_model=list[NursingNoteRead])
+def list_nursing_notes(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[NursingNoteRead]:
+    get_admission_or_404(db, admission_id)
+    return db.scalars(
+        select(NursingNote)
+        .where(NursingNote.admission_id == admission_id)
+        .order_by(desc(NursingNote.recorded_at), desc(NursingNote.id))
+    ).all()
+
+
+@app.post(
+    "/api/inpatient/admissions/{admission_id}/nursing-notes",
+    response_model=NursingNoteRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_nursing_note(
+    admission_id: int,
+    payload: NursingNoteCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> NursingNoteRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    note = NursingNote(
+        admission_id=admission_id,
+        note_type=payload.note_type,
+        focus=payload.focus,
+        subjective=payload.subjective,
+        objective=payload.objective,
+        assessment=payload.assessment,
+        plan=payload.plan,
+        recorded_by=current_user.display_name,
+    )
+    db.add(note)
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="看護記録追加",
+        scope="chart",
+        detail=f"{payload.note_type}: {payload.focus or 'フォーカス未設定'}",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(note)
+    return note
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])

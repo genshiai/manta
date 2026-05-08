@@ -8,6 +8,9 @@ from pydantic import BaseModel, ConfigDict
 
 UserRole = Literal["医師", "管理者"]
 DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
+AdmissionStatus = Literal["planned", "active", "discharge_permitted", "discharged", "cancelled"]
+BedStatus = Literal["available", "occupied", "cleaning", "blocked"]
+InstructionStatus = Literal["pending", "done", "cancelled"]
 
 
 class DetailItem(BaseModel):
@@ -364,6 +367,118 @@ class ChartTemplateUpdateRequest(BaseModel):
     objective: str
     assessment: str
     plan: str
+
+
+class WardMasterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    sort_order: int
+    is_active: bool
+    name: str
+    floor: str
+    department: str
+    note: str | None = None
+
+
+class BedMasterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    ward_id: str
+    sort_order: int
+    is_active: bool
+    room_number: str
+    bed_number: str
+    bed_label: str
+    status: BedStatus
+    note: str | None = None
+
+
+class InpatientInstructionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    category: str
+    title: str
+    status: InstructionStatus
+    due_at: datetime | None = None
+    created_by: str
+    created_at: datetime
+
+
+class InpatientInstructionCreateRequest(BaseModel):
+    category: str
+    title: str
+    due_at: datetime | None = None
+
+
+class NursingNoteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    note_type: str
+    focus: str | None = None
+    subjective: str
+    objective: str
+    assessment: str
+    plan: str
+    recorded_by: str
+    recorded_at: datetime
+
+
+class NursingNoteCreateRequest(BaseModel):
+    note_type: str = "SOAP"
+    focus: str | None = None
+    subjective: str = ""
+    objective: str = ""
+    assessment: str = ""
+    plan: str = ""
+
+
+class AdmissionRead(BaseModel):
+    id: int
+    patient: PatientSummaryRead
+    status: AdmissionStatus
+    requested_at: datetime
+    admitted_at: datetime | None = None
+    discharge_permitted_at: datetime | None = None
+    discharged_at: datetime | None = None
+    ward: WardMasterRead | None = None
+    bed: BedMasterRead | None = None
+    attending_doctor: str
+    team: str | None = None
+    primary_diagnosis: str | None = None
+    care_level: str | None = None
+    note: str | None = None
+    stay_days: int
+    pending_instruction_count: int
+    latest_nursing_note: NursingNoteRead | None = None
+    updated_at: datetime
+
+
+class AdmissionCreateRequest(BaseModel):
+    status: AdmissionStatus = "planned"
+    ward_id: str | None = None
+    bed_id: str | None = None
+    admitted_at: datetime | None = None
+    attending_doctor: str
+    team: str | None = None
+    primary_diagnosis: str | None = None
+    care_level: str | None = None
+    note: str | None = None
+
+
+class AdmissionTransferRequest(BaseModel):
+    ward_id: str
+    bed_id: str
+    note: str | None = None
+
+
+class AdmissionDischargeRequest(BaseModel):
+    note: str | None = None
 
 
 class DiagnosisMasterRead(BaseModel):

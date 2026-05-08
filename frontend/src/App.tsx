@@ -7,10 +7,10 @@ import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { StatusFooter } from './components/StatusFooter';
 import type { PatientRecord, ReceptionStatus } from './data/chartMock';
 import { demoUsers } from './data/workflowMock';
-import { getCurrentSession, isUnauthorizedError, listPatients, login, updatePatientStatus } from './lib/api';
+import { getCurrentSession, isUnauthorizedError, listInpatientAdmissions, listPatients, login, updatePatientStatus } from './lib/api';
 import { type HomeSettings, readHomeSettings, writeHomeSettings } from './lib/homeSettings';
 import { removeStorage, readStorage, writeStorage } from './lib/storage';
-import type { ChartMeta, UserSession } from './types/workflow';
+import type { ChartMeta, InpatientAdmission, UserSession } from './types/workflow';
 
 type Screen = 'login' | 'reception' | 'chart' | 'settings';
 type StatusFilter = ReceptionStatus | 'all';
@@ -71,6 +71,7 @@ function App() {
   );
   const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(readStoredSession()));
   const [patients, setPatients] = useState<PatientRecord[]>([]);
+  const [inpatientAdmissions, setInpatientAdmissions] = useState<InpatientAdmission[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -93,6 +94,7 @@ function App() {
     setSession(null);
     setScreen('login');
     setPatients([]);
+    setInpatientAdmissions([]);
     setSelectedPatient(null);
     setLoginPassword('');
     setLoginAttempts(0);
@@ -164,6 +166,7 @@ function App() {
   useEffect(() => {
     if (!session || isRestoringSession) {
       setPatients([]);
+      setInpatientAdmissions([]);
       return;
     }
 
@@ -177,18 +180,22 @@ function App() {
       setPatientsError(null);
 
       try {
-        const nextPatients = await listPatients({
-          searchQuery,
-          statusFilter,
-          departmentFilter,
-          sortKey,
-        });
+        const [nextPatients, nextInpatientAdmissions] = await Promise.all([
+          listPatients({
+            searchQuery,
+            statusFilter,
+            departmentFilter,
+            sortKey,
+          }),
+          listInpatientAdmissions({ status: 'active', searchQuery }),
+        ]);
 
         if (cancelled) {
           return;
         }
 
         setPatients(nextPatients);
+        setInpatientAdmissions(nextInpatientAdmissions);
         setLastRefreshedAt(formatTimestamp());
 
         if (nextPatients.length === 0) {
@@ -420,6 +427,7 @@ function App() {
             departmentFilter={departmentFilter}
             errorMessage={patientsError}
             homeSettings={homeSettings}
+            inpatientAdmissions={inpatientAdmissions}
             isLoading={patientsLoading}
             lastRefreshedAt={lastRefreshedAt}
             onDepartmentFilterChange={handleDepartmentFilterChange}

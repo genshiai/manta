@@ -8,13 +8,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .models import (
+    Admission,
     AuditLog,
+    BedMaster,
     ChartNote,
     ChartTemplateMaster,
     Condition,
     DiagnosisMaster,
+    InpatientInstruction,
     LabOrder,
     LabSetMaster,
+    NursingNote,
     Observation,
     Patient,
     PrescriptionCatalogMaster,
@@ -24,6 +28,8 @@ from .models import (
     ReservationSlotMaster,
     StandardUsageMaster,
     User,
+    WardMaster,
+    utcnow,
 )
 from .security import hash_password, password_needs_upgrade
 
@@ -367,6 +373,162 @@ CHART_ORDER_MASTER_DATA = {
             "objective": "体温、SpO2、咽頭所見、呼吸音、全身状態を確認。",
             "assessment": "ウイルス性上気道炎を第一に考え、肺炎や細菌感染の所見を除外する。",
             "plan": "対症療法で経過観察。増悪時や呼吸苦出現時は早期再診。必要時に検査追加。",
+        },
+    ],
+}
+
+INPATIENT_DEMO_DATA = {
+    "wards": [
+        {
+            "id": "ward-5e",
+            "sort_order": 10,
+            "is_active": True,
+            "name": "5東病棟",
+            "floor": "5F",
+            "department": "内科",
+            "note": "内科急性期・糖尿病教育入院。",
+        },
+        {
+            "id": "ward-3w",
+            "sort_order": 20,
+            "is_active": True,
+            "name": "3西病棟",
+            "floor": "3F",
+            "department": "循環器内科",
+            "note": "循環器内科・心不全管理。",
+        },
+        {
+            "id": "ward-icu",
+            "sort_order": 30,
+            "is_active": True,
+            "name": "ICU",
+            "floor": "2F",
+            "department": "集中治療",
+            "note": "重症患者管理。",
+        },
+    ],
+    "beds": [
+        {
+            "id": "bed-5e-512-a",
+            "ward_id": "ward-5e",
+            "sort_order": 10,
+            "is_active": True,
+            "room_number": "512",
+            "bed_number": "A",
+            "bed_label": "512-A",
+            "status": "occupied",
+            "note": None,
+        },
+        {
+            "id": "bed-5e-512-b",
+            "ward_id": "ward-5e",
+            "sort_order": 20,
+            "is_active": True,
+            "room_number": "512",
+            "bed_number": "B",
+            "bed_label": "512-B",
+            "status": "available",
+            "note": None,
+        },
+        {
+            "id": "bed-3w-318-a",
+            "ward_id": "ward-3w",
+            "sort_order": 30,
+            "is_active": True,
+            "room_number": "318",
+            "bed_number": "A",
+            "bed_label": "318-A",
+            "status": "occupied",
+            "note": None,
+        },
+        {
+            "id": "bed-icu-02",
+            "ward_id": "ward-icu",
+            "sort_order": 40,
+            "is_active": True,
+            "room_number": "ICU",
+            "bed_number": "02",
+            "bed_label": "ICU-02",
+            "status": "available",
+            "note": "救急受入予備。",
+        },
+    ],
+    "admissions": [
+        {
+            "patient_id": "0009900040",
+            "status": "active",
+            "requested_at": datetime(2026, 5, 2, 1, 0, tzinfo=timezone.utc),
+            "admitted_at": datetime(2026, 5, 2, 2, 30, tzinfo=timezone.utc),
+            "ward_id": "ward-5e",
+            "bed_id": "bed-5e-512-a",
+            "attending_doctor": "田中 太郎",
+            "team": "内科Aチーム",
+            "primary_diagnosis": "2型糖尿病 教育入院",
+            "care_level": "一般",
+            "note": "血糖自己管理と薬剤調整。",
+        },
+        {
+            "patient_id": "0007712301",
+            "status": "active",
+            "requested_at": datetime(2026, 5, 5, 0, 30, tzinfo=timezone.utc),
+            "admitted_at": datetime(2026, 5, 5, 3, 0, tzinfo=timezone.utc),
+            "ward_id": "ward-3w",
+            "bed_id": "bed-3w-318-a",
+            "attending_doctor": "石川 圭介",
+            "team": "循環器チーム",
+            "primary_diagnosis": "胸部圧迫感 精査入院",
+            "care_level": "モニタ管理",
+            "note": "心電図・採血フォロー、冠動脈評価予定。",
+        },
+    ],
+    "instructions": [
+        {
+            "patient_id": "0009900040",
+            "category": "測定",
+            "title": "血糖 1日4検",
+            "status": "pending",
+            "due_at": datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc),
+            "created_by": "田中 太郎",
+        },
+        {
+            "patient_id": "0009900040",
+            "category": "指導",
+            "title": "糖尿病療養指導",
+            "status": "pending",
+            "due_at": datetime(2026, 5, 9, 1, 0, tzinfo=timezone.utc),
+            "created_by": "田中 太郎",
+        },
+        {
+            "patient_id": "0007712301",
+            "category": "検査",
+            "title": "心電図再検",
+            "status": "pending",
+            "due_at": datetime(2026, 5, 8, 4, 0, tzinfo=timezone.utc),
+            "created_by": "石川 圭介",
+        },
+    ],
+    "nursing_notes": [
+        {
+            "patient_id": "0009900040",
+            "note_type": "SOAP",
+            "focus": "血糖自己管理",
+            "subjective": "間食を控えたいが夕方に空腹感がある。",
+            "objective": "夕食前血糖 168 mg/dL。自己注射手技は見守りで実施可能。",
+            "assessment": "退院後の自己管理に向けて反復練習が必要。",
+            "plan": "明日も自己注射手技を確認し、低血糖時対応を説明する。",
+            "recorded_by": "看護師A",
+            "recorded_at": datetime(2026, 5, 8, 1, 15, tzinfo=timezone.utc),
+        },
+        {
+            "patient_id": "0007712301",
+            "note_type": "SOAP",
+            "focus": "胸部症状",
+            "subjective": "安静時の胸部圧迫感は軽快。",
+            "objective": "SpO2 98%、血圧 138/82、冷汗なし。",
+            "assessment": "症状は落ち着いているが再燃に注意。",
+            "plan": "胸痛再燃時は直ちに医師へ報告。モニタ継続。",
+            "recorded_by": "看護師B",
+            "recorded_at": datetime(2026, 5, 8, 0, 45, tzinfo=timezone.utc),
         },
     ],
 }
@@ -1561,6 +1723,93 @@ def backfill_conditions_from_patient_problems(db: Session) -> bool:
     return updated
 
 
+def sync_inpatient_demo_data(db: Session) -> bool:
+    updated = False
+
+    for item in INPATIENT_DEMO_DATA["wards"]:
+        existing = db.get(WardMaster, item["id"])
+        if existing is None:
+            db.add(WardMaster(**item))
+            updated = True
+            continue
+        for key, value in item.items():
+            if getattr(existing, key) != value:
+                setattr(existing, key, value)
+                updated = True
+
+    db.flush()
+
+    for item in INPATIENT_DEMO_DATA["beds"]:
+        existing = db.get(BedMaster, item["id"])
+        if existing is None:
+            db.add(BedMaster(**item))
+            updated = True
+            continue
+        for key, value in item.items():
+            if getattr(existing, key) != value:
+                setattr(existing, key, value)
+                updated = True
+
+    db.flush()
+
+    admissions_by_patient: dict[str, Admission] = {}
+    for item in INPATIENT_DEMO_DATA["admissions"]:
+        patient_id = item["patient_id"]
+        existing = db.scalar(
+            select(Admission).where(
+                Admission.patient_id == patient_id,
+                Admission.status.in_(["planned", "active", "discharge_permitted"]),
+            )
+        )
+        if existing is None:
+            existing = Admission(**item, updated_at=utcnow())
+            db.add(existing)
+            updated = True
+        else:
+            for key, value in item.items():
+                if getattr(existing, key) != value:
+                    setattr(existing, key, value)
+                    updated = True
+            if updated:
+                existing.updated_at = utcnow()
+        admissions_by_patient[patient_id] = existing
+
+    db.flush()
+
+    for item in INPATIENT_DEMO_DATA["instructions"]:
+        admission = admissions_by_patient.get(item["patient_id"])
+        if admission is None:
+            continue
+        exists = db.scalar(
+            select(InpatientInstruction).where(
+                InpatientInstruction.admission_id == admission.id,
+                InpatientInstruction.title == item["title"],
+            )
+        )
+        if exists is None:
+            payload = {key: value for key, value in item.items() if key != "patient_id"}
+            db.add(InpatientInstruction(admission_id=admission.id, **payload))
+            updated = True
+
+    for item in INPATIENT_DEMO_DATA["nursing_notes"]:
+        admission = admissions_by_patient.get(item["patient_id"])
+        if admission is None:
+            continue
+        exists = db.scalar(
+            select(NursingNote).where(
+                NursingNote.admission_id == admission.id,
+                NursingNote.focus == item["focus"],
+                NursingNote.recorded_at == item["recorded_at"],
+            )
+        )
+        if exists is None:
+            payload = {key: value for key, value in item.items() if key != "patient_id"}
+            db.add(NursingNote(admission_id=admission.id, **payload))
+            updated = True
+
+    return updated
+
+
 def backfill_patient_fhir_columns(db: Session) -> bool:
     """新設 FHIR カラムが NULL の Patient 行に対し legacy フィールドから補填する。
 
@@ -1617,6 +1866,9 @@ def seed_demo_data(db: Session) -> None:
             updated = True
 
         if sync_diagnosis_masters(db):
+            updated = True
+
+        if sync_inpatient_demo_data(db):
             updated = True
 
         if backfill_demo_prescription_history(db):
@@ -1845,4 +2097,6 @@ def seed_demo_data(db: Session) -> None:
     backfill_patient_fhir_columns(db)
     backfill_conditions_from_patient_problems(db)
     backfill_observations_from_patient_json(db)
+    sync_inpatient_demo_data(db)
     db.commit()
+    NursingNote,

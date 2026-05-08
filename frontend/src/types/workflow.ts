@@ -29,6 +29,7 @@ export type AdminUserSummary = {
 };
 
 export type AuditScope = 'auth' | 'patient' | 'chart' | 'order' | 'reservation' | 'system';
+export type AdmissionStatus = 'planned' | 'active' | 'discharge_permitted' | 'discharged' | 'cancelled';
 
 export type ProblemListItem = {
   name: string;
@@ -130,6 +131,31 @@ export type ChartMeta = {
   lastSavedAt: string | null;
   version: number;
   pendingWarnings: number;
+};
+
+export type InpatientAdmission = {
+  id: number;
+  patientId: string;
+  patientName: string;
+  patientKana: string;
+  age: string;
+  sex: string;
+  status: AdmissionStatus;
+  wardId?: string;
+  wardName?: string;
+  floor?: string;
+  bedId?: string;
+  bedLabel?: string;
+  attendingDoctor: string;
+  team?: string;
+  primaryDiagnosis?: string;
+  careLevel?: string;
+  note?: string;
+  stayDays: number;
+  pendingInstructionCount: number;
+  latestNursingFocus?: string;
+  latestNursingAssessment?: string;
+  admittedAt?: string;
 };
 
 export type ChartVersion = {
