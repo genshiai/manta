@@ -637,6 +637,76 @@ def test_diagnosis_master_search_supports_alias_hits() -> None:
         cleanup_diagnosis_master(management_number)
 
 
+def test_diagnosis_master_search_returns_migration_target_for_deprecated_alias() -> None:
+    suffix = uuid4().hex[:8]
+    old_management_number = f"O{suffix}0000000"[:16]
+    new_management_number = f"N{suffix}0000000"[:16]
+    alias = f"旧称テスト病名{suffix}"
+
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+
+            with SessionLocal() as db:
+                db.add(
+                    DiagnosisMaster(
+                        management_number=old_management_number,
+                        change_type="9",
+                        disease_name="廃止テスト病名",
+                        disease_name_kana="ハイシテストビョウメイ",
+                        adoption_level="9",
+                        exchange_code="OLDTEST",
+                        icd10_code="B99",
+                        icd10_subcode=None,
+                        claim_code="7654321",
+                        is_deleted=True,
+                        updated_at_master="20260505",
+                    )
+                )
+                db.add(
+                    DiagnosisMaster(
+                        management_number=new_management_number,
+                        change_type="0",
+                        disease_name="現行テスト病名",
+                        disease_name_kana="ゲンコウテストビョウメイ",
+                        adoption_level="1",
+                        exchange_code="NEWTEST",
+                        icd10_code="B99",
+                        icd10_subcode=None,
+                        claim_code="7654322",
+                        is_deleted=False,
+                        updated_at_master="20260505",
+                    )
+                )
+                db.flush()
+                db.add(
+                    DiagnosisAliasMaster(
+                        management_number=old_management_number,
+                        alias=alias,
+                        alias_kana="キュウショウテストビョウメイ",
+                        alias_type="migration",
+                        target_management_number=new_management_number,
+                        is_deleted=False,
+                    )
+                )
+                db.commit()
+
+            response = client.get(
+                f"/api/masters/diagnoses/search?q={alias}",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()[0]
+        assert payload["management_number"] == new_management_number
+        assert payload["matched_alias"] == alias
+        assert payload["migration_source_management_number"] == old_management_number
+        assert payload["migration_source_name"] == "廃止テスト病名"
+    finally:
+        cleanup_diagnosis_master(old_management_number)
+        cleanup_diagnosis_master(new_management_number)
+
+
 def test_doctor_can_update_patient_context() -> None:
     unique_problem_name = f"#9 テスト病名 {uuid4().hex[:6]}"
 

@@ -560,6 +560,14 @@ const ProblemsTab = ({
                     {d.icd10Code ? (
                       <p className="text-[11px] text-text-tertiary">ICD10 {d.icd10Code}</p>
                     ) : null}
+                    {d.matchedAlias ? (
+                      <p className="mt-0.5 text-[11px] text-text-tertiary">一致: {d.matchedAlias}</p>
+                    ) : null}
+                    {d.migrationSourceName ? (
+                      <p className="mt-0.5 text-[11px] font-medium text-warning">
+                        旧病名 {d.migrationSourceName} から移行
+                      </p>
+                    ) : null}
                   </div>
                   <Plus size={14} className="text-text-tertiary" />
                 </button>

@@ -357,7 +357,11 @@ type ApiDiagnosisSearchResult = {
   icd10_code: string | null;
   icd10_subcode: string | null;
   claim_code: string | null;
+  is_deleted: boolean;
   updated_at_master: string | null;
+  matched_alias: string | null;
+  migration_source_management_number: string | null;
+  migration_source_name: string | null;
 };
 
 const formatTimestamp = (value: string) =>
@@ -770,7 +774,11 @@ const mapDiagnosisSearchResult = (item: ApiDiagnosisSearchResult): DiagnosisSear
   icd10Code: item.icd10_code ?? undefined,
   icd10Subcode: item.icd10_subcode ?? undefined,
   claimCode: item.claim_code ?? undefined,
+  isDeleted: item.is_deleted,
   updatedAtMaster: item.updated_at_master ?? undefined,
+  matchedAlias: item.matched_alias ?? undefined,
+  migrationSourceManagementNumber: item.migration_source_management_number ?? undefined,
+  migrationSourceName: item.migration_source_name ?? undefined,
 });
 
 export const login = async (userId: string, password: string): Promise<UserSession> => {

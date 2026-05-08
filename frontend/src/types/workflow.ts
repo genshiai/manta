@@ -316,7 +316,11 @@ export type DiagnosisSearchResult = {
   icd10Code?: string;
   icd10Subcode?: string;
   claimCode?: string;
+  isDeleted?: boolean;
   updatedAtMaster?: string;
+  matchedAlias?: string;
+  migrationSourceManagementNumber?: string;
+  migrationSourceName?: string;
 };
 
 export type ScheduledVisit = {

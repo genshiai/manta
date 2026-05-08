@@ -379,6 +379,9 @@ class DiagnosisMasterRead(BaseModel):
     claim_code: str | None = None
     is_deleted: bool
     updated_at_master: str | None = None
+    matched_alias: str | None = None
+    migration_source_management_number: str | None = None
+    migration_source_name: str | None = None
 
 
 class ReservationSlotCreateRequest(BaseModel):
