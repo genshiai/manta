@@ -742,6 +742,9 @@ const LabsView = ({
         <span className="ml-auto text-[12px] text-text-tertiary">
           ダミー時系列を含む {filtered.length} 件
         </span>
+        <Button variant="ghost" size="xs" onClick={() => window.print()}>
+          印刷
+        </Button>
       </div>
 
       <table className="w-full overflow-hidden rounded-lg border border-border bg-card text-[13px]">

@@ -8,12 +8,21 @@ type LabsSheetProps = {
   trends: LabLongTrendItem[];
 };
 
+const parseBaselineRange = (baseline?: string) => {
+  if (!baseline) return null;
+  const numbers = baseline.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  if (numbers.length >= 2) return { min: numbers[0], max: numbers[1] };
+  if (baseline.endsWith('-') && numbers.length === 1) return { min: numbers[0], max: numbers[0] * 1.4 };
+  return null;
+};
+
 const Sparkline = ({ trend }: { trend: LabLongTrendItem }) => {
   const points = trend.points.filter((p) => typeof p.numericValue === 'number');
   if (points.length < 2) return null;
   const values = points.map((p) => p.numericValue as number);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const baseline = parseBaselineRange(trend.baseline);
+  const min = Math.min(...values, baseline?.min ?? Number.POSITIVE_INFINITY);
+  const max = Math.max(...values, baseline?.max ?? Number.NEGATIVE_INFINITY);
   const range = max - min || 1;
   const w = 100;
   const h = 24;
@@ -34,6 +43,16 @@ const Sparkline = ({ trend }: { trend: LabLongTrendItem }) => {
         stroke={lastIsAbnormal ? 'var(--warning)' : 'var(--brand)'}
         strokeWidth="1.5"
       />
+      {baseline ? (
+        <rect
+          x="0"
+          y={h - ((baseline.max - min) / range) * h}
+          width={w}
+          height={Math.max((((baseline.max - baseline.min) / range) * h), 1)}
+          fill="var(--success)"
+          opacity="0.12"
+        />
+      ) : null}
       {points.map((p, idx) => {
         const x = (idx / (points.length - 1)) * w;
         const y = h - (((p.numericValue as number) - min) / range) * h;
@@ -66,7 +85,16 @@ export const LabsSheet = ({ open, onClose, results, trends }: LabsSheetProps) =>
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent side="right" className="w-full max-w-md overflow-y-auto bg-card sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-[20px] font-bold">検査結果</SheetTitle>
+          <div className="flex items-center justify-between gap-3">
+            <SheetTitle className="text-[20px] font-bold">検査結果</SheetTitle>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-md border border-border px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-surface-subtle"
+            >
+              印刷
+            </button>
+          </div>
         </SheetHeader>
 
         <div className="px-4 pb-8">
