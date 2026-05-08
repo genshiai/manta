@@ -629,13 +629,43 @@ def get_long_term_listed_drug_for_catalog(
 def build_warning_details(warnings: list[str]) -> list[dict[str, str | None]]:
     details: list[dict[str, str | None]] = []
     for warning in warnings:
-        if warning.startswith("PMDA"):
+        if warning.startswith("PMDA禁忌"):
+            source = "PMDA 電子添文 / 禁忌"
+            severity = "contraindication"
+            evidence = warning.removeprefix("PMDA禁忌: ").strip() or warning
+        elif warning.startswith("PMDA妊婦注意"):
+            source = "PMDA 電子添文 / 妊婦"
+            severity = "warning"
+            evidence = warning.removeprefix("PMDA妊婦注意: ").strip() or warning
+        elif warning.startswith("PMDA腎機能注意"):
+            source = "PMDA 電子添文 / 腎機能"
+            severity = "warning"
+            evidence = warning.removeprefix("PMDA腎機能注意: ").strip() or warning
+        elif warning.startswith("PMDA相互作用"):
+            source = "PMDA 電子添文 / 相互作用"
+            severity = "warning"
+            evidence = warning.removeprefix("PMDA相互作用: ").strip() or warning
+        elif warning.startswith("経過措置期限切れ"):
+            source = "支払基金 基本マスター / 経過措置"
+            severity = "danger"
+            evidence = warning.removeprefix("経過措置期限切れ: ").strip() or warning
+        elif warning.startswith("経過措置対象"):
+            source = "支払基金 基本マスター / 経過措置"
+            severity = "warning"
+            evidence = warning.removeprefix("経過措置対象: ").strip() or warning
+        elif warning.startswith("長期収載品・選定療養対象"):
+            source = "支払基金 基本マスター / 長期収載品・選定療養"
+            severity = "warning"
+            evidence = warning.removeprefix("長期収載品・選定療養対象: ").strip() or warning
+        elif warning.startswith("PMDA"):
             source = "PMDA 電子添文"
-            severity = "contraindication" if "禁忌" in warning else "warning"
+            severity = "warning"
+            evidence = warning
         else:
             source = "Manta safety rule"
             severity = "warning"
-        details.append({"message": warning, "source": source, "severity": severity, "evidence": warning})
+            evidence = warning
+        details.append({"message": warning, "source": source, "severity": severity, "evidence": evidence})
     return details
 
 

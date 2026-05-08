@@ -330,7 +330,7 @@ export function ChartWorkspace({
         refreshed.prescriptions.map((item) => {
           if (!attachedWarning && item.drugName === created.drugName) {
             attachedWarning = true;
-            return { ...item, warnings: created.warnings };
+            return { ...item, warnings: created.warnings, warningDetails: created.warningDetails };
           }
           return item;
         }),

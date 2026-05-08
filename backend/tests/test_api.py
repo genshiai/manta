@@ -927,7 +927,7 @@ def test_add_prescription_returns_pmda_pregnancy_warning() -> None:
 
     assert response.status_code == 200
     assert any("PMDA妊婦注意" in warning for warning in response.json()["warnings"])
-    assert any(detail["source"] == "PMDA 電子添文" for detail in response.json()["warning_details"])
+    assert any(detail["source"] == "PMDA 電子添文 / 妊婦" for detail in response.json()["warning_details"])
 
 
 def test_add_prescription_uses_resolved_pmda_interaction_match() -> None:
@@ -1138,6 +1138,11 @@ def test_add_prescription_returns_receipt_policy_warnings() -> None:
     warnings = response.json()["warnings"]
     assert any("経過措置対象" in warning for warning in warnings)
     assert any("長期収載品・選定療養対象" in warning for warning in warnings)
+    warning_details = response.json()["warning_details"]
+    assert any(detail["source"] == "支払基金 基本マスター / 経過措置" for detail in warning_details)
+    assert any(
+        detail["source"] == "支払基金 基本マスター / 長期収載品・選定療養" for detail in warning_details
+    )
 
 
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:
