@@ -4,9 +4,16 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import type { ReservationSlot } from '../../types/workflow';
 
+type LinkedLabOrder = {
+  category: string;
+  urgency?: '通常' | '至急';
+  items: string[];
+};
+
 type NextVisitDialogProps = {
   open: boolean;
   slots: ReservationSlot[];
+  linkedLabOrders?: LinkedLabOrder[];
   isMutating: boolean;
   onClose: () => void;
   /** 予約せずに診察終了 */
@@ -35,6 +42,7 @@ const slotStateClass = (state: ReservationSlot['state']) => {
 export const NextVisitDialog = ({
   open,
   slots,
+  linkedLabOrders = [],
   isMutating,
   onClose,
   onSkip,
@@ -156,6 +164,27 @@ export const NextVisitDialog = ({
           placeholder="備考 (任意)"
           className="mb-4"
         />
+
+        {linkedLabOrders.length > 0 ? (
+          <div className="mb-4 border-t border-border pt-3">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
+              検査予約連動
+            </p>
+            <ul className="space-y-1.5">
+              {linkedLabOrders.slice(0, 3).map((order) => (
+                <li
+                  key={`${order.category}-${order.items.join('-')}`}
+                  className="flex items-start justify-between gap-2 text-[12px]"
+                >
+                  <span className="min-w-0 flex-1 truncate text-text-primary">
+                    {order.category} ・ {order.items.slice(0, 4).join(' / ')}
+                  </span>
+                  <span className="shrink-0 text-text-tertiary">{order.urgency ?? '通常'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onSkip} disabled={isMutating}>

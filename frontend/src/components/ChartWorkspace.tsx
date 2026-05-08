@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addImagingOrder,
   addLabOrder,
@@ -179,6 +179,11 @@ export function ChartWorkspace({
     draft.objective !== savedDraft.objective ||
     draft.assessment !== savedDraft.assessment ||
     draft.plan !== savedDraft.plan;
+
+  const pendingLabOrders = useMemo(
+    () => labOrders.filter((order) => order.status === 'pending'),
+    [labOrders],
+  );
 
   // 親コンポーネントへのメタ通知
   useEffect(() => {
@@ -531,6 +536,13 @@ export function ChartWorkspace({
   const handleBookReservation = async (slotId: string | null, comment: string) => {
     const slot = slotId ? reservationSlots.find((s) => s.id === slotId) : null;
     if (slotId && !slot) return;
+    const linkedLabNote =
+      pendingLabOrders.length > 0
+        ? `検査予約連動: ${pendingLabOrders
+            .map((order) => `${order.category}(${order.items.slice(0, 4).join('/')})`)
+            .join('、')}`
+        : '';
+    const reservationNote = [comment.trim(), linkedLabNote].filter(Boolean).join(' / ');
     setIsMutating(true);
     try {
       await saveReservation(patient.id, {
@@ -538,7 +550,7 @@ export function ChartWorkspace({
         scheduledFor: slot ? `${slot.date} ${slot.time}` : '日未定',
         department: slot?.department ?? currentUser.department,
         doctor: slot?.doctor ?? currentUser.displayName,
-        note: comment,
+        note: reservationNote,
         actor: currentUser.displayName,
       });
       onDataChanged();
@@ -667,6 +679,7 @@ export function ChartWorkspace({
       <NextVisitDialog
         open={reservationDialogOpen}
         slots={reservationSlots}
+        linkedLabOrders={pendingLabOrders}
         isMutating={isMutating}
         onClose={() => setReservationDialogOpen(false)}
         onSkip={handleSkipReservation}
