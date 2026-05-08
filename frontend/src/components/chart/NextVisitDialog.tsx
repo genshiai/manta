@@ -12,7 +12,7 @@ type NextVisitDialogProps = {
   /** 予約せずに診察終了 */
   onSkip: () => void;
   /** 予約 + 診察終了 */
-  onBook: (slotId: string, comment: string) => void;
+  onBook: (slotId: string | null, comment: string) => void;
 };
 
 const slotStateLabel = (state: ReservationSlot['state']) => {
@@ -42,11 +42,12 @@ export const NextVisitDialog = ({
 }: NextVisitDialogProps) => {
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
   const [comment, setComment] = useState('');
+  const [isDateUndecided, setIsDateUndecided] = useState(false);
 
   if (!open) return null;
 
   const selected = slots.find((s) => s.id === selectedSlotId);
-  const canBook = Boolean(selected && selected.state !== 'full');
+  const canBook = isDateUndecided || Boolean(selected && selected.state !== 'full');
 
   return (
     <div
@@ -78,8 +79,40 @@ export const NextVisitDialog = ({
           </button>
         </header>
 
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setIsDateUndecided(false)}
+            className={`h-9 rounded-md border px-3 text-[13px] font-medium ${
+              isDateUndecided
+                ? 'border-border text-text-secondary hover:bg-surface-subtle'
+                : 'border-brand bg-brand-tint text-brand'
+            }`}
+          >
+            予約枠
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsDateUndecided(true);
+              setSelectedSlotId('');
+            }}
+            className={`h-9 rounded-md border px-3 text-[13px] font-medium ${
+              isDateUndecided
+                ? 'border-brand bg-brand-tint text-brand'
+                : 'border-border text-text-secondary hover:bg-surface-subtle'
+            }`}
+          >
+            日未定
+          </button>
+        </div>
+
         <div className="mb-4 max-h-72 overflow-y-auto rounded-lg border border-border">
-          {slots.length === 0 ? (
+          {isDateUndecided ? (
+            <p className="px-3 py-6 text-center text-[13px] text-text-tertiary">
+              次回来院日は未定として保存します
+            </p>
+          ) : slots.length === 0 ? (
             <p className="px-3 py-6 text-center text-[13px] text-text-tertiary">
               空きスロットがありません
             </p>
@@ -131,7 +164,7 @@ export const NextVisitDialog = ({
           <Button
             variant="default"
             size="sm"
-            onClick={() => canBook && onBook(selectedSlotId, comment)}
+            onClick={() => canBook && onBook(isDateUndecided ? null : selectedSlotId, comment)}
             disabled={!canBook || isMutating}
           >
             予約して終了

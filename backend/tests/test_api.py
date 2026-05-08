@@ -21,6 +21,7 @@ from app.models import (
     PrescriptionSetMaster,
     ReceiptLongTermListedDrug,
     ReceiptTransitionalDrug,
+    Reservation,
     ReservationSlotMaster,
     StandardUsageMaster,
     User,
@@ -1143,6 +1144,55 @@ def test_add_prescription_returns_receipt_policy_warnings() -> None:
     assert any(
         detail["source"] == "支払基金 基本マスター / 長期収載品・選定療養" for detail in warning_details
     )
+
+
+def test_doctor_can_save_unscheduled_reservation() -> None:
+    patient_id = "0009900041"
+    original: dict[str, str | int | None] | None = None
+    try:
+        with SessionLocal() as db:
+            reservation = db.scalar(select(Reservation).where(Reservation.patient_id == patient_id))
+            if reservation is not None:
+                original = {
+                    "id": reservation.id,
+                    "slot_id": reservation.slot_id,
+                    "scheduled_for": reservation.scheduled_for,
+                    "department": reservation.department,
+                    "doctor": reservation.doctor,
+                    "note": reservation.note,
+                }
+
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            response = client.post(
+                f"/api/patients/{patient_id}/reservation",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "slot_id": None,
+                    "scheduled_for": "日未定",
+                    "department": "内科",
+                    "doctor": "田中 太郎",
+                    "note": "検査結果確認後に日程調整",
+                    "actor": "田中 太郎",
+                },
+            )
+    finally:
+        with SessionLocal() as db:
+            reservation = db.scalar(select(Reservation).where(Reservation.patient_id == patient_id))
+            if reservation is not None:
+                if original is None:
+                    db.delete(reservation)
+                else:
+                    reservation.slot_id = original["slot_id"] if isinstance(original["slot_id"], str) else None
+                    reservation.scheduled_for = str(original["scheduled_for"])
+                    reservation.department = str(original["department"])
+                    reservation.doctor = str(original["doctor"])
+                    reservation.note = str(original["note"])
+                db.commit()
+
+    assert response.status_code == 200
+    assert response.json()["slot_id"] is None
+    assert response.json()["scheduled_for"] == "日未定"
 
 
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:

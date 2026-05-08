@@ -528,16 +528,16 @@ export function ChartWorkspace({
     await finalizeFinishVisit();
   };
 
-  const handleBookReservation = async (slotId: string, comment: string) => {
-    const slot = reservationSlots.find((s) => s.id === slotId);
-    if (!slot) return;
+  const handleBookReservation = async (slotId: string | null, comment: string) => {
+    const slot = slotId ? reservationSlots.find((s) => s.id === slotId) : null;
+    if (slotId && !slot) return;
     setIsMutating(true);
     try {
       await saveReservation(patient.id, {
-        slotId: slot.id,
-        scheduledFor: `${slot.date} ${slot.time}`,
-        department: slot.department,
-        doctor: slot.doctor,
+        slotId: slot?.id,
+        scheduledFor: slot ? `${slot.date} ${slot.time}` : '日未定',
+        department: slot?.department ?? currentUser.department,
+        doctor: slot?.doctor ?? currentUser.displayName,
         note: comment,
         actor: currentUser.displayName,
       });
