@@ -199,6 +199,21 @@ export type NursingNote = {
   recordedAt: string;
 };
 
+export type InpatientDocumentType = 'admission_care_plan' | 'discharge_summary' | 'discharge_instruction';
+export type InpatientDocumentStatus = 'draft' | 'signed' | 'archived';
+
+export type InpatientDocument = {
+  id: number;
+  admissionId: number;
+  documentType: InpatientDocumentType;
+  title: string;
+  status: InpatientDocumentStatus;
+  body: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type InpatientProgressRow = {
   date: string;
   vitals: string[];

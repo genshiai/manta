@@ -11,6 +11,8 @@ DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
 AdmissionStatus = Literal["planned", "active", "discharge_permitted", "discharged", "cancelled"]
 BedStatus = Literal["available", "occupied", "cleaning", "blocked"]
 InstructionStatus = Literal["pending", "done", "cancelled"]
+InpatientDocumentStatus = Literal["draft", "signed", "archived"]
+InpatientDocumentType = Literal["admission_care_plan", "discharge_summary", "discharge_instruction"]
 
 
 class DetailItem(BaseModel):
@@ -453,6 +455,32 @@ class NursingNoteCreateRequest(BaseModel):
     objective: str = ""
     assessment: str = ""
     plan: str = ""
+
+
+class InpatientDocumentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    document_type: InpatientDocumentType
+    title: str
+    status: InpatientDocumentStatus
+    body: str
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class InpatientDocumentCreateRequest(BaseModel):
+    document_type: InpatientDocumentType
+    title: str | None = None
+    body: str | None = None
+
+
+class InpatientDocumentUpdateRequest(BaseModel):
+    title: str | None = None
+    body: str | None = None
+    status: InpatientDocumentStatus | None = None
 
 
 class InpatientProgressDateRow(BaseModel):

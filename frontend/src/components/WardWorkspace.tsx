@@ -1,19 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, Bed, CheckCircle2, ClipboardList, FilePenLine, MoveRight, UserRoundCheck } from 'lucide-react';
+import { Activity, Bed, CheckCircle2, ClipboardList, FilePenLine, FileText, MoveRight, UserRoundCheck } from 'lucide-react';
 import {
+  createInpatientDocument,
   createNursingNote,
   getInpatientProgress,
   isUnauthorizedError,
   listInpatientAdmissions,
   listInpatientBeds,
+  listInpatientDocuments,
   listInpatientInstructions,
   listNursingNotes,
   transferInpatientAdmission,
   updateInpatientBedStatus,
+  updateInpatientDocument,
   updateInpatientInstructionStatus,
 } from '../lib/api';
 import { cn } from '../lib/cn';
-import type { InpatientAdmission, InpatientBed, InpatientInstruction, InpatientProgress, NursingNote } from '../types/workflow';
+import type {
+  InpatientAdmission,
+  InpatientBed,
+  InpatientDocument,
+  InpatientDocumentType,
+  InpatientInstruction,
+  InpatientProgress,
+  NursingNote,
+} from '../types/workflow';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
@@ -50,6 +61,24 @@ const bedStatusClasses: Record<InpatientBed['status'], string> = {
   blocked: 'border-red-200 bg-red-50 text-red-1000',
 };
 
+const documentTypeLabels: Record<InpatientDocumentType, string> = {
+  admission_care_plan: '入院診療計画書',
+  discharge_summary: '退院サマリ',
+  discharge_instruction: '退院時指導文書',
+};
+
+const documentStatusLabels: Record<InpatientDocument['status'], string> = {
+  draft: '下書き',
+  signed: '署名済',
+  archived: '保管',
+};
+
+const documentStatusClasses: Record<InpatientDocument['status'], string> = {
+  draft: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+  signed: 'border-green-200 bg-green-50 text-green-900',
+  archived: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-700',
+};
+
 const emptyNoteForm = {
   focus: '',
   subjective: '',
@@ -67,11 +96,13 @@ export const WardWorkspace = ({
   const [selectedAdmissionId, setSelectedAdmissionId] = useState<number | null>(admissions[0]?.id ?? null);
   const [instructions, setInstructions] = useState<InpatientInstruction[]>([]);
   const [nursingNotes, setNursingNotes] = useState<NursingNote[]>([]);
+  const [documents, setDocuments] = useState<InpatientDocument[]>([]);
   const [progress, setProgress] = useState<InpatientProgress | null>(null);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isCreatingDocument, setIsCreatingDocument] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -91,6 +122,7 @@ export const WardWorkspace = ({
     if (!selectedAdmission) {
       setInstructions([]);
       setNursingNotes([]);
+      setDocuments([]);
       setProgress(null);
       return;
     }
@@ -101,9 +133,10 @@ export const WardWorkspace = ({
       setIsLoadingDetail(true);
       setErrorMessage(null);
       try {
-        const [nextInstructions, nextNotes, nextProgress] = await Promise.all([
+        const [nextInstructions, nextNotes, nextDocuments, nextProgress] = await Promise.all([
           listInpatientInstructions(selectedAdmission.id),
           listNursingNotes(selectedAdmission.id),
+          listInpatientDocuments(selectedAdmission.id),
           getInpatientProgress(selectedAdmission.id),
         ]);
         if (cancelled) {
@@ -111,6 +144,7 @@ export const WardWorkspace = ({
         }
         setInstructions(nextInstructions);
         setNursingNotes(nextNotes);
+        setDocuments(nextDocuments);
         setProgress(nextProgress);
       } catch (error) {
         if (cancelled) {
@@ -210,6 +244,44 @@ export const WardWorkspace = ({
       setErrorMessage(error instanceof Error ? error.message : '看護記録の保存に失敗しました。');
     } finally {
       setIsSavingNote(false);
+    }
+  };
+
+  const handleCreateDocument = async (documentType: InpatientDocumentType) => {
+    if (!selectedAdmission || isCreatingDocument) {
+      return;
+    }
+
+    setIsCreatingDocument(true);
+    setErrorMessage(null);
+    try {
+      const document = await createInpatientDocument(selectedAdmission.id, { documentType });
+      setDocuments((current) => [document, ...current]);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '入退院文書の作成に失敗しました。');
+    } finally {
+      setIsCreatingDocument(false);
+    }
+  };
+
+  const handleSignDocument = async (document: InpatientDocument) => {
+    if (document.status === 'signed') {
+      return;
+    }
+
+    try {
+      const updated = await updateInpatientDocument(document.id, { status: 'signed' });
+      setDocuments((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '入退院文書の署名に失敗しました。');
     }
   };
 
@@ -357,6 +429,63 @@ export const WardWorkspace = ({
                   <Button onClick={() => onOpenChart(selectedAdmission.patientId)} size='sm' type='button' variant='outline'>
                     カルテを開く
                   </Button>
+                </div>
+              </section>
+
+              <section className='rounded-8 border border-border bg-card'>
+                <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                  <div className='flex items-center gap-2'>
+                    <FileText size={17} className='text-brand' />
+                    <h2 className='text-[16px] font-bold text-text-primary'>入退院文書</h2>
+                  </div>
+                  <div className='flex flex-wrap gap-2'>
+                    {(Object.keys(documentTypeLabels) as InpatientDocumentType[]).map((documentType) => (
+                      <Button
+                        disabled={isCreatingDocument}
+                        key={documentType}
+                        onClick={() => handleCreateDocument(documentType)}
+                        size='xs'
+                        type='button'
+                        variant='outline'
+                      >
+                        {documentTypeLabels[documentType]}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className='divide-y divide-border'>
+                  {documents.slice(0, 4).map((document) => (
+                    <article className='px-4 py-3' key={document.id}>
+                      <div className='flex flex-wrap items-start justify-between gap-3'>
+                        <div>
+                          <div className='flex flex-wrap items-center gap-2'>
+                            <h3 className='text-[14px] font-bold text-text-primary'>{document.title}</h3>
+                            <span className={cn('rounded-md border px-2 py-1 text-[11px] font-bold', documentStatusClasses[document.status])}>
+                              {documentStatusLabels[document.status]}
+                            </span>
+                          </div>
+                          <p className='mt-1 text-[12px] text-text-tertiary'>
+                            {document.createdBy} · 更新 {document.updatedAt}
+                          </p>
+                        </div>
+                        <Button
+                          disabled={document.status === 'signed'}
+                          onClick={() => handleSignDocument(document)}
+                          size='xs'
+                          type='button'
+                          variant='ghost'
+                        >
+                          署名
+                        </Button>
+                      </div>
+                      <pre className='mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-subtle p-3 text-[12px] leading-relaxed text-text-secondary'>
+                        {document.body}
+                      </pre>
+                    </article>
+                  ))}
+                  {documents.length === 0 && !isLoadingDetail ? (
+                    <div className='px-4 py-6 text-[13px] text-text-tertiary'>入退院文書はまだありません。</div>
+                  ) : null}
                 </div>
               </section>
 

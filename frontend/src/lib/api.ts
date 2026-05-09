@@ -20,6 +20,8 @@ import type {
   ImagingOrderEntry,
   InpatientAdmission,
   InpatientBed,
+  InpatientDocument,
+  InpatientDocumentType,
   InpatientInstruction,
   InpatientProgress,
   LabLongTrendItem,
@@ -433,6 +435,18 @@ type ApiNursingNote = {
   plan: string;
   recorded_by: string;
   recorded_at: string;
+};
+
+type ApiInpatientDocument = {
+  id: number;
+  admission_id: number;
+  document_type: InpatientDocumentType;
+  title: string;
+  status: 'draft' | 'signed' | 'archived';
+  body: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 };
 
 type ApiInpatientProgress = {
@@ -947,6 +961,18 @@ const mapNursingNote = (item: ApiNursingNote): NursingNote => ({
   recordedAt: formatTimestamp(item.recorded_at),
 });
 
+const mapInpatientDocument = (item: ApiInpatientDocument): InpatientDocument => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  documentType: item.document_type,
+  title: item.title,
+  status: item.status,
+  body: item.body,
+  createdBy: item.created_by,
+  createdAt: formatTimestamp(item.created_at),
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
 const mapInpatientProgress = (item: ApiInpatientProgress): InpatientProgress => ({
   admissionId: item.admission_id,
   patientId: item.patient_id,
@@ -1197,6 +1223,57 @@ export const createNursingNote = async (
     },
   );
   return mapNursingNote(note);
+};
+
+export const listInpatientDocuments = async (admissionId: number): Promise<InpatientDocument[]> => {
+  const documents = await request<ApiInpatientDocument[]>(
+    `/api/inpatient/admissions/${admissionId}/documents`,
+  );
+  return documents.map(mapInpatientDocument);
+};
+
+export const createInpatientDocument = async (
+  admissionId: number,
+  payload: {
+    documentType: InpatientDocumentType;
+    title?: string;
+    body?: string;
+  },
+): Promise<InpatientDocument> => {
+  const document = await request<ApiInpatientDocument>(
+    `/api/inpatient/admissions/${admissionId}/documents`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        document_type: payload.documentType,
+        title: payload.title ?? null,
+        body: payload.body ?? null,
+      }),
+    },
+  );
+  return mapInpatientDocument(document);
+};
+
+export const updateInpatientDocument = async (
+  documentId: number,
+  payload: {
+    title?: string;
+    body?: string;
+    status?: InpatientDocument['status'];
+  },
+): Promise<InpatientDocument> => {
+  const document = await request<ApiInpatientDocument>(
+    `/api/inpatient/documents/${documentId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        title: payload.title ?? null,
+        body: payload.body ?? null,
+        status: payload.status ?? null,
+      }),
+    },
+  );
+  return mapInpatientDocument(document);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

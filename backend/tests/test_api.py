@@ -12,6 +12,7 @@ from app.models import (
     BedMaster,
     DiagnosisAliasMaster,
     DiagnosisMaster,
+    InpatientDocument,
     InpatientInstruction,
     LabSetMaster,
     Patient,
@@ -285,6 +286,49 @@ def test_get_inpatient_progress() -> None:
     assert {"date", "vitals", "labs", "prescriptions", "lab_orders", "instructions", "nursing_notes"} <= set(
         payload["rows"][0]
     )
+
+
+def test_create_and_sign_inpatient_document() -> None:
+    document_id: int | None = None
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        create_response = client.post(
+            f"/api/inpatient/admissions/{admission_id}/documents",
+            json={"document_type": "admission_care_plan"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_response.status_code == 201
+        document = create_response.json()
+        document_id = document["id"]
+        list_response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/documents",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sign_response = client.patch(
+            f"/api/inpatient/documents/{document_id}",
+            json={"status": "signed"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert document["document_type"] == "admission_care_plan"
+    assert document["title"] == "入院診療計画書"
+    assert "【患者情報】" in document["body"]
+    assert list_response.status_code == 200
+    assert any(item["id"] == document_id for item in list_response.json())
+    assert sign_response.status_code == 200
+    assert sign_response.json()["status"] == "signed"
+
+    if document_id is not None:
+        with SessionLocal() as db:
+            persisted = db.get(InpatientDocument, document_id)
+            if persisted is not None:
+                db.delete(persisted)
+                db.commit()
 
 
 def test_reject_patients_without_token() -> None:

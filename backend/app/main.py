@@ -23,6 +23,7 @@ from .models import (
     ChartNote,
     DiagnosisAliasMaster,
     DiagnosisMaster,
+    InpatientDocument,
     InpatientInstruction,
     LabOrder,
     NursingNote,
@@ -65,6 +66,9 @@ from .schemas import (
     ImagingOrderCreateRequest,
     ImagingOrderItem,
     InpatientInstructionCreateRequest,
+    InpatientDocumentCreateRequest,
+    InpatientDocumentRead,
+    InpatientDocumentUpdateRequest,
     InpatientInstructionRead,
     InpatientInstructionUpdateRequest,
     InpatientProgressDateRow,
@@ -259,6 +263,13 @@ def get_inpatient_instruction_or_404(db: Session, instruction_id: int) -> Inpati
     if instruction is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient instruction not found")
     return instruction
+
+
+def get_inpatient_document_or_404(db: Session, document_id: int) -> InpatientDocument:
+    document = db.get(InpatientDocument, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient document not found")
+    return document
 
 
 def get_user_or_404(db: Session, user_id: str) -> User:
@@ -1070,6 +1081,176 @@ def build_inpatient_progress(
     )
 
 
+INPATIENT_DOCUMENT_TITLES = {
+    "admission_care_plan": "入院診療計画書",
+    "discharge_summary": "退院サマリ",
+    "discharge_instruction": "退院時指導文書",
+}
+
+
+def _format_document_date(value: datetime | None) -> str:
+    if value is None:
+        return "未設定"
+    return value.astimezone(TOKYO_TZ).strftime("%Y/%m/%d")
+
+
+def _patient_active_problem_labels(patient: Patient) -> list[str]:
+    labels: list[str] = []
+    for problem in patient.problems or []:
+        if not isinstance(problem, dict):
+            continue
+        name = problem.get("name")
+        problem_status = problem.get("status")
+        if isinstance(name, str) and name and problem_status != "resolved":
+            labels.append(name)
+    return labels
+
+
+def _latest_inpatient_records(
+    db: Session,
+    *,
+    admission: Admission,
+) -> tuple[list[InpatientInstruction], list[NursingNote], list[PrescriptionOrder], list[LabOrder]]:
+    instructions = db.scalars(
+        select(InpatientInstruction)
+        .where(InpatientInstruction.admission_id == admission.id)
+        .order_by(desc(InpatientInstruction.created_at))
+        .limit(8)
+    ).all()
+    nursing_notes = db.scalars(
+        select(NursingNote)
+        .where(NursingNote.admission_id == admission.id)
+        .order_by(desc(NursingNote.recorded_at), desc(NursingNote.id))
+        .limit(6)
+    ).all()
+    prescriptions = db.scalars(
+        select(PrescriptionOrder)
+        .where(PrescriptionOrder.patient_id == admission.patient_id)
+        .order_by(desc(PrescriptionOrder.created_at))
+        .limit(8)
+    ).all()
+    lab_orders = db.scalars(
+        select(LabOrder)
+        .where(LabOrder.patient_id == admission.patient_id)
+        .order_by(desc(LabOrder.created_at))
+        .limit(6)
+    ).all()
+    return instructions, nursing_notes, prescriptions, lab_orders
+
+
+def build_inpatient_document_body(
+    db: Session,
+    *,
+    admission: Admission,
+    patient: Patient,
+    document_type: str,
+) -> str:
+    instructions, nursing_notes, prescriptions, lab_orders = _latest_inpatient_records(db, admission=admission)
+    diagnosis = admission.primary_diagnosis or ", ".join(_patient_active_problem_labels(patient)[:3]) or "未設定"
+    admission_period = f"{_format_document_date(admission.admitted_at or admission.requested_at)} - {_format_document_date(admission.discharged_at)}"
+    ward = db.get(WardMaster, admission.ward_id) if admission.ward_id else None
+    bed = db.get(BedMaster, admission.bed_id) if admission.bed_id else None
+    ward_label = " ".join(
+        item
+        for item in [
+            ward.name if ward else None,
+            bed.bed_label if bed else None,
+        ]
+        if item
+    ) or "未設定"
+    latest_note = nursing_notes[0] if nursing_notes else None
+    latest_note_summary = (
+        f"{latest_note.focus or latest_note.note_type}: {latest_note.assessment or latest_note.plan or latest_note.objective}"
+        if latest_note
+        else "看護記録なし"
+    )
+    instruction_lines = [
+        f"- [{item.status}] {item.category}: {item.title}"
+        for item in instructions[:5]
+    ] or ["- 指示なし"]
+    prescription_lines = [
+        f"- {item.drug_name} {item.dosage} / {item.days}"
+        for item in prescriptions[:5]
+    ] or ["- 処方なし"]
+    lab_order_lines = [
+        f"- {item.category}: {', '.join(item.items)}"
+        for item in lab_orders[:4]
+    ] or ["- 検査オーダなし"]
+
+    if document_type == "admission_care_plan":
+        return "\n".join(
+            [
+                "【患者情報】",
+                f"患者: {patient.name} ({patient.id}) / {patient.age} / {patient.sex}",
+                f"病棟・病床: {ward_label}",
+                f"主治医: {admission.attending_doctor}",
+                "",
+                "【入院目的・主病名】",
+                f"主病名: {diagnosis}",
+                f"入院目的: {admission.note or diagnosis}",
+                "",
+                "【治療計画】",
+                *instruction_lines,
+                "",
+                "【検査・観察計画】",
+                *lab_order_lines,
+                "",
+                "【看護計画】",
+                f"- {latest_note_summary}",
+                f"- 看護必要度・ケア区分: {admission.care_level or '未設定'}",
+                "",
+                "【退院目標】",
+                "- 症状安定、内服・生活指導の理解、退院後フォロー方針の確認",
+            ]
+        )
+
+    if document_type == "discharge_instruction":
+        return "\n".join(
+            [
+                "【退院後の方針】",
+                f"患者: {patient.name} ({patient.id})",
+                f"主病名: {diagnosis}",
+                "",
+                "【服薬】",
+                *prescription_lines,
+                "",
+                "【生活上の注意】",
+                "- 発熱、呼吸苦、強い疼痛、食事摂取困難、意識変容があれば早めに受診",
+                "- 次回受診日、検査予定、訪問看護・介護連携の有無を確認",
+                "",
+                "【連絡・再診】",
+                f"- 主治医: {admission.attending_doctor}",
+                "- 緊急時は救急外来または地域連携窓口へ連絡",
+            ]
+        )
+
+    return "\n".join(
+        [
+            "【入院概要】",
+            f"患者: {patient.name} ({patient.id}) / {patient.age} / {patient.sex}",
+            f"入院期間: {admission_period}",
+            f"主病名: {diagnosis}",
+            f"担当: {admission.attending_doctor} / {admission.team or 'チーム未設定'}",
+            "",
+            "【入院経過】",
+            f"- {latest_note_summary}",
+            *(f"- {item.assessment or item.plan or item.objective}" for item in nursing_notes[1:4]),
+            "",
+            "【主な指示・処置】",
+            *instruction_lines,
+            "",
+            "【処方】",
+            *prescription_lines,
+            "",
+            "【検査】",
+            *lab_order_lines,
+            "",
+            "【退院時方針】",
+            f"- {admission.note or '退院後フォロー、服薬継続、必要時再診を確認'}",
+        ]
+    )
+
+
 def get_chart_order_masters_read(
     db: Session,
     *,
@@ -1761,6 +1942,95 @@ def create_nursing_note(
     db.commit()
     db.refresh(note)
     return note
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/documents", response_model=list[InpatientDocumentRead])
+def list_inpatient_documents(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[InpatientDocumentRead]:
+    get_admission_or_404(db, admission_id)
+    return db.scalars(
+        select(InpatientDocument)
+        .where(InpatientDocument.admission_id == admission_id)
+        .order_by(desc(InpatientDocument.updated_at), desc(InpatientDocument.id))
+    ).all()
+
+
+@app.post(
+    "/api/inpatient/admissions/{admission_id}/documents",
+    response_model=InpatientDocumentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_inpatient_document(
+    admission_id: int,
+    payload: InpatientDocumentCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientDocumentRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    title = payload.title or INPATIENT_DOCUMENT_TITLES[payload.document_type]
+    body = payload.body or build_inpatient_document_body(
+        db,
+        admission=admission,
+        patient=patient,
+        document_type=payload.document_type,
+    )
+    now = utcnow()
+    document = InpatientDocument(
+        admission_id=admission_id,
+        document_type=payload.document_type,
+        title=title,
+        status="draft",
+        body=body,
+        created_by=current_user.display_name,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(document)
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="入院文書作成",
+        scope="chart",
+        detail=f"{title} を作成しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(document)
+    return document
+
+
+@app.patch("/api/inpatient/documents/{document_id}", response_model=InpatientDocumentRead)
+def update_inpatient_document(
+    document_id: int,
+    payload: InpatientDocumentUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientDocumentRead:
+    document = get_inpatient_document_or_404(db, document_id)
+    admission = get_admission_or_404(db, document.admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    if payload.title is not None:
+        document.title = payload.title
+    if payload.body is not None:
+        document.body = payload.body
+    if payload.status is not None:
+        document.status = payload.status
+    document.updated_at = utcnow()
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="入院文書更新",
+        scope="chart",
+        detail=f"{document.title} を更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(document)
+    return document
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])
