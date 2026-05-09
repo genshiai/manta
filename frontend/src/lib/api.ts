@@ -24,6 +24,7 @@ import type {
   InpatientDocumentType,
   InpatientInstruction,
   InpatientProgress,
+  InpatientSummaryDraft,
   LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
@@ -461,6 +462,23 @@ type ApiInpatientProgress = {
     instructions: string[];
     nursing_notes: string[];
   }>;
+};
+
+type ApiInpatientSummaryDraft = {
+  admission_id: number;
+  patient_id: string;
+  title: string;
+  period_label: string;
+  source_counts: {
+    nursing_notes: number;
+    observations: number;
+    prescriptions: number;
+    lab_orders: number;
+    instructions: number;
+  };
+  key_events: string[];
+  body: string;
+  generated_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -987,6 +1005,23 @@ const mapInpatientProgress = (item: ApiInpatientProgress): InpatientProgress => 
   })),
 });
 
+const mapInpatientSummaryDraft = (item: ApiInpatientSummaryDraft): InpatientSummaryDraft => ({
+  admissionId: item.admission_id,
+  patientId: item.patient_id,
+  title: item.title,
+  periodLabel: item.period_label,
+  sourceCounts: {
+    nursingNotes: item.source_counts.nursing_notes,
+    observations: item.source_counts.observations,
+    prescriptions: item.source_counts.prescriptions,
+    labOrders: item.source_counts.lab_orders,
+    instructions: item.source_counts.instructions,
+  },
+  keyEvents: item.key_events,
+  body: item.body,
+  generatedAt: formatTimestamp(item.generated_at),
+});
+
 export const login = async (userId: string, password: string): Promise<UserSession> => {
   const response = await request<ApiLoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -1174,6 +1209,13 @@ export const getInpatientProgress = async (admissionId: number): Promise<Inpatie
     `/api/inpatient/admissions/${admissionId}/progress`,
   );
   return mapInpatientProgress(progress);
+};
+
+export const getInpatientSummaryDraft = async (admissionId: number, days = 14): Promise<InpatientSummaryDraft> => {
+  const draft = await request<ApiInpatientSummaryDraft>(
+    `/api/inpatient/admissions/${admissionId}/summary-draft?days=${days}`,
+  );
+  return mapInpatientSummaryDraft(draft);
 };
 
 export const updateInpatientInstructionStatus = async (

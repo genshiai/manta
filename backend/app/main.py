@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import re
 import unicodedata
 from zoneinfo import ZoneInfo
@@ -73,6 +73,7 @@ from .schemas import (
     InpatientInstructionUpdateRequest,
     InpatientProgressDateRow,
     InpatientProgressRead,
+    InpatientSummaryDraftRead,
     LabLongTrendItem,
     LabLongTrendPoint,
     LabSetOptionCreateRequest,
@@ -1251,6 +1252,116 @@ def build_inpatient_document_body(
     )
 
 
+def build_inpatient_summary_draft(
+    *,
+    admission: Admission,
+    patient: Patient,
+    observations: list[Observation],
+    prescriptions: list[PrescriptionOrder],
+    lab_orders: list[LabOrder],
+    instructions: list[InpatientInstruction],
+    nursing_notes: list[NursingNote],
+    days: int,
+) -> InpatientSummaryDraftRead:
+    generated_at = utcnow()
+    since = generated_at - timedelta(days=days)
+    period_start = max(admission.admitted_at or admission.requested_at, since)
+    period_label = f"{_format_document_date(period_start)} - {_format_document_date(generated_at)}"
+    diagnosis = admission.primary_diagnosis or ", ".join(_patient_active_problem_labels(patient)[:3]) or "未設定"
+    latest_notes = nursing_notes[:5]
+    latest_labs = [
+        observation
+        for observation in observations
+        if observation.category == "laboratory"
+    ][:6]
+    latest_vitals = [
+        observation
+        for observation in observations
+        if observation.category == "vital-signs"
+    ][:4]
+    active_instructions = [instruction for instruction in instructions if instruction.status == "pending"]
+    done_instructions = [instruction for instruction in instructions if instruction.status == "done"]
+    key_events: list[str] = []
+    if admission.admitted_at:
+        key_events.append(f"{_format_document_date(admission.admitted_at)} 入院")
+    if admission.discharge_permitted_at:
+        key_events.append(f"{_format_document_date(admission.discharge_permitted_at)} 退院許可")
+    if admission.discharged_at:
+        key_events.append(f"{_format_document_date(admission.discharged_at)} 退院")
+    key_events.extend(
+        f"{_format_document_date(note.recorded_at)} {note.focus or note.note_type}: {note.assessment or note.plan or note.objective}"
+        for note in latest_notes[:3]
+        if note.assessment or note.plan or note.objective
+    )
+    note_lines = [
+        f"- {_format_document_date(note.recorded_at)} {note.focus or note.note_type}: {note.assessment or note.plan or note.objective}"
+        for note in latest_notes
+    ] or ["- 看護記録なし"]
+    lab_lines = [
+        f"- {_format_document_date(item.effective_datetime)} {item.code_text or item.code_display or item.code or '検査'}: {_format_lab_value(item)}"
+        for item in latest_labs
+    ] or ["- 検査結果なし"]
+    vital_lines = [
+        f"- {_format_document_date(item.effective_datetime)} {item.code_text or item.code_display or item.code or 'バイタル'}: {_format_lab_value(item)}"
+        for item in latest_vitals
+    ] or ["- バイタルなし"]
+    prescription_lines = [
+        f"- {_format_document_date(item.created_at)} {item.drug_name} {item.dosage} / {item.days}"
+        for item in prescriptions[:8]
+    ] or ["- 処方なし"]
+    instruction_lines = [
+        f"- 未実施: {item.category} / {item.title}"
+        for item in active_instructions[:6]
+    ] or ["- 未実施指示なし"]
+    done_instruction_lines = [
+        f"- 実施済: {item.category} / {item.title}"
+        for item in done_instructions[:4]
+    ]
+    body = "\n".join(
+        [
+            "【入院経過要約案】",
+            f"患者: {patient.name} ({patient.id})",
+            f"対象期間: {period_label}",
+            f"主病名: {diagnosis}",
+            f"担当: {admission.attending_doctor} / {admission.team or 'チーム未設定'}",
+            "",
+            "【経過】",
+            *note_lines,
+            "",
+            "【検査・バイタル】",
+            *vital_lines,
+            *lab_lines,
+            "",
+            "【処方】",
+            *prescription_lines,
+            "",
+            "【指示】",
+            *instruction_lines,
+            *done_instruction_lines,
+            "",
+            "【評価と方針】",
+            f"- {latest_notes[0].assessment if latest_notes and latest_notes[0].assessment else admission.note or '経過安定性、退院可否、外来フォローを確認'}",
+            "- この要約案は記録からの機械的抽出です。医師が確認してから文書へ確定してください。",
+        ]
+    )
+    return InpatientSummaryDraftRead(
+        admission_id=admission.id,
+        patient_id=patient.id,
+        title=f"{patient.name} 入院経過要約案",
+        period_label=period_label,
+        source_counts={
+            "nursing_notes": len(nursing_notes),
+            "observations": len(observations),
+            "prescriptions": len(prescriptions),
+            "lab_orders": len(lab_orders),
+            "instructions": len(instructions),
+        },
+        key_events=key_events[:8],
+        body=body,
+        generated_at=generated_at,
+    )
+
+
 def get_chart_order_masters_read(
     db: Session,
     *,
@@ -1831,6 +1942,58 @@ def get_inpatient_progress(
         lab_orders=lab_orders,
         instructions=instructions,
         nursing_notes=nursing_notes,
+    )
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/summary-draft", response_model=InpatientSummaryDraftRead)
+def get_inpatient_summary_draft(
+    admission_id: int,
+    days: int = Query(default=14, ge=1, le=120),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientSummaryDraftRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    since = utcnow() - timedelta(days=days)
+    observations = db.scalars(
+        select(Observation)
+        .where(
+            Observation.patient_id == admission.patient_id,
+            Observation.category.in_(["vital-signs", "laboratory"]),
+            or_(Observation.effective_datetime.is_(None), Observation.effective_datetime >= since),
+        )
+        .order_by(desc(Observation.effective_datetime))
+    ).all()
+    prescriptions = db.scalars(
+        select(PrescriptionOrder)
+        .where(PrescriptionOrder.patient_id == admission.patient_id, PrescriptionOrder.created_at >= since)
+        .order_by(desc(PrescriptionOrder.created_at))
+    ).all()
+    lab_orders = db.scalars(
+        select(LabOrder)
+        .where(LabOrder.patient_id == admission.patient_id, LabOrder.created_at >= since)
+        .order_by(desc(LabOrder.created_at))
+    ).all()
+    instructions = db.scalars(
+        select(InpatientInstruction)
+        .where(InpatientInstruction.admission_id == admission_id)
+        .where(or_(InpatientInstruction.created_at >= since, InpatientInstruction.due_at >= since))
+        .order_by(desc(InpatientInstruction.created_at))
+    ).all()
+    nursing_notes = db.scalars(
+        select(NursingNote)
+        .where(NursingNote.admission_id == admission_id, NursingNote.recorded_at >= since)
+        .order_by(desc(NursingNote.recorded_at), desc(NursingNote.id))
+    ).all()
+    return build_inpatient_summary_draft(
+        admission=admission,
+        patient=patient,
+        observations=observations,
+        prescriptions=prescriptions,
+        lab_orders=lab_orders,
+        instructions=instructions,
+        nursing_notes=nursing_notes,
+        days=days,
     )
 
 

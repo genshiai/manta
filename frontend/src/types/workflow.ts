@@ -230,6 +230,23 @@ export type InpatientProgress = {
   rows: InpatientProgressRow[];
 };
 
+export type InpatientSummaryDraft = {
+  admissionId: number;
+  patientId: string;
+  title: string;
+  periodLabel: string;
+  sourceCounts: {
+    nursingNotes: number;
+    observations: number;
+    prescriptions: number;
+    labOrders: number;
+    instructions: number;
+  };
+  keyEvents: string[];
+  body: string;
+  generatedAt: string;
+};
+
 export type ChartVersion = {
   version: number;
   savedAt: string;

@@ -4,6 +4,7 @@ import {
   createInpatientDocument,
   createNursingNote,
   getInpatientProgress,
+  getInpatientSummaryDraft,
   isUnauthorizedError,
   listInpatientAdmissions,
   listInpatientBeds,
@@ -23,6 +24,7 @@ import type {
   InpatientDocumentType,
   InpatientInstruction,
   InpatientProgress,
+  InpatientSummaryDraft,
   NursingNote,
 } from '../types/workflow';
 import { Button } from './ui/button';
@@ -98,6 +100,7 @@ export const WardWorkspace = ({
   const [nursingNotes, setNursingNotes] = useState<NursingNote[]>([]);
   const [documents, setDocuments] = useState<InpatientDocument[]>([]);
   const [progress, setProgress] = useState<InpatientProgress | null>(null);
+  const [summaryDraft, setSummaryDraft] = useState<InpatientSummaryDraft | null>(null);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -124,6 +127,7 @@ export const WardWorkspace = ({
       setNursingNotes([]);
       setDocuments([]);
       setProgress(null);
+      setSummaryDraft(null);
       return;
     }
 
@@ -133,11 +137,12 @@ export const WardWorkspace = ({
       setIsLoadingDetail(true);
       setErrorMessage(null);
       try {
-        const [nextInstructions, nextNotes, nextDocuments, nextProgress] = await Promise.all([
+        const [nextInstructions, nextNotes, nextDocuments, nextProgress, nextSummaryDraft] = await Promise.all([
           listInpatientInstructions(selectedAdmission.id),
           listNursingNotes(selectedAdmission.id),
           listInpatientDocuments(selectedAdmission.id),
           getInpatientProgress(selectedAdmission.id),
+          getInpatientSummaryDraft(selectedAdmission.id),
         ]);
         if (cancelled) {
           return;
@@ -146,6 +151,7 @@ export const WardWorkspace = ({
         setNursingNotes(nextNotes);
         setDocuments(nextDocuments);
         setProgress(nextProgress);
+        setSummaryDraft(nextSummaryDraft);
       } catch (error) {
         if (cancelled) {
           return;
@@ -282,6 +288,31 @@ export const WardWorkspace = ({
         return;
       }
       setErrorMessage(error instanceof Error ? error.message : '入退院文書の署名に失敗しました。');
+    }
+  };
+
+  const handleCreateSummaryDocument = async () => {
+    if (!selectedAdmission || !summaryDraft || isCreatingDocument) {
+      return;
+    }
+
+    setIsCreatingDocument(true);
+    setErrorMessage(null);
+    try {
+      const document = await createInpatientDocument(selectedAdmission.id, {
+        documentType: 'discharge_summary',
+        title: '退院サマリ',
+        body: summaryDraft.body,
+      });
+      setDocuments((current) => [document, ...current]);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '要約案の文書化に失敗しました。');
+    } finally {
+      setIsCreatingDocument(false);
     }
   };
 
@@ -487,6 +518,50 @@ export const WardWorkspace = ({
                     <div className='px-4 py-6 text-[13px] text-text-tertiary'>入退院文書はまだありません。</div>
                   ) : null}
                 </div>
+              </section>
+
+              <section className='rounded-8 border border-border bg-card'>
+                <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                  <div className='flex items-center gap-2'>
+                    <Activity size={17} className='text-brand' />
+                    <h2 className='text-[16px] font-bold text-text-primary'>入院経過要約案</h2>
+                  </div>
+                  <Button
+                    disabled={!summaryDraft || isCreatingDocument}
+                    onClick={handleCreateSummaryDocument}
+                    size='xs'
+                    type='button'
+                    variant='outline'
+                  >
+                    退院サマリ化
+                  </Button>
+                </div>
+                {summaryDraft ? (
+                  <div className='grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_14rem]'>
+                    <pre className='max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-subtle p-3 text-[12px] leading-relaxed text-text-secondary'>
+                      {summaryDraft.body}
+                    </pre>
+                    <div className='space-y-3 text-[12px] text-text-secondary'>
+                      <div>
+                        <p className='font-bold text-text-primary'>{summaryDraft.periodLabel}</p>
+                        <p className='mt-1 text-text-tertiary'>生成 {summaryDraft.generatedAt}</p>
+                      </div>
+                      <div className='grid grid-cols-2 gap-2'>
+                        <span>看護 {summaryDraft.sourceCounts.nursingNotes}</span>
+                        <span>観察 {summaryDraft.sourceCounts.observations}</span>
+                        <span>処方 {summaryDraft.sourceCounts.prescriptions}</span>
+                        <span>指示 {summaryDraft.sourceCounts.instructions}</span>
+                      </div>
+                      <div className='space-y-1'>
+                        {summaryDraft.keyEvents.slice(0, 4).map((event) => (
+                          <p key={event}>{event}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className='px-4 py-6 text-[13px] text-text-tertiary'>要約できる入院記録がありません。</div>
+                )}
               </section>
 
               <section className='rounded-8 border border-border bg-card'>

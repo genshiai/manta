@@ -331,6 +331,28 @@ def test_create_and_sign_inpatient_document() -> None:
                 db.commit()
 
 
+def test_get_inpatient_summary_draft() -> None:
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/summary-draft?days=30",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["admission_id"] == admission_id
+    assert payload["title"]
+    assert "【入院経過要約案】" in payload["body"]
+    assert payload["source_counts"]["nursing_notes"] >= 0
+    assert isinstance(payload["key_events"], list)
+
+
 def test_reject_patients_without_token() -> None:
     with TestClient(app) as client:
         response = client.get("/api/patients")

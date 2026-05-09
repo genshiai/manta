@@ -499,6 +499,17 @@ class InpatientProgressRead(BaseModel):
     rows: list[InpatientProgressDateRow]
 
 
+class InpatientSummaryDraftRead(BaseModel):
+    admission_id: int
+    patient_id: str
+    title: str
+    period_label: str
+    source_counts: dict[str, int]
+    key_events: list[str]
+    body: str
+    generated_at: datetime
+
+
 class AdmissionRead(BaseModel):
     id: int
     patient: PatientSummaryRead
