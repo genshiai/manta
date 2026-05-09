@@ -1,16 +1,16 @@
-import { Command, House, Search, Settings, Sparkles } from 'lucide-react';
+import { Bed, Command, House, Search, Settings, Sparkles } from 'lucide-react';
 import type { PatientRecord } from '../data/chartMock';
 import type { UserSession } from '../types/workflow';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
 type AppHeaderProps = {
-  screen: 'reception' | 'chart' | 'settings';
+  screen: 'reception' | 'chart' | 'settings' | 'ward';
   searchQuery: string;
   currentUser: UserSession;
   currentPatient?: PatientRecord | null;
   onSearchChange: (value: string) => void;
-  onNavigate: (screen: 'reception' | 'settings') => void;
+  onNavigate: (screen: 'reception' | 'settings' | 'ward') => void;
   onSwitchUser: () => void;
 };
 
@@ -18,6 +18,7 @@ const screenLabel = {
   reception: 'ホーム',
   chart: 'AIカルテ',
   settings: '管理設定',
+  ward: '病棟',
 } as const;
 
 export const AppHeader = ({
@@ -50,6 +51,16 @@ export const AppHeader = ({
       >
         <House size={15} />
         ホーム
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onNavigate('ward')}
+        className="hidden shrink-0 gap-1.5 xl:inline-flex"
+      >
+        <Bed size={15} />
+        病棟
       </Button>
 
       {currentPatient ? (
@@ -93,6 +104,15 @@ export const AppHeader = ({
           title="ホーム"
         >
           <House size={17} />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onNavigate('ward')}
+          title="病棟"
+        >
+          <Bed size={17} />
         </Button>
         <Button
           type="button"

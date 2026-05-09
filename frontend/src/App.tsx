@@ -5,6 +5,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { ReceptionBoard } from './components/ReceptionBoard';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { StatusFooter } from './components/StatusFooter';
+import { WardWorkspace } from './components/WardWorkspace';
 import type { PatientRecord, ReceptionStatus } from './data/chartMock';
 import { demoUsers } from './data/workflowMock';
 import { getCurrentSession, isUnauthorizedError, listInpatientAdmissions, listPatients, login, updatePatientStatus } from './lib/api';
@@ -12,7 +13,7 @@ import { type HomeSettings, readHomeSettings, writeHomeSettings } from './lib/ho
 import { removeStorage, readStorage, writeStorage } from './lib/storage';
 import type { ChartMeta, InpatientAdmission, UserSession } from './types/workflow';
 
-type Screen = 'login' | 'reception' | 'chart' | 'settings';
+type Screen = 'login' | 'reception' | 'chart' | 'settings' | 'ward';
 type StatusFilter = ReceptionStatus | 'all';
 type DepartmentFilter = string | 'all';
 type SortKey = 'receptionNumber' | 'reservationTime' | 'elapsed';
@@ -409,7 +410,7 @@ function App() {
         onNavigate={setScreen}
         onSearchChange={handleSearchChange}
         onSwitchUser={handleSwitchUser}
-        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : 'reception'}
+        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : 'reception'}
         searchQuery={searchQuery}
       />
 
@@ -420,6 +421,13 @@ function App() {
             homeSettings={homeSettings}
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
             onHomeSettingsChange={setHomeSettings}
+          />
+        ) : screen === 'ward' ? (
+          <WardWorkspace
+            admissions={inpatientAdmissions}
+            onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+            onOpenChart={handleOpenChart}
+            onRefreshAdmissions={setInpatientAdmissions}
           />
         ) : screen === 'reception' ? (
           <ReceptionBoard
@@ -466,7 +474,7 @@ function App() {
         chartMeta={chartMeta}
         currentPatient={currentPatient ?? undefined}
         currentUser={session}
-        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : 'reception'}
+        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : 'reception'}
       />
     </div>
   );

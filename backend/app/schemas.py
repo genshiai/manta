@@ -414,6 +414,10 @@ class InpatientInstructionCreateRequest(BaseModel):
     due_at: datetime | None = None
 
 
+class InpatientInstructionUpdateRequest(BaseModel):
+    status: InstructionStatus
+
+
 class NursingNoteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

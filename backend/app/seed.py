@@ -2099,4 +2099,3 @@ def seed_demo_data(db: Session) -> None:
     backfill_observations_from_patient_json(db)
     sync_inpatient_demo_data(db)
     db.commit()
-    NursingNote,

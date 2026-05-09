@@ -19,9 +19,11 @@ import type {
   DrugCategory,
   ImagingOrderEntry,
   InpatientAdmission,
+  InpatientInstruction,
   LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
+  NursingNote,
   PrescriptionCopyPreview,
   PrescriptionCopyResult,
   PrescriptionHistoryGroup,
@@ -384,6 +386,30 @@ type ApiInpatientAdmission = {
     recorded_at: string;
   } | null;
   updated_at: string;
+};
+
+type ApiInpatientInstruction = {
+  id: number;
+  admission_id: number;
+  category: string;
+  title: string;
+  status: 'pending' | 'done' | 'cancelled';
+  due_at: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+type ApiNursingNote = {
+  id: number;
+  admission_id: number;
+  note_type: string;
+  focus: string | null;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  recorded_by: string;
+  recorded_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -844,6 +870,30 @@ const mapInpatientAdmission = (item: ApiInpatientAdmission): InpatientAdmission 
   admittedAt: item.admitted_at ? formatTimestamp(item.admitted_at) : undefined,
 });
 
+const mapInpatientInstruction = (item: ApiInpatientInstruction): InpatientInstruction => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  category: item.category,
+  title: item.title,
+  status: item.status,
+  dueAt: item.due_at ? formatTimestamp(item.due_at) : undefined,
+  createdBy: item.created_by,
+  createdAt: formatTimestamp(item.created_at),
+});
+
+const mapNursingNote = (item: ApiNursingNote): NursingNote => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  noteType: item.note_type,
+  focus: item.focus ?? undefined,
+  subjective: item.subjective,
+  objective: item.objective,
+  assessment: item.assessment,
+  plan: item.plan,
+  recordedBy: item.recorded_by,
+  recordedAt: formatTimestamp(item.recorded_at),
+});
+
 export const login = async (userId: string, password: string): Promise<UserSession> => {
   const response = await request<ApiLoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -967,6 +1017,62 @@ export const listInpatientAdmissions = async (params?: {
   );
 
   return admissions.map(mapInpatientAdmission);
+};
+
+export const listInpatientInstructions = async (admissionId: number): Promise<InpatientInstruction[]> => {
+  const instructions = await request<ApiInpatientInstruction[]>(
+    `/api/inpatient/admissions/${admissionId}/instructions`,
+  );
+  return instructions.map(mapInpatientInstruction);
+};
+
+export const updateInpatientInstructionStatus = async (
+  instructionId: number,
+  status: 'pending' | 'done' | 'cancelled',
+): Promise<InpatientInstruction> => {
+  const instruction = await request<ApiInpatientInstruction>(
+    `/api/inpatient/instructions/${instructionId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+  );
+  return mapInpatientInstruction(instruction);
+};
+
+export const listNursingNotes = async (admissionId: number): Promise<NursingNote[]> => {
+  const notes = await request<ApiNursingNote[]>(
+    `/api/inpatient/admissions/${admissionId}/nursing-notes`,
+  );
+  return notes.map(mapNursingNote);
+};
+
+export const createNursingNote = async (
+  admissionId: number,
+  payload: {
+    noteType?: string;
+    focus?: string;
+    subjective?: string;
+    objective?: string;
+    assessment?: string;
+    plan?: string;
+  },
+): Promise<NursingNote> => {
+  const note = await request<ApiNursingNote>(
+    `/api/inpatient/admissions/${admissionId}/nursing-notes`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        note_type: payload.noteType ?? 'SOAP',
+        focus: payload.focus ?? null,
+        subjective: payload.subjective ?? '',
+        objective: payload.objective ?? '',
+        assessment: payload.assessment ?? '',
+        plan: payload.plan ?? '',
+      }),
+    },
+  );
+  return mapNursingNote(note);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

@@ -64,6 +64,7 @@ from .schemas import (
     ImagingOrderItem,
     InpatientInstructionCreateRequest,
     InpatientInstructionRead,
+    InpatientInstructionUpdateRequest,
     LabLongTrendItem,
     LabLongTrendPoint,
     LabSetOptionCreateRequest,
@@ -247,6 +248,13 @@ def get_bed_or_404(db: Session, bed_id: str) -> BedMaster:
     if bed is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bed not found")
     return bed
+
+
+def get_inpatient_instruction_or_404(db: Session, instruction_id: int) -> InpatientInstruction:
+    instruction = db.get(InpatientInstruction, instruction_id)
+    if instruction is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient instruction not found")
+    return instruction
 
 
 def get_user_or_404(db: Session, user_id: str) -> User:
@@ -1445,6 +1453,30 @@ def create_inpatient_instruction(
         action="入院指示追加",
         scope="order",
         detail=f"{payload.category}: {payload.title}",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(instruction)
+    return instruction
+
+
+@app.patch("/api/inpatient/instructions/{instruction_id}", response_model=InpatientInstructionRead)
+def update_inpatient_instruction(
+    instruction_id: int,
+    payload: InpatientInstructionUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientInstructionRead:
+    instruction = get_inpatient_instruction_or_404(db, instruction_id)
+    admission = get_admission_or_404(db, instruction.admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    instruction.status = payload.status
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="入院指示更新",
+        scope="order",
+        detail=f"{instruction.title} を {payload.status} に更新しました。",
         patient=patient,
     )
     db.commit()

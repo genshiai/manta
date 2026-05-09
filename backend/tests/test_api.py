@@ -11,6 +11,7 @@ from app.models import (
     ChartTemplateMaster,
     DiagnosisAliasMaster,
     DiagnosisMaster,
+    InpatientInstruction,
     LabSetMaster,
     Patient,
     PmdaPackageInsertSection,
@@ -204,6 +205,30 @@ def test_list_inpatient_admissions() -> None:
     assert admissions[0]["patient"]["id"]
     assert admissions[0]["stay_days"] >= 1
     assert "pending_instruction_count" in admissions[0]
+
+
+def test_update_inpatient_instruction_status() -> None:
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        with SessionLocal() as db:
+            instruction = db.scalar(select(InpatientInstruction).where(InpatientInstruction.status == "pending"))
+            assert instruction is not None
+            instruction_id = instruction.id
+
+        response = client.patch(
+            f"/api/inpatient/instructions/{instruction_id}",
+            json={"status": "done"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "done"
+
+    with SessionLocal() as db:
+        instruction = db.get(InpatientInstruction, instruction_id)
+        assert instruction is not None
+        instruction.status = "pending"
+        db.commit()
 
 
 def test_reject_patients_without_token() -> None:

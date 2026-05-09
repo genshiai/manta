@@ -158,6 +158,30 @@ export type InpatientAdmission = {
   admittedAt?: string;
 };
 
+export type InpatientInstruction = {
+  id: number;
+  admissionId: number;
+  category: string;
+  title: string;
+  status: 'pending' | 'done' | 'cancelled';
+  dueAt?: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type NursingNote = {
+  id: number;
+  admissionId: number;
+  noteType: string;
+  focus?: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  recordedBy: string;
+  recordedAt: string;
+};
+
 export type ChartVersion = {
   version: number;
   savedAt: string;
