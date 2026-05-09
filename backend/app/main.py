@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import case, desc, func, or_, select
+from sqlalchemy import case, desc, func, or_, select, true as sa_true
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -53,6 +53,8 @@ from .schemas import (
     AdmissionDischargeRequest,
     AdmissionRead,
     AdmissionTransferRequest,
+    BedBoardItemRead,
+    BedStatusUpdateRequest,
     ChartOrderMasterRead,
     ChartTemplateCreateRequest,
     ChartTemplateRead,
@@ -1153,6 +1155,23 @@ def admission_to_read(
     )
 
 
+def bed_board_item_to_read(
+    db: Session,
+    *,
+    bed: BedMaster,
+    ward: WardMaster,
+    admission: Admission | None,
+    patient: Patient | None,
+) -> BedBoardItemRead:
+    return BedBoardItemRead(
+        bed=bed,
+        ward=ward,
+        current_admission_id=admission.id if admission else None,
+        current_patient=patient_to_read(patient) if patient else None,
+        stay_days=_admission_stay_days(admission) if admission else None,
+    )
+
+
 @app.get("/health")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
@@ -1222,6 +1241,92 @@ def get_chart_order_config(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     return get_chart_order_masters_read(db, include_inactive=include_inactive, department=department)
+
+
+@app.get("/api/inpatient/beds", response_model=list[BedBoardItemRead])
+def list_inpatient_beds(
+    ward_id: str | None = Query(default=None),
+    include_inactive: bool = Query(default=False),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[BedBoardItemRead]:
+    active_admission = (
+        select(Admission)
+        .where(Admission.bed_id == BedMaster.id)
+        .where(Admission.status.in_(["active", "discharge_permitted"]))
+        .correlate(BedMaster)
+        .lateral()
+    )
+    query = (
+        select(BedMaster, WardMaster, active_admission.c.id)
+        .join(WardMaster, BedMaster.ward_id == WardMaster.id)
+        .outerjoin(active_admission, sa_true())
+    )
+    if ward_id:
+        query = query.where(BedMaster.ward_id == ward_id)
+    if not include_inactive:
+        query = query.where(BedMaster.is_active.is_(True), WardMaster.is_active.is_(True))
+    query = query.order_by(WardMaster.sort_order, BedMaster.sort_order)
+
+    rows = db.execute(query).all()
+    admission_ids = [admission_id for _, _, admission_id in rows if admission_id is not None]
+    admissions_by_id = {
+        admission.id: admission
+        for admission in db.scalars(select(Admission).where(Admission.id.in_(admission_ids))).all()
+    } if admission_ids else {}
+    patient_ids = [admission.patient_id for admission in admissions_by_id.values()]
+    patients_by_id = {
+        patient.id: patient
+        for patient in db.scalars(select(Patient).where(Patient.id.in_(patient_ids))).all()
+    } if patient_ids else {}
+
+    return [
+        bed_board_item_to_read(
+            db,
+            bed=bed,
+            ward=ward,
+            admission=admissions_by_id.get(admission_id),
+            patient=patients_by_id.get(admissions_by_id[admission_id].patient_id)
+            if admission_id in admissions_by_id
+            else None,
+        )
+        for bed, ward, admission_id in rows
+    ]
+
+
+@app.patch("/api/inpatient/beds/{bed_id}", response_model=BedBoardItemRead)
+def update_bed_status(
+    bed_id: str,
+    payload: BedStatusUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BedBoardItemRead:
+    bed = get_bed_or_404(db, bed_id)
+    ward = get_ward_or_404(db, bed.ward_id)
+    active_admission = db.scalar(
+        select(Admission).where(
+            Admission.bed_id == bed_id,
+            Admission.status.in_(["active", "discharge_permitted"]),
+        )
+    )
+    if active_admission is not None and payload.status != "occupied":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot free occupied bed")
+    if payload.status == "occupied" and active_admission is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Occupied bed requires admission")
+
+    bed.status = payload.status
+    bed.note = payload.note
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="病床状態更新",
+        scope="system",
+        detail=f"{ward.name} {bed.bed_label} を {payload.status} に更新しました。",
+    )
+    db.commit()
+    db.refresh(bed)
+    patient = get_patient_or_404(db, active_admission.patient_id) if active_admission else None
+    return bed_board_item_to_read(db, bed=bed, ward=ward, admission=active_admission, patient=patient)
 
 
 @app.get("/api/inpatient/admissions", response_model=list[AdmissionRead])

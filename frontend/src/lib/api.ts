@@ -19,6 +19,7 @@ import type {
   DrugCategory,
   ImagingOrderEntry,
   InpatientAdmission,
+  InpatientBed,
   InpatientInstruction,
   LabLongTrendItem,
   LabResultEntry,
@@ -397,6 +398,27 @@ type ApiInpatientInstruction = {
   due_at: string | null;
   created_by: string;
   created_at: string;
+};
+
+type ApiInpatientBed = {
+  bed: {
+    id: string;
+    ward_id: string;
+    room_number: string;
+    bed_number: string;
+    bed_label: string;
+    status: 'available' | 'occupied' | 'cleaning' | 'blocked';
+    note: string | null;
+  };
+  ward: {
+    id: string;
+    name: string;
+    floor: string;
+    department: string;
+  };
+  current_admission_id: number | null;
+  current_patient: ApiPatient | null;
+  stay_days: number | null;
 };
 
 type ApiNursingNote = {
@@ -881,6 +903,22 @@ const mapInpatientInstruction = (item: ApiInpatientInstruction): InpatientInstru
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapInpatientBed = (item: ApiInpatientBed): InpatientBed => ({
+  id: item.bed.id,
+  wardId: item.ward.id,
+  wardName: item.ward.name,
+  floor: item.ward.floor,
+  roomNumber: item.bed.room_number,
+  bedNumber: item.bed.bed_number,
+  bedLabel: item.bed.bed_label,
+  status: item.bed.status,
+  note: item.bed.note ?? undefined,
+  currentAdmissionId: item.current_admission_id ?? undefined,
+  currentPatientId: item.current_patient?.id,
+  currentPatientName: item.current_patient?.name,
+  stayDays: item.stay_days ?? undefined,
+});
+
 const mapNursingNote = (item: ApiNursingNote): NursingNote => ({
   id: item.id,
   admissionId: item.admission_id,
@@ -1017,6 +1055,56 @@ export const listInpatientAdmissions = async (params?: {
   );
 
   return admissions.map(mapInpatientAdmission);
+};
+
+export const listInpatientBeds = async (params?: {
+  wardId?: string;
+  includeInactive?: boolean;
+}): Promise<InpatientBed[]> => {
+  const searchParams = new URLSearchParams();
+  if (params?.wardId) {
+    searchParams.set('ward_id', params.wardId);
+  }
+  if (params?.includeInactive) {
+    searchParams.set('include_inactive', 'true');
+  }
+  const beds = await request<ApiInpatientBed[]>(
+    `/api/inpatient/beds${searchParams.size > 0 ? `?${searchParams.toString()}` : ''}`,
+  );
+  return beds.map(mapInpatientBed);
+};
+
+export const updateInpatientBedStatus = async (
+  bedId: string,
+  status: InpatientBed['status'],
+  note?: string,
+): Promise<InpatientBed> => {
+  const bed = await request<ApiInpatientBed>(
+    `/api/inpatient/beds/${encodeURIComponent(bedId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status, note: note ?? null }),
+    },
+  );
+  return mapInpatientBed(bed);
+};
+
+export const transferInpatientAdmission = async (
+  admissionId: number,
+  payload: { wardId: string; bedId: string; note?: string },
+): Promise<InpatientAdmission> => {
+  const admission = await request<ApiInpatientAdmission>(
+    `/api/inpatient/admissions/${admissionId}/transfer`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        ward_id: payload.wardId,
+        bed_id: payload.bedId,
+        note: payload.note ?? null,
+      }),
+    },
+  );
+  return mapInpatientAdmission(admission);
 };
 
 export const listInpatientInstructions = async (admissionId: number): Promise<InpatientInstruction[]> => {

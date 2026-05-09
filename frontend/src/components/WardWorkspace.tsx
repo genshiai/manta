@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bed, CheckCircle2, ClipboardList, FilePenLine, UserRoundCheck } from 'lucide-react';
+import { Bed, CheckCircle2, ClipboardList, FilePenLine, MoveRight, UserRoundCheck } from 'lucide-react';
 import {
   createNursingNote,
   isUnauthorizedError,
   listInpatientAdmissions,
+  listInpatientBeds,
   listInpatientInstructions,
   listNursingNotes,
+  transferInpatientAdmission,
+  updateInpatientBedStatus,
   updateInpatientInstructionStatus,
 } from '../lib/api';
 import { cn } from '../lib/cn';
-import type { InpatientAdmission, InpatientInstruction, NursingNote } from '../types/workflow';
+import type { InpatientAdmission, InpatientBed, InpatientInstruction, NursingNote } from '../types/workflow';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
@@ -32,6 +35,20 @@ const statusClasses: Record<InpatientInstruction['status'], string> = {
   cancelled: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-700',
 };
 
+const bedStatusLabels: Record<InpatientBed['status'], string> = {
+  available: '空床',
+  occupied: '使用中',
+  cleaning: '清掃中',
+  blocked: '使用不可',
+};
+
+const bedStatusClasses: Record<InpatientBed['status'], string> = {
+  available: 'border-green-200 bg-green-50 text-green-900',
+  occupied: 'border-blue-200 bg-blue-50 text-blue-900',
+  cleaning: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+  blocked: 'border-red-200 bg-red-50 text-red-1000',
+};
+
 const emptyNoteForm = {
   focus: '',
   subjective: '',
@@ -49,9 +66,11 @@ export const WardWorkspace = ({
   const [selectedAdmissionId, setSelectedAdmissionId] = useState<number | null>(admissions[0]?.id ?? null);
   const [instructions, setInstructions] = useState<InpatientInstruction[]>([]);
   const [nursingNotes, setNursingNotes] = useState<NursingNote[]>([]);
+  const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,9 +130,41 @@ export const WardWorkspace = ({
     };
   }, [onAuthExpired, selectedAdmission]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBeds = async () => {
+      try {
+        const nextBeds = await listInpatientBeds();
+        if (!cancelled) {
+          setBeds(nextBeds);
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        if (isUnauthorizedError(error)) {
+          onAuthExpired();
+          return;
+        }
+        setErrorMessage(error instanceof Error ? error.message : '病床一覧の取得に失敗しました。');
+      }
+    };
+
+    loadBeds();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onAuthExpired]);
+
   const refreshAdmissions = async () => {
-    const nextAdmissions = await listInpatientAdmissions({ status: 'active' });
+    const [nextAdmissions, nextBeds] = await Promise.all([
+      listInpatientAdmissions({ status: 'active' }),
+      listInpatientBeds(),
+    ]);
     onRefreshAdmissions(nextAdmissions);
+    setBeds(nextBeds);
   };
 
   const handleInstructionStatus = async (
@@ -157,6 +208,66 @@ export const WardWorkspace = ({
   };
 
   const pendingInstructions = instructions.filter((instruction) => instruction.status === 'pending');
+  const bedsByWard = useMemo(() => {
+    const grouped = new Map<string, InpatientBed[]>();
+    beds.forEach((bed) => {
+      const key = `${bed.wardId}:${bed.wardName}`;
+      grouped.set(key, [...(grouped.get(key) ?? []), bed]);
+    });
+    return Array.from(grouped.entries()).map(([key, wardBeds]) => ({
+      key,
+      wardName: wardBeds[0]?.wardName ?? '病棟未設定',
+      beds: wardBeds,
+    }));
+  }, [beds]);
+  const bedCounts = beds.reduce(
+    (counts, bed) => {
+      counts[bed.status] += 1;
+      return counts;
+    },
+    { available: 0, occupied: 0, cleaning: 0, blocked: 0 } as Record<InpatientBed['status'], number>,
+  );
+
+  const handleTransfer = async (bed: InpatientBed) => {
+    if (!selectedAdmission || bed.status !== 'available' || isTransferring) {
+      return;
+    }
+
+    setIsTransferring(true);
+    setErrorMessage(null);
+    try {
+      const updated = await transferInpatientAdmission(selectedAdmission.id, {
+        wardId: bed.wardId,
+        bedId: bed.id,
+        note: `${bed.wardName} ${bed.bedLabel} へ転床`,
+      });
+      onRefreshAdmissions(admissions.map((admission) => (admission.id === updated.id ? updated : admission)));
+      setSelectedAdmissionId(updated.id);
+      await refreshAdmissions();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '転床に失敗しました。');
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleBedStatus = async (bed: InpatientBed, status: InpatientBed['status']) => {
+    try {
+      const updated = await updateInpatientBedStatus(bed.id, status, bed.note);
+      setBeds((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      await refreshAdmissions();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '病床状態の更新に失敗しました。');
+    }
+  };
 
   return (
     <main className='mx-auto w-full max-w-[1440px] space-y-5 px-4 py-6 lg:px-6'>
@@ -167,9 +278,11 @@ export const WardWorkspace = ({
             入院患者、未実施指示、看護記録を同じ画面で確認します。
           </p>
         </div>
-        <div className='flex items-center gap-3 text-[13px] text-text-secondary'>
+        <div className='flex flex-wrap items-center gap-3 text-[13px] text-text-secondary'>
           <span>入院中 {admissions.length}</span>
           <span>未実施 {admissions.reduce((sum, item) => sum + item.pendingInstructionCount, 0)}</span>
+          <span>空床 {bedCounts.available}</span>
+          <span>清掃中 {bedCounts.cleaning}</span>
         </div>
       </section>
 
@@ -179,7 +292,7 @@ export const WardWorkspace = ({
         </section>
       ) : null}
 
-      <div className='grid gap-4 xl:grid-cols-[minmax(22rem,0.85fr)_minmax(0,1.45fr)]'>
+      <div className='grid gap-4 xl:grid-cols-[minmax(20rem,0.75fr)_minmax(0,1.2fr)_minmax(22rem,0.9fr)]'>
         <section className='overflow-hidden rounded-8 border border-border bg-card'>
           <div className='border-b border-border px-4 py-3'>
             <div className='flex items-center gap-2'>
@@ -334,6 +447,93 @@ export const WardWorkspace = ({
               入院中の患者がいません。
             </section>
           )}
+        </section>
+
+        <section className='space-y-4'>
+          <section className='rounded-8 border border-border bg-card'>
+            <div className='flex items-center justify-between gap-3 border-b border-border px-4 py-3'>
+              <div className='flex items-center gap-2'>
+                <Bed size={17} className='text-brand' />
+                <h2 className='text-[16px] font-bold text-text-primary'>病床ボード</h2>
+              </div>
+              {selectedAdmission ? (
+                <span className='text-[12px] text-text-tertiary'>{selectedAdmission.patientName} を選択中</span>
+              ) : null}
+            </div>
+            <div className='max-h-[calc(100vh-13rem)] space-y-4 overflow-auto p-4'>
+              {bedsByWard.map((group) => (
+                <div className='space-y-2' key={group.key}>
+                  <h3 className='text-[13px] font-bold text-text-secondary'>{group.wardName}</h3>
+                  <div className='grid gap-2 sm:grid-cols-2'>
+                    {group.beds.map((bed) => {
+                      const canTransfer = Boolean(selectedAdmission) && bed.status === 'available';
+                      return (
+                        <div
+                          className={cn(
+                            'rounded-md border p-3',
+                            selectedAdmission?.bedId === bed.id ? 'border-brand bg-blue-50' : 'border-border bg-surface-subtle',
+                          )}
+                          key={bed.id}
+                        >
+                          <div className='flex items-start justify-between gap-2'>
+                            <div>
+                              <p className='text-[14px] font-bold text-text-primary'>{bed.bedLabel}</p>
+                              <p className='mt-1 text-[12px] text-text-tertiary'>{bed.currentPatientName ?? bed.note ?? '利用可能'}</p>
+                            </div>
+                            <span className={cn('rounded-md border px-2 py-1 text-[11px] font-bold', bedStatusClasses[bed.status])}>
+                              {bedStatusLabels[bed.status]}
+                            </span>
+                          </div>
+                          <div className='mt-3 flex flex-wrap gap-2'>
+                            <Button
+                              disabled={!canTransfer || isTransferring}
+                              onClick={() => handleTransfer(bed)}
+                              size='xs'
+                              type='button'
+                              variant='outline'
+                            >
+                              <MoveRight size={13} />
+                              転床
+                            </Button>
+                            {bed.status === 'cleaning' ? (
+                              <Button
+                                onClick={() => handleBedStatus(bed, 'available')}
+                                size='xs'
+                                type='button'
+                                variant='ghost'
+                              >
+                                空床化
+                              </Button>
+                            ) : null}
+                            {bed.status === 'available' ? (
+                              <Button
+                                onClick={() => handleBedStatus(bed, 'blocked')}
+                                size='xs'
+                                type='button'
+                                variant='ghost'
+                              >
+                                停止
+                              </Button>
+                            ) : null}
+                            {bed.status === 'blocked' ? (
+                              <Button
+                                onClick={() => handleBedStatus(bed, 'available')}
+                                size='xs'
+                                type='button'
+                                variant='ghost'
+                              >
+                                再開
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </section>
       </div>
     </main>

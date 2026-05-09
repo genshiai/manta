@@ -395,6 +395,19 @@ class BedMasterRead(BaseModel):
     note: str | None = None
 
 
+class BedBoardItemRead(BaseModel):
+    bed: BedMasterRead
+    ward: WardMasterRead
+    current_admission_id: int | None = None
+    current_patient: PatientSummaryRead | None = None
+    stay_days: int | None = None
+
+
+class BedStatusUpdateRequest(BaseModel):
+    status: BedStatus
+    note: str | None = None
+
+
 class InpatientInstructionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

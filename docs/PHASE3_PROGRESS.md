@@ -18,11 +18,14 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `POST /api/inpatient/admissions/{admission_id}/transfer`: 転棟・転床
 - `POST /api/inpatient/admissions/{admission_id}/permit-discharge`: 退院許可
 - `POST /api/inpatient/admissions/{admission_id}/discharge`: 退院実施
+- `GET /api/inpatient/beds`: 病床ボード
+- `PATCH /api/inpatient/beds/{bed_id}`: 病床状態更新
 - `GET/POST /api/inpatient/admissions/{admission_id}/instructions`: 入院指示
 - `PATCH /api/inpatient/instructions/{instruction_id}`: 指示ステータス更新
 - `GET/POST /api/inpatient/admissions/{admission_id}/nursing-notes`: 看護記録
 - ホームの入院タブを mock ではなく入院 API データで表示
 - 専用の病棟ワークスペースを追加し、入院患者選択、指示簿、看護記録 SOAP 追加を同一画面で扱えるようにした
+- 病床ボードを病棟ワークスペースへ追加し、空床/使用中/清掃中/使用不可の表示、清掃後の空床化、停止/再開、選択患者の転床操作に対応した
 
 ## Phase 3 実装範囲
 
@@ -30,9 +33,9 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
 | 退院許可・退院実施 | backend API 済み | 退院サマリ、退院時処方、退院会計への連携 |
-| 転棟・転床 | backend API 済み | 病床管理画面から D&D / 選択で移動 |
+| 転棟・転床 | backend API/UI 済み | D&D 操作、移動履歴、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
-| 病床管理一覧 | master/API 基盤済み | 病床ボード、空床/清掃中/使用不可の更新 UI |
+| 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |
 | 指示簿 | データ/API/UI 済み | 指示受け、職種別フィルタ、期限超過表示 |
 | 看護記録 SOAP | データ/API/UI 済み | フォーカス/経過表連動、記録テンプレート |
 | 経過表 | 未着手 | バイタル、検査、指示、看護記録を日別グリッドに集約 |
@@ -43,11 +46,9 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 
 ## 次の実装順
 
-1. 病床管理ボード
-   - 空床、使用中、清掃中、使用不可を病棟別に表示し、転棟・転床操作につなぐ。
-2. 経過表
+1. 経過表
    - バイタル、検査、処方、入院指示、看護記録を日付軸で固定表示する。
-3. 入退院文書
+2. 入退院文書
    - 入院診療計画書、退院サマリ、退院時指導文書をテンプレート化する。
-4. AI 要約
+3. AI 要約
    - 入院経過、看護記録、検査推移、処方変更から要約案を生成し、人間が保存確定する。

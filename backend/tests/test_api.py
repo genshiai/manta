@@ -9,6 +9,7 @@ from app.db import SessionLocal
 from app.main import app
 from app.models import (
     ChartTemplateMaster,
+    BedMaster,
     DiagnosisAliasMaster,
     DiagnosisMaster,
     InpatientInstruction,
@@ -228,6 +229,38 @@ def test_update_inpatient_instruction_status() -> None:
         instruction = db.get(InpatientInstruction, instruction_id)
         assert instruction is not None
         instruction.status = "pending"
+        db.commit()
+
+
+def test_list_and_update_inpatient_beds() -> None:
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        beds_response = client.get(
+            "/api/inpatient/beds",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert beds_response.status_code == 200
+        beds = beds_response.json()
+        assert len(beds) >= 1
+        cleaning_bed = next((item for item in beds if item["bed"]["status"] == "cleaning"), None)
+        target_bed = cleaning_bed or next(item for item in beds if item["current_admission_id"] is None)
+        target_status = "available" if target_bed["bed"]["status"] != "available" else "blocked"
+        update_response = client.patch(
+            f"/api/inpatient/beds/{target_bed['bed']['id']}",
+            json={"status": target_status, "note": "test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["bed"]["status"] == target_status
+
+    with SessionLocal() as db:
+        bed_id = target_bed["bed"]["id"]
+        bed = db.get(BedMaster, bed_id)
+        assert bed is not None
+        bed.status = target_bed["bed"]["status"]
+        bed.note = target_bed["bed"]["note"]
         db.commit()
 
 
