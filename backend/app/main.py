@@ -25,6 +25,7 @@ from .models import (
     DiagnosisMaster,
     InpatientDocument,
     InpatientAiSummaryReview,
+    InpatientDischargePlan,
     InpatientEvent,
     InpatientInstruction,
     InpatientPathwayAssignment,
@@ -75,6 +76,8 @@ from .schemas import (
     InpatientDocumentUpdateRequest,
     InpatientAiSummaryReviewCreateRequest,
     InpatientAiSummaryReviewRead,
+    InpatientDischargePlanRead,
+    InpatientDischargePlanUpdateRequest,
     InpatientEventRead,
     InpatientInstructionRead,
     InpatientInstructionUpdateRequest,
@@ -1427,6 +1430,39 @@ def inpatient_pathway_to_read(
     )
 
 
+def build_discharge_plan_defaults(
+    *,
+    admission: Admission,
+    prescriptions: list[PrescriptionOrder],
+    instructions: list[InpatientInstruction],
+) -> tuple[str, list[dict[str, str]], str]:
+    latest_by_drug: dict[str, PrescriptionOrder] = {}
+    for prescription in prescriptions:
+        latest_by_drug.setdefault(prescription.drug_name, prescription)
+    medication_note = "\n".join(
+        f"- {item.drug_name} {item.dosage} / {item.days}"
+        for item in latest_by_drug.values()
+    ) or "- 退院時処方候補なし"
+    candidates = [
+        {
+            "category": "入院基本料",
+            "label": f"{admission.ward_id or '病棟未設定'} 入院日数 {_admission_stay_days(admission)}日",
+            "source": "admission",
+        },
+        {
+            "category": "退院支援",
+            "label": "退院支援・退院時指導の算定候補を確認",
+            "source": "discharge",
+        },
+    ]
+    if prescriptions:
+        candidates.append({"category": "投薬", "label": "退院時処方料・薬剤料候補", "source": "prescription"})
+    if any(instruction.status == "done" for instruction in instructions):
+        candidates.append({"category": "処置/指導", "label": "実施済み入院指示から算定候補を確認", "source": "instruction"})
+    follow_up = admission.note or "退院後外来、再診、検査予定、地域連携の確認"
+    return medication_note, candidates, follow_up
+
+
 def get_chart_order_masters_read(
     db: Session,
     *,
@@ -2521,6 +2557,118 @@ def create_inpatient_summary_review(
     db.commit()
     db.refresh(review)
     return review
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/discharge-plan", response_model=InpatientDischargePlanRead)
+def get_inpatient_discharge_plan(
+    admission_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientDischargePlanRead:
+    admission = get_admission_or_404(db, admission_id)
+    plan = db.scalar(
+        select(InpatientDischargePlan)
+        .where(InpatientDischargePlan.admission_id == admission_id)
+        .order_by(desc(InpatientDischargePlan.updated_at), desc(InpatientDischargePlan.id))
+    )
+    if plan is not None:
+        return plan
+    prescriptions = db.scalars(
+        select(PrescriptionOrder)
+        .where(PrescriptionOrder.patient_id == admission.patient_id)
+        .order_by(desc(PrescriptionOrder.created_at))
+        .limit(20)
+    ).all()
+    instructions = db.scalars(
+        select(InpatientInstruction)
+        .where(InpatientInstruction.admission_id == admission_id)
+        .order_by(desc(InpatientInstruction.created_at))
+    ).all()
+    medication_note, candidates, follow_up = build_discharge_plan_defaults(
+        admission=admission,
+        prescriptions=prescriptions,
+        instructions=instructions,
+    )
+    now = utcnow()
+    return InpatientDischargePlanRead(
+        id=0,
+        admission_id=admission_id,
+        status="draft",
+        discharge_medication_note=medication_note,
+        billing_candidates=candidates,
+        follow_up_note=follow_up,
+        reviewed_by=current_user.display_name,
+        reviewed_at=now,
+        updated_at=now,
+    )
+
+
+@app.put("/api/inpatient/admissions/{admission_id}/discharge-plan", response_model=InpatientDischargePlanRead)
+def upsert_inpatient_discharge_plan(
+    admission_id: int,
+    payload: InpatientDischargePlanUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientDischargePlanRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    plan = db.scalar(
+        select(InpatientDischargePlan)
+        .where(InpatientDischargePlan.admission_id == admission_id)
+        .order_by(desc(InpatientDischargePlan.updated_at), desc(InpatientDischargePlan.id))
+    )
+    if plan is None:
+        medication_note, candidates, follow_up = build_discharge_plan_defaults(
+            admission=admission,
+            prescriptions=db.scalars(
+                select(PrescriptionOrder)
+                .where(PrescriptionOrder.patient_id == admission.patient_id)
+                .order_by(desc(PrescriptionOrder.created_at))
+                .limit(20)
+            ).all(),
+            instructions=db.scalars(
+                select(InpatientInstruction).where(InpatientInstruction.admission_id == admission_id)
+            ).all(),
+        )
+        plan = InpatientDischargePlan(
+            admission_id=admission_id,
+            status=payload.status,
+            discharge_medication_note=payload.discharge_medication_note or medication_note,
+            billing_candidates=payload.billing_candidates or candidates,
+            follow_up_note=payload.follow_up_note or follow_up,
+            reviewed_by=current_user.display_name,
+        )
+        db.add(plan)
+    else:
+        plan.status = payload.status
+        if payload.discharge_medication_note is not None:
+            plan.discharge_medication_note = payload.discharge_medication_note
+        if payload.billing_candidates is not None:
+            plan.billing_candidates = payload.billing_candidates
+        if payload.follow_up_note is not None:
+            plan.follow_up_note = payload.follow_up_note
+        plan.reviewed_by = current_user.display_name
+        plan.reviewed_at = utcnow()
+        plan.updated_at = utcnow()
+    add_inpatient_event(
+        db,
+        admission_id=admission_id,
+        event_type="discharge_plan_reviewed",
+        title="退院計画レビュー",
+        detail=f"状態: {payload.status}",
+        actor=current_user.display_name,
+    )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="退院計画レビュー",
+        scope="chart",
+        detail=f"退院計画を {payload.status} に更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(plan)
+    return plan
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])

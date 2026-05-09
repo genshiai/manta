@@ -35,20 +35,24 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `inpatient_events`: 入院イベント履歴
 - `inpatient_pathway_assignments` / `inpatient_pathway_tasks`: クリティカルパス割当と日別タスク
 - `inpatient_ai_summary_reviews`: Mock AI 要約案の採用/差し戻し履歴
+- `inpatient_discharge_plans`: 退院計画・会計候補レビュー
 - `GET /api/inpatient/admissions/{admission_id}/events`: 入院イベント履歴
 - `GET/POST /api/inpatient/admissions/{admission_id}/pathway`: クリティカルパス取得・開始
 - `PATCH /api/inpatient/pathway-tasks/{task_id}`: パスタスク完了・逸脱
 - `GET/POST /api/inpatient/admissions/{admission_id}/summary-reviews`: AI 要約レビュー履歴
+- `GET/PUT /api/inpatient/admissions/{admission_id}/discharge-plan`: 退院時処方メモ・会計候補レビュー
 - 病棟ワークスペースで入院診療計画書、退院サマリ、退院時指導文書のドラフト生成、本文確認、署名状態への更新に対応した
 - 病棟ワークスペースで入院経過要約案を表示し、そのまま退院サマリ文書へ保存できるようにした
 - 病棟ワークスペースで標準クリティカルパス開始、日別タスク完了、逸脱記録、入院イベント履歴、要約案の採用/差し戻しを操作できるようにした
+- 病棟ワークスペースで退院時処方メモ、退院後方針、会計候補を確認し、レビュー済/退院準備完了に更新できるようにした
 
 ## Phase 3 実装範囲
 
 | 領域 | 状態 | 次に必要なこと |
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
-| 退院許可・退院実施 | backend API 済み | 退院時処方、退院会計への連携 |
+| 退院許可・退院実施 | backend API 済み | 退院会計の本番レセコン連携 |
+| 退院時処方・会計候補 | API/UI 済み | ORCA/会計連携、算定根拠の厳密化 |
 | 転棟・転床 | backend API/UI 済み | D&D 操作、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |
@@ -62,7 +66,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 
 ## 次の実装順
 
-1. 退院時処方・会計連携
-   - 退院時処方、退院会計候補、算定レビューを入院エピソードに紐づける。
-2. クリティカルパス master 化
+1. クリティカルパス master 化
    - 疾患別パス master、予定日自動計算、職種別タスクを追加する。
+2. 退院会計の本番連携
+   - ORCA/会計連携、算定根拠、実施済みオーダとの照合を追加する。

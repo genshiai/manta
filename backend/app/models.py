@@ -508,6 +508,20 @@ class InpatientAiSummaryReview(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
+class InpatientDischargePlan(Base):
+    __tablename__ = "inpatient_discharge_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admission_id: Mapped[int] = mapped_column(ForeignKey("admissions.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    discharge_medication_note: Mapped[str] = mapped_column(Text, default="")
+    billing_candidates: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
+    follow_up_note: Mapped[str] = mapped_column(Text, default="")
+    reviewed_by: Mapped[str] = mapped_column(String(128))
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class ChartTemplateMaster(Base):
     __tablename__ = "chart_template_masters"
 

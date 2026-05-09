@@ -295,6 +295,22 @@ export type InpatientAiSummaryReview = {
   createdAt: string;
 };
 
+export type InpatientDischargePlan = {
+  id: number;
+  admissionId: number;
+  status: 'draft' | 'reviewed' | 'ready';
+  dischargeMedicationNote: string;
+  billingCandidates: Array<{
+    category: string;
+    label: string;
+    source: string;
+  }>;
+  followUpNote: string;
+  reviewedBy: string;
+  reviewedAt: string;
+  updatedAt: string;
+};
+
 export type ChartVersion = {
   version: number;
   savedAt: string;

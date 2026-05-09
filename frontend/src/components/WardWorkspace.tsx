@@ -6,6 +6,7 @@ import {
   createInpatientSummaryReview,
   createNursingNote,
   getInpatientPathway,
+  getInpatientDischargePlan,
   getInpatientProgress,
   getInpatientSummaryDraft,
   isUnauthorizedError,
@@ -19,6 +20,7 @@ import {
   transferInpatientAdmission,
   updateInpatientBedStatus,
   updateInpatientDocument,
+  updateInpatientDischargePlan,
   updateInpatientInstructionStatus,
   updateInpatientPathwayTask,
 } from '../lib/api';
@@ -29,6 +31,7 @@ import type {
   InpatientBed,
   InpatientDocument,
   InpatientDocumentType,
+  InpatientDischargePlan,
   InpatientEvent,
   InpatientInstruction,
   InpatientPathway,
@@ -128,6 +131,7 @@ export const WardWorkspace = ({
   const [events, setEvents] = useState<InpatientEvent[]>([]);
   const [pathway, setPathway] = useState<InpatientPathway | null>(null);
   const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
+  const [dischargePlan, setDischargePlan] = useState<InpatientDischargePlan | null>(null);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -135,6 +139,7 @@ export const WardWorkspace = ({
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
   const [isStartingPathway, setIsStartingPathway] = useState(false);
   const [isReviewingSummary, setIsReviewingSummary] = useState(false);
+  const [isSavingDischargePlan, setIsSavingDischargePlan] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -160,6 +165,7 @@ export const WardWorkspace = ({
       setEvents([]);
       setPathway(null);
       setSummaryReviews([]);
+      setDischargePlan(null);
       return;
     }
 
@@ -178,6 +184,7 @@ export const WardWorkspace = ({
           nextEvents,
           nextPathway,
           nextSummaryReviews,
+          nextDischargePlan,
         ] = await Promise.all([
           listInpatientInstructions(selectedAdmission.id),
           listNursingNotes(selectedAdmission.id),
@@ -187,6 +194,7 @@ export const WardWorkspace = ({
           listInpatientEvents(selectedAdmission.id),
           getInpatientPathway(selectedAdmission.id),
           listInpatientSummaryReviews(selectedAdmission.id),
+          getInpatientDischargePlan(selectedAdmission.id),
         ]);
         if (cancelled) {
           return;
@@ -199,6 +207,7 @@ export const WardWorkspace = ({
         setEvents(nextEvents);
         setPathway(nextPathway);
         setSummaryReviews(nextSummaryReviews);
+        setDischargePlan(nextDischargePlan);
       } catch (error) {
         if (cancelled) {
           return;
@@ -440,6 +449,33 @@ export const WardWorkspace = ({
       setErrorMessage(error instanceof Error ? error.message : '要約レビューの保存に失敗しました。');
     } finally {
       setIsReviewingSummary(false);
+    }
+  };
+
+  const handleSaveDischargePlan = async (status: InpatientDischargePlan['status']) => {
+    if (!selectedAdmission || !dischargePlan || isSavingDischargePlan) {
+      return;
+    }
+
+    setIsSavingDischargePlan(true);
+    setErrorMessage(null);
+    try {
+      const updated = await updateInpatientDischargePlan(selectedAdmission.id, {
+        status,
+        dischargeMedicationNote: dischargePlan.dischargeMedicationNote,
+        billingCandidates: dischargePlan.billingCandidates,
+        followUpNote: dischargePlan.followUpNote,
+      });
+      setDischargePlan(updated);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '退院計画の保存に失敗しました。');
+    } finally {
+      setIsSavingDischargePlan(false);
     }
   };
 
@@ -766,6 +802,64 @@ export const WardWorkspace = ({
                   </div>
                 ) : (
                   <div className='px-4 py-6 text-[13px] text-text-tertiary'>この入院にはクリティカルパスが開始されていません。</div>
+                )}
+              </section>
+
+              <section className='rounded-8 border border-border bg-card'>
+                <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                  <div className='flex items-center gap-2'>
+                    <FilePenLine size={17} className='text-brand' />
+                    <h2 className='text-[16px] font-bold text-text-primary'>退院計画・会計候補</h2>
+                  </div>
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      disabled={!dischargePlan || isSavingDischargePlan}
+                      onClick={() => handleSaveDischargePlan('reviewed')}
+                      size='xs'
+                      type='button'
+                      variant='outline'
+                    >
+                      レビュー済
+                    </Button>
+                    <Button
+                      disabled={!dischargePlan || isSavingDischargePlan}
+                      onClick={() => handleSaveDischargePlan('ready')}
+                      size='xs'
+                      type='button'
+                      variant='ghost'
+                    >
+                      退院準備完了
+                    </Button>
+                  </div>
+                </div>
+                {dischargePlan ? (
+                  <div className='grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.75fr)]'>
+                    <div className='space-y-3'>
+                      <textarea
+                        className='min-h-32 w-full rounded-md border border-border bg-white px-3 py-2 text-[13px] leading-normal text-text-primary outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
+                        onChange={(event) => setDischargePlan((current) => current ? { ...current, dischargeMedicationNote: event.target.value } : current)}
+                        value={dischargePlan.dischargeMedicationNote}
+                      />
+                      <textarea
+                        className='min-h-24 w-full rounded-md border border-border bg-white px-3 py-2 text-[13px] leading-normal text-text-primary outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
+                        onChange={(event) => setDischargePlan((current) => current ? { ...current, followUpNote: event.target.value } : current)}
+                        value={dischargePlan.followUpNote}
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <span className={cn('inline-flex rounded-md border px-2 py-1 text-[12px] font-bold', dischargePlan.status === 'ready' ? 'border-green-200 bg-green-50 text-green-900' : 'border-yellow-200 bg-yellow-50 text-yellow-1100')}>
+                        {dischargePlan.status === 'ready' ? '退院準備完了' : dischargePlan.status === 'reviewed' ? 'レビュー済' : '下書き'}
+                      </span>
+                      {dischargePlan.billingCandidates.map((candidate) => (
+                        <div className='rounded-md border border-border bg-surface-subtle p-2' key={`${candidate.category}-${candidate.label}`}>
+                          <p className='text-[12px] font-bold text-text-primary'>{candidate.category}</p>
+                          <p className='mt-1 text-[12px] leading-normal text-text-secondary'>{candidate.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className='px-4 py-6 text-[13px] text-text-tertiary'>退院計画を読み込み中です。</div>
                 )}
               </section>
 

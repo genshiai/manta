@@ -14,6 +14,7 @@ from app.models import (
     DiagnosisMaster,
     InpatientDocument,
     InpatientAiSummaryReview,
+    InpatientDischargePlan,
     InpatientInstruction,
     InpatientPathwayAssignment,
     LabSetMaster,
@@ -439,6 +440,48 @@ def test_create_inpatient_summary_review() -> None:
     if review_id is not None:
         with SessionLocal() as db:
             persisted = db.get(InpatientAiSummaryReview, review_id)
+            if persisted is not None:
+                db.delete(persisted)
+                db.commit()
+
+
+def test_get_and_update_inpatient_discharge_plan() -> None:
+    plan_id: int | None = None
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        get_response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/discharge-plan",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_response.status_code == 200
+        draft = get_response.json()
+        update_response = client.put(
+            f"/api/inpatient/admissions/{admission_id}/discharge-plan",
+            json={
+                "status": "ready",
+                "discharge_medication_note": draft["discharge_medication_note"],
+                "billing_candidates": draft["billing_candidates"],
+                "follow_up_note": "次回外来を予約",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert update_response.status_code == 200
+        plan = update_response.json()
+        plan_id = plan["id"]
+
+    assert draft["status"] == "draft"
+    assert draft["billing_candidates"]
+    assert plan["status"] == "ready"
+    assert plan["follow_up_note"] == "次回外来を予約"
+
+    if plan_id is not None:
+        with SessionLocal() as db:
+            persisted = db.get(InpatientDischargePlan, plan_id)
             if persisted is not None:
                 db.delete(persisted)
                 db.commit()

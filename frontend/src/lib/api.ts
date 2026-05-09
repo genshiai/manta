@@ -23,6 +23,7 @@ import type {
   InpatientBed,
   InpatientDocument,
   InpatientDocumentType,
+  InpatientDischargePlan,
   InpatientEvent,
   InpatientInstruction,
   InpatientPathway,
@@ -529,6 +530,22 @@ type ApiInpatientAiSummaryReview = {
   reviewed_by: string;
   review_note: string | null;
   created_at: string;
+};
+
+type ApiInpatientDischargePlan = {
+  id: number;
+  admission_id: number;
+  status: 'draft' | 'reviewed' | 'ready';
+  discharge_medication_note: string;
+  billing_candidates: Array<{
+    category: string;
+    label: string;
+    source: string;
+  }>;
+  follow_up_note: string;
+  reviewed_by: string;
+  reviewed_at: string;
+  updated_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -1124,6 +1141,18 @@ const mapInpatientAiSummaryReview = (item: ApiInpatientAiSummaryReview): Inpatie
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapInpatientDischargePlan = (item: ApiInpatientDischargePlan): InpatientDischargePlan => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  status: item.status,
+  dischargeMedicationNote: item.discharge_medication_note,
+  billingCandidates: item.billing_candidates,
+  followUpNote: item.follow_up_note,
+  reviewedBy: item.reviewed_by,
+  reviewedAt: formatTimestamp(item.reviewed_at),
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
 export const login = async (userId: string, password: string): Promise<UserSession> => {
   const response = await request<ApiLoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -1504,6 +1533,37 @@ export const createInpatientSummaryReview = async (
     },
   );
   return mapInpatientAiSummaryReview(review);
+};
+
+export const getInpatientDischargePlan = async (admissionId: number): Promise<InpatientDischargePlan> => {
+  const plan = await request<ApiInpatientDischargePlan>(
+    `/api/inpatient/admissions/${admissionId}/discharge-plan`,
+  );
+  return mapInpatientDischargePlan(plan);
+};
+
+export const updateInpatientDischargePlan = async (
+  admissionId: number,
+  payload: {
+    status: InpatientDischargePlan['status'];
+    dischargeMedicationNote: string;
+    billingCandidates: InpatientDischargePlan['billingCandidates'];
+    followUpNote: string;
+  },
+): Promise<InpatientDischargePlan> => {
+  const plan = await request<ApiInpatientDischargePlan>(
+    `/api/inpatient/admissions/${admissionId}/discharge-plan`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        status: payload.status,
+        discharge_medication_note: payload.dischargeMedicationNote,
+        billing_candidates: payload.billingCandidates,
+        follow_up_note: payload.followUpNote,
+      }),
+    },
+  );
+  return mapInpatientDischargePlan(plan);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

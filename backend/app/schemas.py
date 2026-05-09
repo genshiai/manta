@@ -15,6 +15,7 @@ InpatientDocumentStatus = Literal["draft", "signed", "archived"]
 InpatientDocumentType = Literal["admission_care_plan", "discharge_summary", "discharge_instruction"]
 PathwayTaskStatus = Literal["pending", "done", "variance", "skipped"]
 AiSummaryReviewStatus = Literal["accepted", "rejected"]
+DischargePlanStatus = Literal["draft", "reviewed", "ready"]
 
 
 class DetailItem(BaseModel):
@@ -580,6 +581,27 @@ class InpatientAiSummaryReviewCreateRequest(BaseModel):
     status: AiSummaryReviewStatus
     source_counts: dict[str, int] = {}
     review_note: str | None = None
+
+
+class InpatientDischargePlanRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    status: DischargePlanStatus
+    discharge_medication_note: str
+    billing_candidates: list[dict[str, str]]
+    follow_up_note: str
+    reviewed_by: str
+    reviewed_at: datetime
+    updated_at: datetime
+
+
+class InpatientDischargePlanUpdateRequest(BaseModel):
+    status: DischargePlanStatus = "reviewed"
+    discharge_medication_note: str | None = None
+    billing_candidates: list[dict[str, str]] | None = None
+    follow_up_note: str | None = None
 
 
 class AdmissionRead(BaseModel):
