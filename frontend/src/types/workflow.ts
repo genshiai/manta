@@ -265,6 +265,9 @@ export type InpatientPathwayTask = {
   dayOffset: number;
   category: string;
   title: string;
+  role?: string;
+  dueOn?: string;
+  dueTime?: string;
   status: InpatientPathwayTaskStatus;
   varianceNote?: string;
   updatedBy?: string;

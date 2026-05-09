@@ -807,11 +807,17 @@ export const WardWorkspace = ({
                       {pathway.pathwayName} · 開始日 {pathway.startedOn}
                     </div>
                     {pathway.tasks.map((task) => (
-                      <div className='grid gap-3 px-4 py-3 lg:grid-cols-[4rem_6rem_minmax(0,1fr)_6rem_10rem]' key={task.id}>
+                      <div className='grid gap-3 px-4 py-3 lg:grid-cols-[4rem_7rem_minmax(0,1fr)_6rem_10rem]' key={task.id}>
                         <span className='text-[13px] font-bold text-text-secondary'>Day {task.dayOffset}</span>
-                        <span className='text-[13px] text-text-secondary'>{task.category}</span>
+                        <div className='text-[12px] text-text-secondary'>
+                          <p className='font-bold'>{task.category}</p>
+                          <p className='mt-1 text-text-tertiary'>{task.role ?? '担当未設定'}</p>
+                        </div>
                         <div>
                           <p className='text-[14px] font-bold text-text-primary'>{task.title}</p>
+                          <p className='mt-1 text-[12px] text-text-tertiary'>
+                            {task.dueOn ?? '予定日未設定'} {task.dueTime ?? ''}
+                          </p>
                           {task.varianceNote ? <p className='mt-1 text-[12px] text-red-900'>{task.varianceNote}</p> : null}
                         </div>
                         <span className={cn('inline-flex h-7 w-fit items-center rounded-md border px-2 text-[12px] font-bold', pathwayStatusClasses[task.status])}>

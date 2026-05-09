@@ -392,6 +392,8 @@ def test_inpatient_pathway_and_events() -> None:
 
     assert pathway["pathway_master_id"] == pathway_master_id
     assert len(pathway["tasks"]) >= 3
+    assert pathway["tasks"][0]["due_on"]
+    assert pathway["tasks"][0]["role"]
     assert task_response.status_code == 200
     assert task_response.json()["status"] == "variance"
     assert events_response.status_code == 200

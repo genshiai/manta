@@ -503,6 +503,9 @@ type ApiInpatientPathwayTask = {
   day_offset: number;
   category: string;
   title: string;
+  role: string | null;
+  due_on: string | null;
+  due_time: string | null;
   status: 'pending' | 'done' | 'variance' | 'skipped';
   variance_note: string | null;
   updated_by: string | null;
@@ -1130,6 +1133,9 @@ const mapInpatientPathwayTask = (item: ApiInpatientPathwayTask): InpatientPathwa
   dayOffset: item.day_offset,
   category: item.category,
   title: item.title,
+  role: item.role ?? undefined,
+  dueOn: item.due_on ?? undefined,
+  dueTime: item.due_time ?? undefined,
   status: item.status,
   varianceNote: item.variance_note ?? undefined,
   updatedBy: item.updated_by ?? undefined,

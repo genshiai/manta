@@ -2276,6 +2276,7 @@ def create_inpatient_pathway(
     )
     db.add(assignment)
     db.flush()
+    started_on = assignment.started_on
     master_tasks = []
     if pathway_master is not None:
         master_tasks = db.scalars(
@@ -2289,6 +2290,9 @@ def create_inpatient_pathway(
             day_offset=task.day_offset if pathway_master else task[0],
             category=task.category if pathway_master else task[1],
             title=task.title if pathway_master else task[2],
+            role=task.role if pathway_master else None,
+            due_on=started_on + timedelta(days=task.day_offset if pathway_master else task[0]),
+            due_time=task.due_time if pathway_master else None,
             status="pending",
             updated_at=now,
         )

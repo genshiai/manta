@@ -533,6 +533,9 @@ class InpatientPathwayTaskRead(BaseModel):
     day_offset: int
     category: str
     title: str
+    role: str | None = None
+    due_on: date | None = None
+    due_time: str | None = None
     status: PathwayTaskStatus
     variance_note: str | None = None
     updated_by: str | None = None
