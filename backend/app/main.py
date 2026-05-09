@@ -67,6 +67,8 @@ from .schemas import (
     InpatientInstructionCreateRequest,
     InpatientInstructionRead,
     InpatientInstructionUpdateRequest,
+    InpatientProgressDateRow,
+    InpatientProgressRead,
     LabLongTrendItem,
     LabLongTrendPoint,
     LabSetOptionCreateRequest,
@@ -910,6 +912,12 @@ def _format_lab_date(value: datetime | None) -> str:
     return value.astimezone(TOKYO_TZ).strftime("%Y/%m/%d")
 
 
+def _format_progress_date(value: datetime | None) -> str:
+    if value is None:
+        return "日付未設定"
+    return value.astimezone(TOKYO_TZ).strftime("%Y/%m/%d")
+
+
 def _format_lab_value(row: Observation) -> str:
     if row.value_quantity_value is not None:
         value = row.value_quantity_value.normalize()
@@ -990,6 +998,76 @@ def build_lab_long_trends(rows: list[Observation]) -> list[LabLongTrendItem]:
         )
 
     return sorted(trends, key=lambda item: (item.abnormal_count == 0, item.item))
+
+
+def build_inpatient_progress(
+    *,
+    admission: Admission,
+    observations: list[Observation],
+    prescriptions: list[PrescriptionOrder],
+    lab_orders: list[LabOrder],
+    instructions: list[InpatientInstruction],
+    nursing_notes: list[NursingNote],
+) -> InpatientProgressRead:
+    rows_by_date: dict[str, dict[str, list[str]]] = {}
+
+    def row_for(date_key: str) -> dict[str, list[str]]:
+        return rows_by_date.setdefault(
+            date_key,
+            {
+                "vitals": [],
+                "labs": [],
+                "prescriptions": [],
+                "lab_orders": [],
+                "instructions": [],
+                "nursing_notes": [],
+            },
+        )
+
+    for observation in observations:
+        date_key = _format_progress_date(observation.effective_datetime)
+        label = observation.code_text or observation.code_display or observation.code or "観察"
+        value = _format_lab_value(observation)
+        if observation.category == "vital-signs":
+            row_for(date_key)["vitals"].append(f"{label}: {value}".strip())
+        elif observation.category == "laboratory":
+            row_for(date_key)["labs"].append(f"{label}: {value}".strip())
+
+    for prescription in prescriptions:
+        date_key = _format_progress_date(prescription.created_at)
+        row_for(date_key)["prescriptions"].append(
+            f"{prescription.drug_name} {prescription.dosage} / {prescription.days}"
+        )
+
+    for order in lab_orders:
+        date_key = _format_progress_date(order.created_at)
+        urgency = f"{order.urgency} " if order.urgency else ""
+        row_for(date_key)["lab_orders"].append(f"{urgency}{order.category}: {', '.join(order.items)}")
+
+    for instruction in instructions:
+        date_key = _format_progress_date(instruction.due_at or instruction.created_at)
+        row_for(date_key)["instructions"].append(
+            f"[{instruction.status}] {instruction.category}: {instruction.title}"
+        )
+
+    for note in nursing_notes:
+        date_key = _format_progress_date(note.recorded_at)
+        focus = f"{note.focus}: " if note.focus else ""
+        row_for(date_key)["nursing_notes"].append(f"{focus}{note.assessment or note.plan or note.objective}")
+
+    sorted_dates = sorted(
+        rows_by_date,
+        key=lambda value: datetime.strptime(value, "%Y/%m/%d") if value != "日付未設定" else datetime.min,
+        reverse=True,
+    )
+    return InpatientProgressRead(
+        admission_id=admission.id,
+        patient_id=admission.patient_id,
+        rows=[
+            InpatientProgressDateRow(date=date_key, **rows_by_date[date_key])
+            for date_key in sorted_dates
+        ],
+    )
 
 
 def get_chart_order_masters_read(
@@ -1528,6 +1606,51 @@ def list_inpatient_instructions(
         .where(InpatientInstruction.admission_id == admission_id)
         .order_by(InpatientInstruction.status, InpatientInstruction.due_at, InpatientInstruction.id)
     ).all()
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/progress", response_model=InpatientProgressRead)
+def get_inpatient_progress(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientProgressRead:
+    admission = get_admission_or_404(db, admission_id)
+    observations = db.scalars(
+        select(Observation)
+        .where(
+            Observation.patient_id == admission.patient_id,
+            Observation.category.in_(["vital-signs", "laboratory"]),
+        )
+        .order_by(desc(Observation.effective_datetime))
+    ).all()
+    prescriptions = db.scalars(
+        select(PrescriptionOrder)
+        .where(PrescriptionOrder.patient_id == admission.patient_id)
+        .order_by(desc(PrescriptionOrder.created_at))
+    ).all()
+    lab_orders = db.scalars(
+        select(LabOrder)
+        .where(LabOrder.patient_id == admission.patient_id)
+        .order_by(desc(LabOrder.created_at))
+    ).all()
+    instructions = db.scalars(
+        select(InpatientInstruction)
+        .where(InpatientInstruction.admission_id == admission_id)
+        .order_by(desc(InpatientInstruction.created_at))
+    ).all()
+    nursing_notes = db.scalars(
+        select(NursingNote)
+        .where(NursingNote.admission_id == admission_id)
+        .order_by(desc(NursingNote.recorded_at))
+    ).all()
+    return build_inpatient_progress(
+        admission=admission,
+        observations=observations,
+        prescriptions=prescriptions,
+        lab_orders=lab_orders,
+        instructions=instructions,
+        nursing_notes=nursing_notes,
+    )
 
 
 @app.post(

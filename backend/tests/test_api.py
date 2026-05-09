@@ -264,6 +264,29 @@ def test_list_and_update_inpatient_beds() -> None:
         db.commit()
 
 
+def test_get_inpatient_progress() -> None:
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/progress",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["admission_id"] == admission_id
+    assert isinstance(payload["rows"], list)
+    assert payload["rows"]
+    assert {"date", "vitals", "labs", "prescriptions", "lab_orders", "instructions", "nursing_notes"} <= set(
+        payload["rows"][0]
+    )
+
+
 def test_reject_patients_without_token() -> None:
     with TestClient(app) as client:
         response = client.get("/api/patients")

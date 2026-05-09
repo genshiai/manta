@@ -21,6 +21,7 @@ import type {
   InpatientAdmission,
   InpatientBed,
   InpatientInstruction,
+  InpatientProgress,
   LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
@@ -432,6 +433,20 @@ type ApiNursingNote = {
   plan: string;
   recorded_by: string;
   recorded_at: string;
+};
+
+type ApiInpatientProgress = {
+  admission_id: number;
+  patient_id: string;
+  rows: Array<{
+    date: string;
+    vitals: string[];
+    labs: string[];
+    prescriptions: string[];
+    lab_orders: string[];
+    instructions: string[];
+    nursing_notes: string[];
+  }>;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -932,6 +947,20 @@ const mapNursingNote = (item: ApiNursingNote): NursingNote => ({
   recordedAt: formatTimestamp(item.recorded_at),
 });
 
+const mapInpatientProgress = (item: ApiInpatientProgress): InpatientProgress => ({
+  admissionId: item.admission_id,
+  patientId: item.patient_id,
+  rows: item.rows.map((row) => ({
+    date: row.date,
+    vitals: row.vitals,
+    labs: row.labs,
+    prescriptions: row.prescriptions,
+    labOrders: row.lab_orders,
+    instructions: row.instructions,
+    nursingNotes: row.nursing_notes,
+  })),
+});
+
 export const login = async (userId: string, password: string): Promise<UserSession> => {
   const response = await request<ApiLoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -1112,6 +1141,13 @@ export const listInpatientInstructions = async (admissionId: number): Promise<In
     `/api/inpatient/admissions/${admissionId}/instructions`,
   );
   return instructions.map(mapInpatientInstruction);
+};
+
+export const getInpatientProgress = async (admissionId: number): Promise<InpatientProgress> => {
+  const progress = await request<ApiInpatientProgress>(
+    `/api/inpatient/admissions/${admissionId}/progress`,
+  );
+  return mapInpatientProgress(progress);
 };
 
 export const updateInpatientInstructionStatus = async (

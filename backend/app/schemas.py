@@ -455,6 +455,22 @@ class NursingNoteCreateRequest(BaseModel):
     plan: str = ""
 
 
+class InpatientProgressDateRow(BaseModel):
+    date: str
+    vitals: list[str] = []
+    labs: list[str] = []
+    prescriptions: list[str] = []
+    lab_orders: list[str] = []
+    instructions: list[str] = []
+    nursing_notes: list[str] = []
+
+
+class InpatientProgressRead(BaseModel):
+    admission_id: int
+    patient_id: str
+    rows: list[InpatientProgressDateRow]
+
+
 class AdmissionRead(BaseModel):
     id: int
     patient: PatientSummaryRead

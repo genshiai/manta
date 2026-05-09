@@ -199,6 +199,22 @@ export type NursingNote = {
   recordedAt: string;
 };
 
+export type InpatientProgressRow = {
+  date: string;
+  vitals: string[];
+  labs: string[];
+  prescriptions: string[];
+  labOrders: string[];
+  instructions: string[];
+  nursingNotes: string[];
+};
+
+export type InpatientProgress = {
+  admissionId: number;
+  patientId: string;
+  rows: InpatientProgressRow[];
+};
+
 export type ChartVersion = {
   version: number;
   savedAt: string;

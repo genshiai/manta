@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bed, CheckCircle2, ClipboardList, FilePenLine, MoveRight, UserRoundCheck } from 'lucide-react';
+import { Activity, Bed, CheckCircle2, ClipboardList, FilePenLine, MoveRight, UserRoundCheck } from 'lucide-react';
 import {
   createNursingNote,
+  getInpatientProgress,
   isUnauthorizedError,
   listInpatientAdmissions,
   listInpatientBeds,
@@ -12,7 +13,7 @@ import {
   updateInpatientInstructionStatus,
 } from '../lib/api';
 import { cn } from '../lib/cn';
-import type { InpatientAdmission, InpatientBed, InpatientInstruction, NursingNote } from '../types/workflow';
+import type { InpatientAdmission, InpatientBed, InpatientInstruction, InpatientProgress, NursingNote } from '../types/workflow';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
@@ -66,6 +67,7 @@ export const WardWorkspace = ({
   const [selectedAdmissionId, setSelectedAdmissionId] = useState<number | null>(admissions[0]?.id ?? null);
   const [instructions, setInstructions] = useState<InpatientInstruction[]>([]);
   const [nursingNotes, setNursingNotes] = useState<NursingNote[]>([]);
+  const [progress, setProgress] = useState<InpatientProgress | null>(null);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -89,6 +91,7 @@ export const WardWorkspace = ({
     if (!selectedAdmission) {
       setInstructions([]);
       setNursingNotes([]);
+      setProgress(null);
       return;
     }
 
@@ -98,15 +101,17 @@ export const WardWorkspace = ({
       setIsLoadingDetail(true);
       setErrorMessage(null);
       try {
-        const [nextInstructions, nextNotes] = await Promise.all([
+        const [nextInstructions, nextNotes, nextProgress] = await Promise.all([
           listInpatientInstructions(selectedAdmission.id),
           listNursingNotes(selectedAdmission.id),
+          getInpatientProgress(selectedAdmission.id),
         ]);
         if (cancelled) {
           return;
         }
         setInstructions(nextInstructions);
         setNursingNotes(nextNotes);
+        setProgress(nextProgress);
       } catch (error) {
         if (cancelled) {
           return;
@@ -194,6 +199,7 @@ export const WardWorkspace = ({
     try {
       const note = await createNursingNote(selectedAdmission.id, noteForm);
       setNursingNotes((current) => [note, ...current]);
+      setProgress(await getInpatientProgress(selectedAdmission.id));
       setNoteForm(emptyNoteForm);
       await refreshAdmissions();
     } catch (error) {
@@ -208,6 +214,7 @@ export const WardWorkspace = ({
   };
 
   const pendingInstructions = instructions.filter((instruction) => instruction.status === 'pending');
+  const progressRows = progress?.rows ?? [];
   const bedsByWard = useMemo(() => {
     const grouped = new Map<string, InpatientBed[]>();
     beds.forEach((bed) => {
@@ -350,6 +357,48 @@ export const WardWorkspace = ({
                   <Button onClick={() => onOpenChart(selectedAdmission.patientId)} size='sm' type='button' variant='outline'>
                     カルテを開く
                   </Button>
+                </div>
+              </section>
+
+              <section className='rounded-8 border border-border bg-card'>
+                <div className='flex items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                  <div className='flex items-center gap-2'>
+                    <Activity size={17} className='text-brand' />
+                    <h2 className='text-[16px] font-bold text-text-primary'>経過表</h2>
+                  </div>
+                  <span className='text-[12px] text-text-tertiary'>{progressRows.length}日分</span>
+                </div>
+                <div className='overflow-auto'>
+                  <div className='min-w-[760px]'>
+                    <div className='grid grid-cols-[7rem_repeat(5,minmax(8rem,1fr))] border-b border-border bg-surface-subtle px-4 py-2 text-[12px] font-bold text-text-tertiary'>
+                      <span>日付</span>
+                      <span>バイタル</span>
+                      <span>検査</span>
+                      <span>処方</span>
+                      <span>指示</span>
+                      <span>看護記録</span>
+                    </div>
+                    <div className='divide-y divide-border'>
+                      {progressRows.slice(0, 8).map((row) => (
+                        <div
+                          className='grid grid-cols-[7rem_repeat(5,minmax(8rem,1fr))] gap-2 px-4 py-3 text-[12px] leading-normal text-text-secondary'
+                          key={row.date}
+                        >
+                          <span className='font-bold text-text-primary'>{row.date}</span>
+                          <div className='space-y-1'>{row.vitals.slice(0, 3).map((item) => <p key={item}>{item}</p>)}</div>
+                          <div className='space-y-1'>
+                            {[...row.labs.slice(0, 3), ...row.labOrders.slice(0, 1)].map((item) => <p key={item}>{item}</p>)}
+                          </div>
+                          <div className='space-y-1'>{row.prescriptions.slice(0, 2).map((item) => <p key={item}>{item}</p>)}</div>
+                          <div className='space-y-1'>{row.instructions.slice(0, 3).map((item) => <p key={item}>{item}</p>)}</div>
+                          <div className='space-y-1'>{row.nursingNotes.slice(0, 2).map((item) => <p key={item}>{item}</p>)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {progressRows.length === 0 ? (
+                      <div className='px-4 py-6 text-[13px] text-text-tertiary'>経過表に表示できる記録がありません。</div>
+                    ) : null}
+                  </div>
                 </div>
               </section>
 

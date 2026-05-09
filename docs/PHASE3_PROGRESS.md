@@ -20,12 +20,14 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `POST /api/inpatient/admissions/{admission_id}/discharge`: 退院実施
 - `GET /api/inpatient/beds`: 病床ボード
 - `PATCH /api/inpatient/beds/{bed_id}`: 病床状態更新
+- `GET /api/inpatient/admissions/{admission_id}/progress`: 入院経過表
 - `GET/POST /api/inpatient/admissions/{admission_id}/instructions`: 入院指示
 - `PATCH /api/inpatient/instructions/{instruction_id}`: 指示ステータス更新
 - `GET/POST /api/inpatient/admissions/{admission_id}/nursing-notes`: 看護記録
 - ホームの入院タブを mock ではなく入院 API データで表示
 - 専用の病棟ワークスペースを追加し、入院患者選択、指示簿、看護記録 SOAP 追加を同一画面で扱えるようにした
 - 病床ボードを病棟ワークスペースへ追加し、空床/使用中/清掃中/使用不可の表示、清掃後の空床化、停止/再開、選択患者の転床操作に対応した
+- 経過表を追加し、バイタル、検査、検査オーダ、処方、入院指示、看護記録を日付軸で横断表示できるようにした
 
 ## Phase 3 実装範囲
 
@@ -38,7 +40,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |
 | 指示簿 | データ/API/UI 済み | 指示受け、職種別フィルタ、期限超過表示 |
 | 看護記録 SOAP | データ/API/UI 済み | フォーカス/経過表連動、記録テンプレート |
-| 経過表 | 未着手 | バイタル、検査、指示、看護記録を日別グリッドに集約 |
+| 経過表 | API/UI 済み | 表示期間切替、看護必要度、入院イベント、出力最適化 |
 | 入院診療計画書 | 未着手 | テンプレート + 患者/病名/入院目的の差し込み |
 | サマリ管理 | 未着手 | 入院サマリ、退院サマリ、AI 要約の保存 |
 | クリティカルパス | 未着手 | パス master、日別タスク、逸脱記録 |
@@ -46,9 +48,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 
 ## 次の実装順
 
-1. 経過表
-   - バイタル、検査、処方、入院指示、看護記録を日付軸で固定表示する。
-2. 入退院文書
+1. 入退院文書
    - 入院診療計画書、退院サマリ、退院時指導文書をテンプレート化する。
-3. AI 要約
+2. AI 要約
    - 入院経過、看護記録、検査推移、処方変更から要約案を生成し、人間が保存確定する。
