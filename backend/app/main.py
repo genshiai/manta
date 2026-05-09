@@ -24,7 +24,11 @@ from .models import (
     DiagnosisAliasMaster,
     DiagnosisMaster,
     InpatientDocument,
+    InpatientAiSummaryReview,
+    InpatientEvent,
     InpatientInstruction,
+    InpatientPathwayAssignment,
+    InpatientPathwayTask,
     LabOrder,
     NursingNote,
     Observation,
@@ -69,8 +73,15 @@ from .schemas import (
     InpatientDocumentCreateRequest,
     InpatientDocumentRead,
     InpatientDocumentUpdateRequest,
+    InpatientAiSummaryReviewCreateRequest,
+    InpatientAiSummaryReviewRead,
+    InpatientEventRead,
     InpatientInstructionRead,
     InpatientInstructionUpdateRequest,
+    InpatientPathwayCreateRequest,
+    InpatientPathwayRead,
+    InpatientPathwayTaskRead,
+    InpatientPathwayTaskUpdateRequest,
     InpatientProgressDateRow,
     InpatientProgressRead,
     InpatientSummaryDraftRead,
@@ -181,6 +192,26 @@ def log_audit(
     )
 
 
+def add_inpatient_event(
+    db: Session,
+    *,
+    admission_id: int,
+    event_type: str,
+    title: str,
+    actor: str,
+    detail: str | None = None,
+) -> None:
+    db.add(
+        InpatientEvent(
+            admission_id=admission_id,
+            event_type=event_type,
+            title=title,
+            detail=detail,
+            actor=actor,
+        )
+    )
+
+
 def patient_to_read(patient: Patient) -> PatientSummaryRead:
     return PatientSummaryRead(
         id=patient.id,
@@ -271,6 +302,13 @@ def get_inpatient_document_or_404(db: Session, document_id: int) -> InpatientDoc
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient document not found")
     return document
+
+
+def get_inpatient_pathway_task_or_404(db: Session, task_id: int) -> InpatientPathwayTask:
+    task = db.get(InpatientPathwayTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient pathway task not found")
+    return task
 
 
 def get_user_or_404(db: Session, user_id: str) -> User:
@@ -1362,6 +1400,33 @@ def build_inpatient_summary_draft(
     )
 
 
+STANDARD_PATHWAY_TASKS = [
+    (0, "入院", "入院時評価、持参薬確認、転倒リスク評価"),
+    (0, "検査", "入院時採血・画像・感染症確認"),
+    (1, "治療", "初期治療反応と指示内容の再評価"),
+    (2, "看護", "セルフケア、疼痛、栄養、排泄状況の評価"),
+    (3, "退院支援", "退院目標、家族説明、地域連携の確認"),
+    (5, "退院支援", "退院時処方、指導文書、次回外来の確認"),
+]
+
+
+def inpatient_pathway_to_read(
+    assignment: InpatientPathwayAssignment,
+    tasks: list[InpatientPathwayTask],
+) -> InpatientPathwayRead:
+    return InpatientPathwayRead(
+        id=assignment.id,
+        admission_id=assignment.admission_id,
+        pathway_name=assignment.pathway_name,
+        status=assignment.status,
+        started_on=assignment.started_on,
+        assigned_by=assignment.assigned_by,
+        created_at=assignment.created_at,
+        updated_at=assignment.updated_at,
+        tasks=[InpatientPathwayTaskRead.model_validate(task) for task in tasks],
+    )
+
+
 def get_chart_order_masters_read(
     db: Session,
     *,
@@ -1777,6 +1842,15 @@ def create_admission(
     db.add(admission)
     if bed and payload.status in ("active", "discharge_permitted"):
         bed.status = "occupied"
+    db.flush()
+    add_inpatient_event(
+        db,
+        admission_id=admission.id,
+        event_type="admission_created",
+        title="入院エピソード作成",
+        detail=f"{ward.name if ward else '病棟未定'} {bed.bed_label if bed else ''}".strip() or None,
+        actor=current_user.display_name,
+    )
     log_audit(
         db,
         actor=current_user.display_name,
@@ -1817,6 +1891,14 @@ def transfer_admission(
     admission.note = payload.note or admission.note
     admission.updated_at = utcnow()
     bed.status = "occupied"
+    add_inpatient_event(
+        db,
+        admission_id=admission.id,
+        event_type="transfer",
+        title="転棟・転床",
+        detail=f"{ward.name} {bed.bed_label} へ移動しました。",
+        actor=current_user.display_name,
+    )
     log_audit(
         db,
         actor=current_user.display_name,
@@ -1843,6 +1925,14 @@ def permit_discharge(
     admission.discharge_permitted_at = utcnow()
     admission.note = payload.note or admission.note
     admission.updated_at = utcnow()
+    add_inpatient_event(
+        db,
+        admission_id=admission.id,
+        event_type="discharge_permitted",
+        title="退院許可",
+        detail=payload.note,
+        actor=current_user.display_name,
+    )
     log_audit(
         db,
         actor=current_user.display_name,
@@ -1873,6 +1963,14 @@ def discharge_admission(
         bed = db.get(BedMaster, admission.bed_id)
         if bed is not None:
             bed.status = "cleaning"
+    add_inpatient_event(
+        db,
+        admission_id=admission.id,
+        event_type="discharged",
+        title="退院実施",
+        detail=payload.note,
+        actor=current_user.display_name,
+    )
     log_audit(
         db,
         actor=current_user.display_name,
@@ -1995,6 +2093,160 @@ def get_inpatient_summary_draft(
         nursing_notes=nursing_notes,
         days=days,
     )
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/events", response_model=list[InpatientEventRead])
+def list_inpatient_events(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[InpatientEventRead]:
+    admission = get_admission_or_404(db, admission_id)
+    events = db.scalars(
+        select(InpatientEvent)
+        .where(InpatientEvent.admission_id == admission_id)
+        .order_by(desc(InpatientEvent.occurred_at), desc(InpatientEvent.id))
+    ).all()
+    if events:
+        return events
+    return [
+        InpatientEventRead(
+            id=0,
+            admission_id=admission.id,
+            event_type="admission_created",
+            title="入院エピソード作成",
+            detail=admission.note,
+            actor=admission.attending_doctor,
+            occurred_at=admission.requested_at,
+        )
+    ]
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/pathway", response_model=InpatientPathwayRead | None)
+def get_inpatient_pathway(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientPathwayRead | None:
+    get_admission_or_404(db, admission_id)
+    assignment = db.scalar(
+        select(InpatientPathwayAssignment)
+        .where(InpatientPathwayAssignment.admission_id == admission_id)
+        .order_by(desc(InpatientPathwayAssignment.created_at), desc(InpatientPathwayAssignment.id))
+    )
+    if assignment is None:
+        return None
+    tasks = db.scalars(
+        select(InpatientPathwayTask)
+        .where(InpatientPathwayTask.pathway_assignment_id == assignment.id)
+        .order_by(InpatientPathwayTask.day_offset, InpatientPathwayTask.id)
+    ).all()
+    return inpatient_pathway_to_read(assignment, tasks)
+
+
+@app.post(
+    "/api/inpatient/admissions/{admission_id}/pathway",
+    response_model=InpatientPathwayRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_inpatient_pathway(
+    admission_id: int,
+    payload: InpatientPathwayCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientPathwayRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    existing = db.scalar(
+        select(InpatientPathwayAssignment).where(
+            InpatientPathwayAssignment.admission_id == admission_id,
+            InpatientPathwayAssignment.status == "active",
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Active pathway already exists")
+    now = utcnow()
+    assignment = InpatientPathwayAssignment(
+        admission_id=admission_id,
+        pathway_name=payload.pathway_name,
+        status="active",
+        started_on=payload.started_on or (admission.admitted_at or now).astimezone(TOKYO_TZ).date(),
+        assigned_by=current_user.display_name,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(assignment)
+    db.flush()
+    tasks = [
+        InpatientPathwayTask(
+            pathway_assignment_id=assignment.id,
+            day_offset=day_offset,
+            category=category,
+            title=title,
+            status="pending",
+            updated_at=now,
+        )
+        for day_offset, category, title in STANDARD_PATHWAY_TASKS
+    ]
+    db.add_all(tasks)
+    add_inpatient_event(
+        db,
+        admission_id=admission_id,
+        event_type="pathway_started",
+        title="クリティカルパス開始",
+        detail=payload.pathway_name,
+        actor=current_user.display_name,
+    )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="クリティカルパス開始",
+        scope="chart",
+        detail=f"{payload.pathway_name} を開始しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(assignment)
+    return inpatient_pathway_to_read(assignment, tasks)
+
+
+@app.patch("/api/inpatient/pathway-tasks/{task_id}", response_model=InpatientPathwayTaskRead)
+def update_inpatient_pathway_task(
+    task_id: int,
+    payload: InpatientPathwayTaskUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientPathwayTaskRead:
+    task = get_inpatient_pathway_task_or_404(db, task_id)
+    assignment = db.get(InpatientPathwayAssignment, task.pathway_assignment_id)
+    if assignment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient pathway not found")
+    admission = get_admission_or_404(db, assignment.admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    task.status = payload.status
+    task.variance_note = payload.variance_note
+    task.updated_by = current_user.display_name
+    task.updated_at = utcnow()
+    if payload.status == "variance":
+        add_inpatient_event(
+            db,
+            admission_id=assignment.admission_id,
+            event_type="pathway_variance",
+            title=f"パス逸脱: {task.title}",
+            detail=payload.variance_note,
+            actor=current_user.display_name,
+        )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="パスタスク更新",
+        scope="chart",
+        detail=f"{task.title} を {payload.status} に更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(task)
+    return task
 
 
 @app.post(
@@ -2153,6 +2405,14 @@ def create_inpatient_document(
         updated_at=now,
     )
     db.add(document)
+    add_inpatient_event(
+        db,
+        admission_id=admission_id,
+        event_type="document_created",
+        title=f"文書作成: {title}",
+        detail=payload.document_type,
+        actor=current_user.display_name,
+    )
     log_audit(
         db,
         actor=current_user.display_name,
@@ -2183,6 +2443,15 @@ def update_inpatient_document(
     if payload.status is not None:
         document.status = payload.status
     document.updated_at = utcnow()
+    if payload.status == "signed":
+        add_inpatient_event(
+            db,
+            admission_id=document.admission_id,
+            event_type="document_signed",
+            title=f"文書署名: {document.title}",
+            detail=document.document_type,
+            actor=current_user.display_name,
+        )
     log_audit(
         db,
         actor=current_user.display_name,
@@ -2194,6 +2463,64 @@ def update_inpatient_document(
     db.commit()
     db.refresh(document)
     return document
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/summary-reviews", response_model=list[InpatientAiSummaryReviewRead])
+def list_inpatient_summary_reviews(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[InpatientAiSummaryReviewRead]:
+    get_admission_or_404(db, admission_id)
+    return db.scalars(
+        select(InpatientAiSummaryReview)
+        .where(InpatientAiSummaryReview.admission_id == admission_id)
+        .order_by(desc(InpatientAiSummaryReview.created_at), desc(InpatientAiSummaryReview.id))
+    ).all()
+
+
+@app.post(
+    "/api/inpatient/admissions/{admission_id}/summary-reviews",
+    response_model=InpatientAiSummaryReviewRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_inpatient_summary_review(
+    admission_id: int,
+    payload: InpatientAiSummaryReviewCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientAiSummaryReviewRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    review = InpatientAiSummaryReview(
+        admission_id=admission_id,
+        summary_title=payload.summary_title,
+        summary_body=payload.summary_body,
+        status=payload.status,
+        source_counts=payload.source_counts,
+        reviewed_by=current_user.display_name,
+        review_note=payload.review_note,
+    )
+    db.add(review)
+    add_inpatient_event(
+        db,
+        admission_id=admission_id,
+        event_type=f"summary_{payload.status}",
+        title=f"要約案{ '採用' if payload.status == 'accepted' else '差し戻し' }",
+        detail=payload.review_note,
+        actor=current_user.display_name,
+    )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="AI要約レビュー",
+        scope="chart",
+        detail=f"{payload.summary_title} を {payload.status} にしました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(review)
+    return review
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])

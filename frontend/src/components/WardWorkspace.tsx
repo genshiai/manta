@@ -2,27 +2,37 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, Bed, CheckCircle2, ClipboardList, FilePenLine, FileText, MoveRight, UserRoundCheck } from 'lucide-react';
 import {
   createInpatientDocument,
+  createInpatientPathway,
+  createInpatientSummaryReview,
   createNursingNote,
+  getInpatientPathway,
   getInpatientProgress,
   getInpatientSummaryDraft,
   isUnauthorizedError,
   listInpatientAdmissions,
   listInpatientBeds,
   listInpatientDocuments,
+  listInpatientEvents,
   listInpatientInstructions,
   listNursingNotes,
+  listInpatientSummaryReviews,
   transferInpatientAdmission,
   updateInpatientBedStatus,
   updateInpatientDocument,
   updateInpatientInstructionStatus,
+  updateInpatientPathwayTask,
 } from '../lib/api';
 import { cn } from '../lib/cn';
 import type {
   InpatientAdmission,
+  InpatientAiSummaryReview,
   InpatientBed,
   InpatientDocument,
   InpatientDocumentType,
+  InpatientEvent,
   InpatientInstruction,
+  InpatientPathway,
+  InpatientPathwayTask,
   InpatientProgress,
   InpatientSummaryDraft,
   NursingNote,
@@ -81,6 +91,20 @@ const documentStatusClasses: Record<InpatientDocument['status'], string> = {
   archived: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-700',
 };
 
+const pathwayStatusLabels: Record<InpatientPathwayTask['status'], string> = {
+  pending: '未実施',
+  done: '完了',
+  variance: '逸脱',
+  skipped: '除外',
+};
+
+const pathwayStatusClasses: Record<InpatientPathwayTask['status'], string> = {
+  pending: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+  done: 'border-green-200 bg-green-50 text-green-900',
+  variance: 'border-red-200 bg-red-50 text-red-1000',
+  skipped: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-700',
+};
+
 const emptyNoteForm = {
   focus: '',
   subjective: '',
@@ -101,11 +125,16 @@ export const WardWorkspace = ({
   const [documents, setDocuments] = useState<InpatientDocument[]>([]);
   const [progress, setProgress] = useState<InpatientProgress | null>(null);
   const [summaryDraft, setSummaryDraft] = useState<InpatientSummaryDraft | null>(null);
+  const [events, setEvents] = useState<InpatientEvent[]>([]);
+  const [pathway, setPathway] = useState<InpatientPathway | null>(null);
+  const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
+  const [isStartingPathway, setIsStartingPathway] = useState(false);
+  const [isReviewingSummary, setIsReviewingSummary] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -128,6 +157,9 @@ export const WardWorkspace = ({
       setDocuments([]);
       setProgress(null);
       setSummaryDraft(null);
+      setEvents([]);
+      setPathway(null);
+      setSummaryReviews([]);
       return;
     }
 
@@ -137,12 +169,24 @@ export const WardWorkspace = ({
       setIsLoadingDetail(true);
       setErrorMessage(null);
       try {
-        const [nextInstructions, nextNotes, nextDocuments, nextProgress, nextSummaryDraft] = await Promise.all([
+        const [
+          nextInstructions,
+          nextNotes,
+          nextDocuments,
+          nextProgress,
+          nextSummaryDraft,
+          nextEvents,
+          nextPathway,
+          nextSummaryReviews,
+        ] = await Promise.all([
           listInpatientInstructions(selectedAdmission.id),
           listNursingNotes(selectedAdmission.id),
           listInpatientDocuments(selectedAdmission.id),
           getInpatientProgress(selectedAdmission.id),
           getInpatientSummaryDraft(selectedAdmission.id),
+          listInpatientEvents(selectedAdmission.id),
+          getInpatientPathway(selectedAdmission.id),
+          listInpatientSummaryReviews(selectedAdmission.id),
         ]);
         if (cancelled) {
           return;
@@ -152,6 +196,9 @@ export const WardWorkspace = ({
         setDocuments(nextDocuments);
         setProgress(nextProgress);
         setSummaryDraft(nextSummaryDraft);
+        setEvents(nextEvents);
+        setPathway(nextPathway);
+        setSummaryReviews(nextSummaryReviews);
       } catch (error) {
         if (cancelled) {
           return;
@@ -316,8 +363,95 @@ export const WardWorkspace = ({
     }
   };
 
+  const refreshEvents = async () => {
+    if (!selectedAdmission) {
+      return;
+    }
+    setEvents(await listInpatientEvents(selectedAdmission.id));
+  };
+
+  const handleStartPathway = async () => {
+    if (!selectedAdmission || isStartingPathway) {
+      return;
+    }
+
+    setIsStartingPathway(true);
+    setErrorMessage(null);
+    try {
+      const nextPathway = await createInpatientPathway(selectedAdmission.id);
+      setPathway(nextPathway);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : 'クリティカルパスの開始に失敗しました。');
+    } finally {
+      setIsStartingPathway(false);
+    }
+  };
+
+  const handlePathwayTaskStatus = async (
+    task: InpatientPathwayTask,
+    status: InpatientPathwayTask['status'],
+  ) => {
+    try {
+      const updated = await updateInpatientPathwayTask(task.id, {
+        status,
+        varianceNote: status === 'variance' ? `${task.title} の逸脱を記録` : undefined,
+      });
+      setPathway((current) => current ? {
+        ...current,
+        tasks: current.tasks.map((item) => (item.id === updated.id ? updated : item)),
+      } : current);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : 'パスタスクの更新に失敗しました。');
+    }
+  };
+
+  const handleSummaryReview = async (status: InpatientAiSummaryReview['status']) => {
+    if (!selectedAdmission || !summaryDraft || isReviewingSummary) {
+      return;
+    }
+
+    setIsReviewingSummary(true);
+    setErrorMessage(null);
+    try {
+      const review = await createInpatientSummaryReview(selectedAdmission.id, {
+        summaryTitle: summaryDraft.title,
+        summaryBody: summaryDraft.body,
+        status,
+        sourceCounts: summaryDraft.sourceCounts,
+        reviewNote: status === 'accepted' ? '退院サマリ作成候補として採用' : '記載内容を再確認',
+      });
+      setSummaryReviews((current) => [review, ...current]);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '要約レビューの保存に失敗しました。');
+    } finally {
+      setIsReviewingSummary(false);
+    }
+  };
+
   const pendingInstructions = instructions.filter((instruction) => instruction.status === 'pending');
   const progressRows = progress?.rows ?? [];
+  const pathwayTaskCounts = pathway?.tasks.reduce(
+    (counts, task) => {
+      counts[task.status] += 1;
+      return counts;
+    },
+    { pending: 0, done: 0, variance: 0, skipped: 0 } as Record<InpatientPathwayTask['status'], number>,
+  );
   const bedsByWard = useMemo(() => {
     const grouped = new Map<string, InpatientBed[]>();
     beds.forEach((bed) => {
@@ -535,6 +669,24 @@ export const WardWorkspace = ({
                   >
                     退院サマリ化
                   </Button>
+                  <Button
+                    disabled={!summaryDraft || isReviewingSummary}
+                    onClick={() => handleSummaryReview('accepted')}
+                    size='xs'
+                    type='button'
+                    variant='ghost'
+                  >
+                    採用
+                  </Button>
+                  <Button
+                    disabled={!summaryDraft || isReviewingSummary}
+                    onClick={() => handleSummaryReview('rejected')}
+                    size='xs'
+                    type='button'
+                    variant='ghost'
+                  >
+                    差戻し
+                  </Button>
                 </div>
                 {summaryDraft ? (
                   <div className='grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_14rem]'>
@@ -557,10 +709,63 @@ export const WardWorkspace = ({
                           <p key={event}>{event}</p>
                         ))}
                       </div>
+                      {summaryReviews[0] ? (
+                        <div className='rounded-md border border-border bg-white p-2'>
+                          <p className='font-bold text-text-primary'>
+                            最新レビュー: {summaryReviews[0].status === 'accepted' ? '採用' : '差戻し'}
+                          </p>
+                          <p className='mt-1 text-text-tertiary'>{summaryReviews[0].createdAt}</p>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : (
                   <div className='px-4 py-6 text-[13px] text-text-tertiary'>要約できる入院記録がありません。</div>
+                )}
+              </section>
+
+              <section className='rounded-8 border border-border bg-card'>
+                <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                  <div className='flex items-center gap-2'>
+                    <ClipboardList size={17} className='text-brand' />
+                    <h2 className='text-[16px] font-bold text-text-primary'>クリティカルパス</h2>
+                  </div>
+                  {pathway ? (
+                    <span className='text-[12px] text-text-tertiary'>
+                      未実施 {pathwayTaskCounts?.pending ?? 0} · 逸脱 {pathwayTaskCounts?.variance ?? 0}
+                    </span>
+                  ) : (
+                    <Button disabled={isStartingPathway} onClick={handleStartPathway} size='xs' type='button' variant='outline'>
+                      標準パス開始
+                    </Button>
+                  )}
+                </div>
+                {pathway ? (
+                  <div className='divide-y divide-border'>
+                    {pathway.tasks.map((task) => (
+                      <div className='grid gap-3 px-4 py-3 lg:grid-cols-[4rem_6rem_minmax(0,1fr)_6rem_10rem]' key={task.id}>
+                        <span className='text-[13px] font-bold text-text-secondary'>Day {task.dayOffset}</span>
+                        <span className='text-[13px] text-text-secondary'>{task.category}</span>
+                        <div>
+                          <p className='text-[14px] font-bold text-text-primary'>{task.title}</p>
+                          {task.varianceNote ? <p className='mt-1 text-[12px] text-red-900'>{task.varianceNote}</p> : null}
+                        </div>
+                        <span className={cn('inline-flex h-7 w-fit items-center rounded-md border px-2 text-[12px] font-bold', pathwayStatusClasses[task.status])}>
+                          {pathwayStatusLabels[task.status]}
+                        </span>
+                        <div className='flex flex-wrap gap-2'>
+                          <Button disabled={task.status === 'done'} onClick={() => handlePathwayTaskStatus(task, 'done')} size='xs' type='button' variant='outline'>
+                            完了
+                          </Button>
+                          <Button disabled={task.status === 'variance'} onClick={() => handlePathwayTaskStatus(task, 'variance')} size='xs' type='button' variant='ghost'>
+                            逸脱
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className='px-4 py-6 text-[13px] text-text-tertiary'>この入院にはクリティカルパスが開始されていません。</div>
                 )}
               </section>
 
@@ -703,6 +908,31 @@ export const WardWorkspace = ({
         </section>
 
         <section className='space-y-4'>
+          <section className='rounded-8 border border-border bg-card'>
+            <div className='flex items-center justify-between gap-3 border-b border-border px-4 py-3'>
+              <div className='flex items-center gap-2'>
+                <Activity size={17} className='text-brand' />
+                <h2 className='text-[16px] font-bold text-text-primary'>入院イベント</h2>
+              </div>
+              <span className='text-[12px] text-text-tertiary'>{events.length}件</span>
+            </div>
+            <div className='max-h-80 divide-y divide-border overflow-auto'>
+              {events.slice(0, 12).map((event) => (
+                <article className='px-4 py-3' key={`${event.id}-${event.occurredAt}`}>
+                  <div className='flex items-start justify-between gap-3'>
+                    <h3 className='text-[13px] font-bold text-text-primary'>{event.title}</h3>
+                    <span className='shrink-0 text-[11px] text-text-tertiary'>{event.occurredAt}</span>
+                  </div>
+                  {event.detail ? <p className='mt-1 text-[12px] leading-normal text-text-secondary'>{event.detail}</p> : null}
+                  <p className='mt-1 text-[11px] text-text-tertiary'>{event.actor}</p>
+                </article>
+              ))}
+              {events.length === 0 ? (
+                <div className='px-4 py-6 text-[13px] text-text-tertiary'>イベント履歴はまだありません。</div>
+              ) : null}
+            </div>
+          </section>
+
           <section className='rounded-8 border border-border bg-card'>
             <div className='flex items-center justify-between gap-3 border-b border-border px-4 py-3'>
               <div className='flex items-center gap-2'>

@@ -247,6 +247,54 @@ export type InpatientSummaryDraft = {
   generatedAt: string;
 };
 
+export type InpatientEvent = {
+  id: number;
+  admissionId: number;
+  eventType: string;
+  title: string;
+  detail?: string;
+  actor: string;
+  occurredAt: string;
+};
+
+export type InpatientPathwayTaskStatus = 'pending' | 'done' | 'variance' | 'skipped';
+
+export type InpatientPathwayTask = {
+  id: number;
+  pathwayAssignmentId: number;
+  dayOffset: number;
+  category: string;
+  title: string;
+  status: InpatientPathwayTaskStatus;
+  varianceNote?: string;
+  updatedBy?: string;
+  updatedAt: string;
+};
+
+export type InpatientPathway = {
+  id: number;
+  admissionId: number;
+  pathwayName: string;
+  status: string;
+  startedOn: string;
+  assignedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  tasks: InpatientPathwayTask[];
+};
+
+export type InpatientAiSummaryReview = {
+  id: number;
+  admissionId: number;
+  summaryTitle: string;
+  summaryBody: string;
+  status: 'accepted' | 'rejected';
+  sourceCounts: InpatientSummaryDraft['sourceCounts'];
+  reviewedBy: string;
+  reviewNote?: string;
+  createdAt: string;
+};
+
 export type ChartVersion = {
   version: number;
   savedAt: string;

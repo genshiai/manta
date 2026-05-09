@@ -13,7 +13,9 @@ from app.models import (
     DiagnosisAliasMaster,
     DiagnosisMaster,
     InpatientDocument,
+    InpatientAiSummaryReview,
     InpatientInstruction,
+    InpatientPathwayAssignment,
     LabSetMaster,
     Patient,
     PmdaPackageInsertSection,
@@ -351,6 +353,95 @@ def test_get_inpatient_summary_draft() -> None:
     assert "【入院経過要約案】" in payload["body"]
     assert payload["source_counts"]["nursing_notes"] >= 0
     assert isinstance(payload["key_events"], list)
+
+
+def test_inpatient_pathway_and_events() -> None:
+    pathway_id: int | None = None
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        create_response = client.post(
+            f"/api/inpatient/admissions/{admission_id}/pathway",
+            json={"pathway_name": "テスト標準パス"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_response.status_code == 201
+        pathway = create_response.json()
+        pathway_id = pathway["id"]
+        task_id = pathway["tasks"][0]["id"]
+        task_response = client.patch(
+            f"/api/inpatient/pathway-tasks/{task_id}",
+            json={"status": "variance", "variance_note": "検査延期"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        events_response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/events",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert pathway["pathway_name"] == "テスト標準パス"
+    assert len(pathway["tasks"]) >= 3
+    assert task_response.status_code == 200
+    assert task_response.json()["status"] == "variance"
+    assert events_response.status_code == 200
+    assert any(item["event_type"] == "pathway_variance" for item in events_response.json())
+
+    if pathway_id is not None:
+        with SessionLocal() as db:
+            pathway = db.get(InpatientPathwayAssignment, pathway_id)
+            if pathway is not None:
+                db.delete(pathway)
+                db.commit()
+
+
+def test_create_inpatient_summary_review() -> None:
+    review_id: int | None = None
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        response = client.post(
+            f"/api/inpatient/admissions/{admission_id}/summary-reviews",
+            json={
+                "summary_title": "テスト要約",
+                "summary_body": "要約本文",
+                "status": "accepted",
+                "source_counts": {
+                    "nursing_notes": 1,
+                    "observations": 2,
+                    "prescriptions": 3,
+                    "lab_orders": 4,
+                    "instructions": 5,
+                },
+                "review_note": "採用",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 201
+        review = response.json()
+        review_id = review["id"]
+        list_response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/summary-reviews",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert review["status"] == "accepted"
+    assert list_response.status_code == 200
+    assert any(item["id"] == review_id for item in list_response.json())
+
+    if review_id is not None:
+        with SessionLocal() as db:
+            persisted = db.get(InpatientAiSummaryReview, review_id)
+            if persisted is not None:
+                db.delete(persisted)
+                db.commit()
 
 
 def test_reject_patients_without_token() -> None:

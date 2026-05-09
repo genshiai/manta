@@ -13,6 +13,8 @@ BedStatus = Literal["available", "occupied", "cleaning", "blocked"]
 InstructionStatus = Literal["pending", "done", "cancelled"]
 InpatientDocumentStatus = Literal["draft", "signed", "archived"]
 InpatientDocumentType = Literal["admission_care_plan", "discharge_summary", "discharge_instruction"]
+PathwayTaskStatus = Literal["pending", "done", "variance", "skipped"]
+AiSummaryReviewStatus = Literal["accepted", "rejected"]
 
 
 class DetailItem(BaseModel):
@@ -508,6 +510,76 @@ class InpatientSummaryDraftRead(BaseModel):
     key_events: list[str]
     body: str
     generated_at: datetime
+
+
+class InpatientEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    event_type: str
+    title: str
+    detail: str | None = None
+    actor: str
+    occurred_at: datetime
+
+
+class InpatientPathwayTaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    pathway_assignment_id: int
+    day_offset: int
+    category: str
+    title: str
+    status: PathwayTaskStatus
+    variance_note: str | None = None
+    updated_by: str | None = None
+    updated_at: datetime
+
+
+class InpatientPathwayRead(BaseModel):
+    id: int
+    admission_id: int
+    pathway_name: str
+    status: str
+    started_on: date
+    assigned_by: str
+    created_at: datetime
+    updated_at: datetime
+    tasks: list[InpatientPathwayTaskRead]
+
+
+class InpatientPathwayCreateRequest(BaseModel):
+    pathway_name: str = "標準入院パス"
+    started_on: date | None = None
+
+
+class InpatientPathwayTaskUpdateRequest(BaseModel):
+    status: PathwayTaskStatus
+    variance_note: str | None = None
+
+
+class InpatientAiSummaryReviewRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    summary_title: str
+    summary_body: str
+    status: AiSummaryReviewStatus
+    source_counts: dict[str, int]
+    reviewed_by: str
+    review_note: str | None = None
+    created_at: datetime
+
+
+class InpatientAiSummaryReviewCreateRequest(BaseModel):
+    summary_title: str
+    summary_body: str
+    status: AiSummaryReviewStatus
+    source_counts: dict[str, int] = {}
+    review_note: str | None = None
 
 
 class AdmissionRead(BaseModel):

@@ -19,10 +19,14 @@ import type {
   DrugCategory,
   ImagingOrderEntry,
   InpatientAdmission,
+  InpatientAiSummaryReview,
   InpatientBed,
   InpatientDocument,
   InpatientDocumentType,
+  InpatientEvent,
   InpatientInstruction,
+  InpatientPathway,
+  InpatientPathwayTask,
   InpatientProgress,
   InpatientSummaryDraft,
   LabLongTrendItem,
@@ -479,6 +483,52 @@ type ApiInpatientSummaryDraft = {
   key_events: string[];
   body: string;
   generated_at: string;
+};
+
+type ApiInpatientEvent = {
+  id: number;
+  admission_id: number;
+  event_type: string;
+  title: string;
+  detail: string | null;
+  actor: string;
+  occurred_at: string;
+};
+
+type ApiInpatientPathwayTask = {
+  id: number;
+  pathway_assignment_id: number;
+  day_offset: number;
+  category: string;
+  title: string;
+  status: 'pending' | 'done' | 'variance' | 'skipped';
+  variance_note: string | null;
+  updated_by: string | null;
+  updated_at: string;
+};
+
+type ApiInpatientPathway = {
+  id: number;
+  admission_id: number;
+  pathway_name: string;
+  status: string;
+  started_on: string;
+  assigned_by: string;
+  created_at: string;
+  updated_at: string;
+  tasks: ApiInpatientPathwayTask[];
+};
+
+type ApiInpatientAiSummaryReview = {
+  id: number;
+  admission_id: number;
+  summary_title: string;
+  summary_body: string;
+  status: 'accepted' | 'rejected';
+  source_counts: ApiInpatientSummaryDraft['source_counts'];
+  reviewed_by: string;
+  review_note: string | null;
+  created_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -1022,6 +1072,58 @@ const mapInpatientSummaryDraft = (item: ApiInpatientSummaryDraft): InpatientSumm
   generatedAt: formatTimestamp(item.generated_at),
 });
 
+const mapInpatientEvent = (item: ApiInpatientEvent): InpatientEvent => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  eventType: item.event_type,
+  title: item.title,
+  detail: item.detail ?? undefined,
+  actor: item.actor,
+  occurredAt: formatTimestamp(item.occurred_at),
+});
+
+const mapInpatientPathwayTask = (item: ApiInpatientPathwayTask): InpatientPathwayTask => ({
+  id: item.id,
+  pathwayAssignmentId: item.pathway_assignment_id,
+  dayOffset: item.day_offset,
+  category: item.category,
+  title: item.title,
+  status: item.status,
+  varianceNote: item.variance_note ?? undefined,
+  updatedBy: item.updated_by ?? undefined,
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapInpatientPathway = (item: ApiInpatientPathway): InpatientPathway => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  pathwayName: item.pathway_name,
+  status: item.status,
+  startedOn: item.started_on,
+  assignedBy: item.assigned_by,
+  createdAt: formatTimestamp(item.created_at),
+  updatedAt: formatTimestamp(item.updated_at),
+  tasks: item.tasks.map(mapInpatientPathwayTask),
+});
+
+const mapInpatientAiSummaryReview = (item: ApiInpatientAiSummaryReview): InpatientAiSummaryReview => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  summaryTitle: item.summary_title,
+  summaryBody: item.summary_body,
+  status: item.status,
+  sourceCounts: {
+    nursingNotes: item.source_counts.nursing_notes,
+    observations: item.source_counts.observations,
+    prescriptions: item.source_counts.prescriptions,
+    labOrders: item.source_counts.lab_orders,
+    instructions: item.source_counts.instructions,
+  },
+  reviewedBy: item.reviewed_by,
+  reviewNote: item.review_note ?? undefined,
+  createdAt: formatTimestamp(item.created_at),
+});
+
 export const login = async (userId: string, password: string): Promise<UserSession> => {
   const response = await request<ApiLoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -1218,6 +1320,53 @@ export const getInpatientSummaryDraft = async (admissionId: number, days = 14): 
   return mapInpatientSummaryDraft(draft);
 };
 
+export const listInpatientEvents = async (admissionId: number): Promise<InpatientEvent[]> => {
+  const events = await request<ApiInpatientEvent[]>(
+    `/api/inpatient/admissions/${admissionId}/events`,
+  );
+  return events.map(mapInpatientEvent);
+};
+
+export const getInpatientPathway = async (admissionId: number): Promise<InpatientPathway | null> => {
+  const pathway = await request<ApiInpatientPathway | null>(
+    `/api/inpatient/admissions/${admissionId}/pathway`,
+  );
+  return pathway ? mapInpatientPathway(pathway) : null;
+};
+
+export const createInpatientPathway = async (
+  admissionId: number,
+  payload?: { pathwayName?: string },
+): Promise<InpatientPathway> => {
+  const pathway = await request<ApiInpatientPathway>(
+    `/api/inpatient/admissions/${admissionId}/pathway`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        pathway_name: payload?.pathwayName ?? '標準入院パス',
+      }),
+    },
+  );
+  return mapInpatientPathway(pathway);
+};
+
+export const updateInpatientPathwayTask = async (
+  taskId: number,
+  payload: { status: InpatientPathwayTask['status']; varianceNote?: string },
+): Promise<InpatientPathwayTask> => {
+  const task = await request<ApiInpatientPathwayTask>(
+    `/api/inpatient/pathway-tasks/${taskId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: payload.status,
+        variance_note: payload.varianceNote ?? null,
+      }),
+    },
+  );
+  return mapInpatientPathwayTask(task);
+};
+
 export const updateInpatientInstructionStatus = async (
   instructionId: number,
   status: 'pending' | 'done' | 'cancelled',
@@ -1316,6 +1465,45 @@ export const updateInpatientDocument = async (
     },
   );
   return mapInpatientDocument(document);
+};
+
+export const listInpatientSummaryReviews = async (admissionId: number): Promise<InpatientAiSummaryReview[]> => {
+  const reviews = await request<ApiInpatientAiSummaryReview[]>(
+    `/api/inpatient/admissions/${admissionId}/summary-reviews`,
+  );
+  return reviews.map(mapInpatientAiSummaryReview);
+};
+
+export const createInpatientSummaryReview = async (
+  admissionId: number,
+  payload: {
+    summaryTitle: string;
+    summaryBody: string;
+    status: InpatientAiSummaryReview['status'];
+    sourceCounts: InpatientSummaryDraft['sourceCounts'];
+    reviewNote?: string;
+  },
+): Promise<InpatientAiSummaryReview> => {
+  const review = await request<ApiInpatientAiSummaryReview>(
+    `/api/inpatient/admissions/${admissionId}/summary-reviews`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        summary_title: payload.summaryTitle,
+        summary_body: payload.summaryBody,
+        status: payload.status,
+        source_counts: {
+          nursing_notes: payload.sourceCounts.nursingNotes,
+          observations: payload.sourceCounts.observations,
+          prescriptions: payload.sourceCounts.prescriptions,
+          lab_orders: payload.sourceCounts.labOrders,
+          instructions: payload.sourceCounts.instructions,
+        },
+        review_note: payload.reviewNote ?? null,
+      }),
+    },
+  );
+  return mapInpatientAiSummaryReview(review);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {
