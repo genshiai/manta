@@ -274,6 +274,7 @@ export type InpatientPathwayTask = {
 export type InpatientPathway = {
   id: number;
   admissionId: number;
+  pathwayMasterId?: string;
   pathwayName: string;
   status: string;
   startedOn: string;
@@ -281,6 +282,29 @@ export type InpatientPathway = {
   createdAt: string;
   updatedAt: string;
   tasks: InpatientPathwayTask[];
+};
+
+export type InpatientPathwayTaskMaster = {
+  id: string;
+  pathwayMasterId: string;
+  sortOrder: number;
+  dayOffset: number;
+  category: string;
+  title: string;
+  role?: string;
+  dueTime?: string;
+};
+
+export type InpatientPathwayMaster = {
+  id: string;
+  sortOrder: number;
+  isActive: boolean;
+  name: string;
+  department: string;
+  primaryDiagnosis?: string;
+  expectedDays: number;
+  note?: string;
+  tasks: InpatientPathwayTaskMaster[];
 };
 
 export type InpatientAiSummaryReview = {

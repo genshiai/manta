@@ -542,6 +542,7 @@ class InpatientPathwayTaskRead(BaseModel):
 class InpatientPathwayRead(BaseModel):
     id: int
     admission_id: int
+    pathway_master_id: str | None = None
     pathway_name: str
     status: str
     started_on: date
@@ -551,7 +552,35 @@ class InpatientPathwayRead(BaseModel):
     tasks: list[InpatientPathwayTaskRead]
 
 
+class InpatientPathwayTaskMasterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    pathway_master_id: str
+    sort_order: int
+    day_offset: int
+    category: str
+    title: str
+    role: str | None = None
+    due_time: str | None = None
+
+
+class InpatientPathwayMasterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    sort_order: int
+    is_active: bool
+    name: str
+    department: str
+    primary_diagnosis: str | None = None
+    expected_days: int
+    note: str | None = None
+    tasks: list[InpatientPathwayTaskMasterRead] = []
+
+
 class InpatientPathwayCreateRequest(BaseModel):
+    pathway_master_id: str | None = None
     pathway_name: str = "標準入院パス"
     started_on: date | None = None
 

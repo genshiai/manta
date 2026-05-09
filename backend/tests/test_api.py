@@ -365,9 +365,15 @@ def test_inpatient_pathway_and_events() -> None:
             headers={"Authorization": f"Bearer {token}"},
         )
         admission_id = admissions_response.json()[0]["id"]
+        masters_response = client.get(
+            "/api/inpatient/pathway-masters",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert masters_response.status_code == 200
+        pathway_master_id = masters_response.json()[0]["id"]
         create_response = client.post(
             f"/api/inpatient/admissions/{admission_id}/pathway",
-            json={"pathway_name": "テスト標準パス"},
+            json={"pathway_master_id": pathway_master_id, "pathway_name": "テスト標準パス"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert create_response.status_code == 201
@@ -384,7 +390,7 @@ def test_inpatient_pathway_and_events() -> None:
             headers={"Authorization": f"Bearer {token}"},
         )
 
-    assert pathway["pathway_name"] == "テスト標準パス"
+    assert pathway["pathway_master_id"] == pathway_master_id
     assert len(pathway["tasks"]) >= 3
     assert task_response.status_code == 200
     assert task_response.json()["status"] == "variance"

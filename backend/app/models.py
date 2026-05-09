@@ -470,12 +470,41 @@ class InpatientPathwayAssignment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     admission_id: Mapped[int] = mapped_column(ForeignKey("admissions.id", ondelete="CASCADE"), index=True)
+    pathway_master_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     pathway_name: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     started_on: Mapped[date] = mapped_column(Date)
     assigned_by: Mapped[str] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class InpatientPathwayMaster(Base):
+    __tablename__ = "inpatient_pathway_masters"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    name: Mapped[str] = mapped_column(String(255))
+    department: Mapped[str] = mapped_column(String(128), index=True)
+    primary_diagnosis: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    expected_days: Mapped[int] = mapped_column(Integer, default=7)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class InpatientPathwayTaskMaster(Base):
+    __tablename__ = "inpatient_pathway_task_masters"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    pathway_master_id: Mapped[str] = mapped_column(
+        ForeignKey("inpatient_pathway_masters.id", ondelete="CASCADE"), index=True
+    )
+    sort_order: Mapped[int] = mapped_column(Integer)
+    day_offset: Mapped[int] = mapped_column(Integer, index=True)
+    category: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    due_time: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class InpatientPathwayTask(Base):

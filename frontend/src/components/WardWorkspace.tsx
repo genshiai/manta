@@ -15,6 +15,7 @@ import {
   listInpatientDocuments,
   listInpatientEvents,
   listInpatientInstructions,
+  listInpatientPathwayMasters,
   listNursingNotes,
   listInpatientSummaryReviews,
   transferInpatientAdmission,
@@ -35,6 +36,7 @@ import type {
   InpatientEvent,
   InpatientInstruction,
   InpatientPathway,
+  InpatientPathwayMaster,
   InpatientPathwayTask,
   InpatientProgress,
   InpatientSummaryDraft,
@@ -130,6 +132,8 @@ export const WardWorkspace = ({
   const [summaryDraft, setSummaryDraft] = useState<InpatientSummaryDraft | null>(null);
   const [events, setEvents] = useState<InpatientEvent[]>([]);
   const [pathway, setPathway] = useState<InpatientPathway | null>(null);
+  const [pathwayMasters, setPathwayMasters] = useState<InpatientPathwayMaster[]>([]);
+  const [selectedPathwayMasterId, setSelectedPathwayMasterId] = useState('');
   const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
   const [dischargePlan, setDischargePlan] = useState<InpatientDischargePlan | null>(null);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
@@ -183,6 +187,7 @@ export const WardWorkspace = ({
           nextSummaryDraft,
           nextEvents,
           nextPathway,
+          nextPathwayMasters,
           nextSummaryReviews,
           nextDischargePlan,
         ] = await Promise.all([
@@ -193,6 +198,7 @@ export const WardWorkspace = ({
           getInpatientSummaryDraft(selectedAdmission.id),
           listInpatientEvents(selectedAdmission.id),
           getInpatientPathway(selectedAdmission.id),
+          listInpatientPathwayMasters(),
           listInpatientSummaryReviews(selectedAdmission.id),
           getInpatientDischargePlan(selectedAdmission.id),
         ]);
@@ -206,6 +212,8 @@ export const WardWorkspace = ({
         setSummaryDraft(nextSummaryDraft);
         setEvents(nextEvents);
         setPathway(nextPathway);
+        setPathwayMasters(nextPathwayMasters);
+        setSelectedPathwayMasterId(nextPathway?.pathwayMasterId ?? nextPathwayMasters[0]?.id ?? '');
         setSummaryReviews(nextSummaryReviews);
         setDischargePlan(nextDischargePlan);
       } catch (error) {
@@ -387,7 +395,11 @@ export const WardWorkspace = ({
     setIsStartingPathway(true);
     setErrorMessage(null);
     try {
-      const nextPathway = await createInpatientPathway(selectedAdmission.id);
+      const selectedMaster = pathwayMasters.find((master) => master.id === selectedPathwayMasterId);
+      const nextPathway = await createInpatientPathway(selectedAdmission.id, {
+        pathwayMasterId: selectedMaster?.id,
+        pathwayName: selectedMaster?.name ?? '標準入院パス',
+      });
       setPathway(nextPathway);
       await refreshEvents();
     } catch (error) {
@@ -771,13 +783,29 @@ export const WardWorkspace = ({
                       未実施 {pathwayTaskCounts?.pending ?? 0} · 逸脱 {pathwayTaskCounts?.variance ?? 0}
                     </span>
                   ) : (
-                    <Button disabled={isStartingPathway} onClick={handleStartPathway} size='xs' type='button' variant='outline'>
-                      標準パス開始
-                    </Button>
+                    <div className='flex flex-wrap gap-2'>
+                      <select
+                        className='h-8 rounded-md border border-border bg-white px-2 text-[12px] font-bold text-text-primary outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
+                        onChange={(event) => setSelectedPathwayMasterId(event.target.value)}
+                        value={selectedPathwayMasterId}
+                      >
+                        {pathwayMasters.map((master) => (
+                          <option key={master.id} value={master.id}>
+                            {master.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button disabled={isStartingPathway} onClick={handleStartPathway} size='xs' type='button' variant='outline'>
+                        パス開始
+                      </Button>
+                    </div>
                   )}
                 </div>
                 {pathway ? (
                   <div className='divide-y divide-border'>
+                    <div className='px-4 py-3 text-[12px] text-text-tertiary'>
+                      {pathway.pathwayName} · 開始日 {pathway.startedOn}
+                    </div>
                     {pathway.tasks.map((task) => (
                       <div className='grid gap-3 px-4 py-3 lg:grid-cols-[4rem_6rem_minmax(0,1fr)_6rem_10rem]' key={task.id}>
                         <span className='text-[13px] font-bold text-text-secondary'>Day {task.dayOffset}</span>

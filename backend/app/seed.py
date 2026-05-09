@@ -16,6 +16,8 @@ from .models import (
     Condition,
     DiagnosisMaster,
     InpatientInstruction,
+    InpatientPathwayMaster,
+    InpatientPathwayTaskMaster,
     LabOrder,
     LabSetMaster,
     NursingNote,
@@ -376,6 +378,46 @@ CHART_ORDER_MASTER_DATA = {
         },
     ],
 }
+
+
+INPATIENT_PATHWAY_MASTER_DATA = [
+    {
+        "id": "internal-standard",
+        "sort_order": 10,
+        "is_active": True,
+        "name": "内科標準入院パス",
+        "department": "内科",
+        "primary_diagnosis": None,
+        "expected_days": 7,
+        "note": "内科一般入院の初期評価、治療反応、退院支援を標準化するパス。",
+        "tasks": [
+            {"id": "internal-standard-001", "sort_order": 10, "day_offset": 0, "category": "入院", "title": "入院時評価、持参薬確認、転倒リスク評価", "role": "医師/看護", "due_time": "午前"},
+            {"id": "internal-standard-002", "sort_order": 20, "day_offset": 0, "category": "検査", "title": "入院時採血・画像・感染症確認", "role": "医師", "due_time": "午前"},
+            {"id": "internal-standard-003", "sort_order": 30, "day_offset": 1, "category": "治療", "title": "初期治療反応と指示内容の再評価", "role": "医師", "due_time": "午前"},
+            {"id": "internal-standard-004", "sort_order": 40, "day_offset": 2, "category": "看護", "title": "セルフケア、疼痛、栄養、排泄状況の評価", "role": "看護", "due_time": "午後"},
+            {"id": "internal-standard-005", "sort_order": 50, "day_offset": 3, "category": "退院支援", "title": "退院目標、家族説明、地域連携の確認", "role": "MSW/看護", "due_time": "午後"},
+            {"id": "internal-standard-006", "sort_order": 60, "day_offset": 5, "category": "退院支援", "title": "退院時処方、指導文書、次回外来の確認", "role": "医師/看護", "due_time": "午前"},
+        ],
+    },
+    {
+        "id": "diabetes-education",
+        "sort_order": 20,
+        "is_active": True,
+        "name": "糖尿病教育入院パス",
+        "department": "内科",
+        "primary_diagnosis": "2型糖尿病",
+        "expected_days": 10,
+        "note": "糖尿病教育入院の検査、栄養指導、自己注射/自己測定確認を管理するパス。",
+        "tasks": [
+            {"id": "diabetes-education-001", "sort_order": 10, "day_offset": 0, "category": "入院", "title": "糖尿病教育入院オリエンテーション", "role": "看護", "due_time": "午後"},
+            {"id": "diabetes-education-002", "sort_order": 20, "day_offset": 1, "category": "検査", "title": "血糖推移、HbA1c、腎機能、尿検査の確認", "role": "医師", "due_time": "午前"},
+            {"id": "diabetes-education-003", "sort_order": 30, "day_offset": 2, "category": "栄養", "title": "管理栄養士による食事指導", "role": "栄養", "due_time": "午後"},
+            {"id": "diabetes-education-004", "sort_order": 40, "day_offset": 3, "category": "指導", "title": "低血糖対応とシックデイルール説明", "role": "看護", "due_time": "午後"},
+            {"id": "diabetes-education-005", "sort_order": 50, "day_offset": 5, "category": "治療", "title": "退院後薬物療法と自己管理目標の調整", "role": "医師", "due_time": "午前"},
+            {"id": "diabetes-education-006", "sort_order": 60, "day_offset": 8, "category": "退院支援", "title": "退院後外来、療養指導、処方確認", "role": "医師/看護", "due_time": "午前"},
+        ],
+    },
+]
 
 INPATIENT_DEMO_DATA = {
     "wards": [
@@ -1433,6 +1475,37 @@ def sync_chart_order_masters(db: Session) -> bool:
     return updated
 
 
+def sync_inpatient_pathway_masters(db: Session) -> bool:
+    updated = False
+
+    for item in INPATIENT_PATHWAY_MASTER_DATA:
+        tasks = item["tasks"]
+        master_payload = {key: value for key, value in item.items() if key != "tasks"}
+        existing = db.get(InpatientPathwayMaster, master_payload["id"])
+        if existing is None:
+            db.add(InpatientPathwayMaster(**master_payload))
+            updated = True
+        else:
+            for key, value in master_payload.items():
+                if getattr(existing, key) != value:
+                    setattr(existing, key, value)
+                    updated = True
+
+        for task in tasks:
+            task_payload = {**task, "pathway_master_id": master_payload["id"]}
+            existing_task = db.get(InpatientPathwayTaskMaster, task_payload["id"])
+            if existing_task is None:
+                db.add(InpatientPathwayTaskMaster(**task_payload))
+                updated = True
+                continue
+            for key, value in task_payload.items():
+                if getattr(existing_task, key) != value:
+                    setattr(existing_task, key, value)
+                    updated = True
+
+    return updated
+
+
 def backfill_demo_prescription_history(db: Session) -> bool:
     updated = False
 
@@ -1865,6 +1938,9 @@ def seed_demo_data(db: Session) -> None:
         if sync_chart_order_masters(db):
             updated = True
 
+        if sync_inpatient_pathway_masters(db):
+            updated = True
+
         if sync_diagnosis_masters(db):
             updated = True
 
@@ -1899,6 +1975,7 @@ def seed_demo_data(db: Session) -> None:
         ]
     )
     sync_chart_order_masters(db)
+    sync_inpatient_pathway_masters(db)
     sync_diagnosis_masters(db)
 
     patients = [
@@ -2098,4 +2175,5 @@ def seed_demo_data(db: Session) -> None:
     backfill_conditions_from_patient_problems(db)
     backfill_observations_from_patient_json(db)
     sync_inpatient_demo_data(db)
+    sync_inpatient_pathway_masters(db)
     db.commit()

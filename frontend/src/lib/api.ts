@@ -27,6 +27,7 @@ import type {
   InpatientEvent,
   InpatientInstruction,
   InpatientPathway,
+  InpatientPathwayMaster,
   InpatientPathwayTask,
   InpatientProgress,
   InpatientSummaryDraft,
@@ -511,6 +512,7 @@ type ApiInpatientPathwayTask = {
 type ApiInpatientPathway = {
   id: number;
   admission_id: number;
+  pathway_master_id: string | null;
   pathway_name: string;
   status: string;
   started_on: string;
@@ -518,6 +520,29 @@ type ApiInpatientPathway = {
   created_at: string;
   updated_at: string;
   tasks: ApiInpatientPathwayTask[];
+};
+
+type ApiInpatientPathwayTaskMaster = {
+  id: string;
+  pathway_master_id: string;
+  sort_order: number;
+  day_offset: number;
+  category: string;
+  title: string;
+  role: string | null;
+  due_time: string | null;
+};
+
+type ApiInpatientPathwayMaster = {
+  id: string;
+  sort_order: number;
+  is_active: boolean;
+  name: string;
+  department: string;
+  primary_diagnosis: string | null;
+  expected_days: number;
+  note: string | null;
+  tasks: ApiInpatientPathwayTaskMaster[];
 };
 
 type ApiInpatientAiSummaryReview = {
@@ -1114,6 +1139,7 @@ const mapInpatientPathwayTask = (item: ApiInpatientPathwayTask): InpatientPathwa
 const mapInpatientPathway = (item: ApiInpatientPathway): InpatientPathway => ({
   id: item.id,
   admissionId: item.admission_id,
+  pathwayMasterId: item.pathway_master_id ?? undefined,
   pathwayName: item.pathway_name,
   status: item.status,
   startedOn: item.started_on,
@@ -1121,6 +1147,27 @@ const mapInpatientPathway = (item: ApiInpatientPathway): InpatientPathway => ({
   createdAt: formatTimestamp(item.created_at),
   updatedAt: formatTimestamp(item.updated_at),
   tasks: item.tasks.map(mapInpatientPathwayTask),
+});
+
+const mapInpatientPathwayMaster = (item: ApiInpatientPathwayMaster): InpatientPathwayMaster => ({
+  id: item.id,
+  sortOrder: item.sort_order,
+  isActive: item.is_active,
+  name: item.name,
+  department: item.department,
+  primaryDiagnosis: item.primary_diagnosis ?? undefined,
+  expectedDays: item.expected_days,
+  note: item.note ?? undefined,
+  tasks: item.tasks.map((task) => ({
+    id: task.id,
+    pathwayMasterId: task.pathway_master_id,
+    sortOrder: task.sort_order,
+    dayOffset: task.day_offset,
+    category: task.category,
+    title: task.title,
+    role: task.role ?? undefined,
+    dueTime: task.due_time ?? undefined,
+  })),
 });
 
 const mapInpatientAiSummaryReview = (item: ApiInpatientAiSummaryReview): InpatientAiSummaryReview => ({
@@ -1363,15 +1410,27 @@ export const getInpatientPathway = async (admissionId: number): Promise<Inpatien
   return pathway ? mapInpatientPathway(pathway) : null;
 };
 
+export const listInpatientPathwayMasters = async (department?: string): Promise<InpatientPathwayMaster[]> => {
+  const searchParams = new URLSearchParams();
+  if (department) {
+    searchParams.set('department', department);
+  }
+  const masters = await request<ApiInpatientPathwayMaster[]>(
+    `/api/inpatient/pathway-masters${searchParams.size > 0 ? `?${searchParams.toString()}` : ''}`,
+  );
+  return masters.map(mapInpatientPathwayMaster);
+};
+
 export const createInpatientPathway = async (
   admissionId: number,
-  payload?: { pathwayName?: string },
+  payload?: { pathwayName?: string; pathwayMasterId?: string },
 ): Promise<InpatientPathway> => {
   const pathway = await request<ApiInpatientPathway>(
     `/api/inpatient/admissions/${admissionId}/pathway`,
     {
       method: 'POST',
       body: JSON.stringify({
+        pathway_master_id: payload?.pathwayMasterId ?? null,
         pathway_name: payload?.pathwayName ?? '標準入院パス',
       }),
     },

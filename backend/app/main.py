@@ -29,7 +29,9 @@ from .models import (
     InpatientEvent,
     InpatientInstruction,
     InpatientPathwayAssignment,
+    InpatientPathwayMaster,
     InpatientPathwayTask,
+    InpatientPathwayTaskMaster,
     LabOrder,
     NursingNote,
     Observation,
@@ -82,7 +84,9 @@ from .schemas import (
     InpatientInstructionRead,
     InpatientInstructionUpdateRequest,
     InpatientPathwayCreateRequest,
+    InpatientPathwayMasterRead,
     InpatientPathwayRead,
+    InpatientPathwayTaskMasterRead,
     InpatientPathwayTaskRead,
     InpatientPathwayTaskUpdateRequest,
     InpatientProgressDateRow,
@@ -1420,6 +1424,7 @@ def inpatient_pathway_to_read(
     return InpatientPathwayRead(
         id=assignment.id,
         admission_id=assignment.admission_id,
+        pathway_master_id=assignment.pathway_master_id,
         pathway_name=assignment.pathway_name,
         status=assignment.status,
         started_on=assignment.started_on,
@@ -1428,6 +1433,30 @@ def inpatient_pathway_to_read(
         updated_at=assignment.updated_at,
         tasks=[InpatientPathwayTaskRead.model_validate(task) for task in tasks],
     )
+
+
+def inpatient_pathway_master_to_read(
+    master: InpatientPathwayMaster,
+    tasks: list[InpatientPathwayTaskMaster],
+) -> InpatientPathwayMasterRead:
+    return InpatientPathwayMasterRead(
+        id=master.id,
+        sort_order=master.sort_order,
+        is_active=master.is_active,
+        name=master.name,
+        department=master.department,
+        primary_diagnosis=master.primary_diagnosis,
+        expected_days=master.expected_days,
+        note=master.note,
+        tasks=[InpatientPathwayTaskMasterRead.model_validate(task) for task in tasks],
+    )
+
+
+def get_pathway_master_or_404(db: Session, master_id: str) -> InpatientPathwayMaster:
+    master = db.get(InpatientPathwayMaster, master_id)
+    if master is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inpatient pathway master not found")
+    return master
 
 
 def build_discharge_plan_defaults(
@@ -2180,6 +2209,38 @@ def get_inpatient_pathway(
     return inpatient_pathway_to_read(assignment, tasks)
 
 
+@app.get("/api/inpatient/pathway-masters", response_model=list[InpatientPathwayMasterRead])
+def list_inpatient_pathway_masters(
+    department: str | None = Query(default=None),
+    include_inactive: bool = Query(default=False),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[InpatientPathwayMasterRead]:
+    query = select(InpatientPathwayMaster)
+    if department:
+        query = query.where(
+            or_(InpatientPathwayMaster.department == department, InpatientPathwayMaster.department == "共通")
+        )
+    if not include_inactive:
+        query = query.where(InpatientPathwayMaster.is_active.is_(True))
+    masters = db.scalars(query.order_by(InpatientPathwayMaster.sort_order, InpatientPathwayMaster.id)).all()
+    master_ids = [master.id for master in masters]
+    tasks_by_master: dict[str, list[InpatientPathwayTaskMaster]] = {master_id: [] for master_id in master_ids}
+    if master_ids:
+        tasks = db.scalars(
+            select(InpatientPathwayTaskMaster)
+            .where(InpatientPathwayTaskMaster.pathway_master_id.in_(master_ids))
+            .order_by(
+                InpatientPathwayTaskMaster.pathway_master_id,
+                InpatientPathwayTaskMaster.day_offset,
+                InpatientPathwayTaskMaster.sort_order,
+            )
+        ).all()
+        for task in tasks:
+            tasks_by_master.setdefault(task.pathway_master_id, []).append(task)
+    return [inpatient_pathway_master_to_read(master, tasks_by_master.get(master.id, [])) for master in masters]
+
+
 @app.post(
     "/api/inpatient/admissions/{admission_id}/pathway",
     response_model=InpatientPathwayRead,
@@ -2193,6 +2254,7 @@ def create_inpatient_pathway(
 ) -> InpatientPathwayRead:
     admission = get_admission_or_404(db, admission_id)
     patient = get_patient_or_404(db, admission.patient_id)
+    pathway_master = get_pathway_master_or_404(db, payload.pathway_master_id) if payload.pathway_master_id else None
     existing = db.scalar(
         select(InpatientPathwayAssignment).where(
             InpatientPathwayAssignment.admission_id == admission_id,
@@ -2204,7 +2266,8 @@ def create_inpatient_pathway(
     now = utcnow()
     assignment = InpatientPathwayAssignment(
         admission_id=admission_id,
-        pathway_name=payload.pathway_name,
+        pathway_master_id=pathway_master.id if pathway_master else None,
+        pathway_name=pathway_master.name if pathway_master else payload.pathway_name,
         status="active",
         started_on=payload.started_on or (admission.admitted_at or now).astimezone(TOKYO_TZ).date(),
         assigned_by=current_user.display_name,
@@ -2213,16 +2276,23 @@ def create_inpatient_pathway(
     )
     db.add(assignment)
     db.flush()
+    master_tasks = []
+    if pathway_master is not None:
+        master_tasks = db.scalars(
+            select(InpatientPathwayTaskMaster)
+            .where(InpatientPathwayTaskMaster.pathway_master_id == pathway_master.id)
+            .order_by(InpatientPathwayTaskMaster.day_offset, InpatientPathwayTaskMaster.sort_order)
+        ).all()
     tasks = [
         InpatientPathwayTask(
             pathway_assignment_id=assignment.id,
-            day_offset=day_offset,
-            category=category,
-            title=title,
+            day_offset=task.day_offset if pathway_master else task[0],
+            category=task.category if pathway_master else task[1],
+            title=task.title if pathway_master else task[2],
             status="pending",
             updated_at=now,
         )
-        for day_offset, category, title in STANDARD_PATHWAY_TASKS
+        for task in (master_tasks if pathway_master else STANDARD_PATHWAY_TASKS)
     ]
     db.add_all(tasks)
     add_inpatient_event(
@@ -2230,7 +2300,7 @@ def create_inpatient_pathway(
         admission_id=admission_id,
         event_type="pathway_started",
         title="クリティカルパス開始",
-        detail=payload.pathway_name,
+        detail=assignment.pathway_name,
         actor=current_user.display_name,
     )
     log_audit(
@@ -2238,7 +2308,7 @@ def create_inpatient_pathway(
         actor=current_user.display_name,
         action="クリティカルパス開始",
         scope="chart",
-        detail=f"{payload.pathway_name} を開始しました。",
+        detail=f"{assignment.pathway_name} を開始しました。",
         patient=patient,
     )
     db.commit()
