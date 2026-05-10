@@ -1655,6 +1655,7 @@ def sync_orca_adapter_setting(db: Session) -> bool:
             mode="mock",
             auth_type="none",
             claim_endpoint="/api01rv2/claim",
+            health_endpoint="/api01rv2/systeminfv2",
             note="実ORCA接続情報が決まるまでは mock mode で送信履歴のみ保存する。",
         )
     )

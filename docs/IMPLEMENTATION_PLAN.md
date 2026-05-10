@@ -159,7 +159,7 @@ Mantaカルテ本体は **外来 1 ループの demo MVP はかなり進んで�
 | オーダ / マスター | 処方・検査・予約 master はあり。公式診療報酬 master 連携は未着手 | 40% |
 | FHIR / 外部公開 | 主要 resource の preview adapter あり | 35% |
 | Mantaレセコン | ClaimDraft/Line、ReviewIssue、施設別rule管理UI、Mock ORCA送信履歴まで実装 | 32% |
-| レセコン連携 | ORCA adapter 境界、接続設定、mock送信履歴まで実装。実接続は未実装 | 18% |
+| レセコン連携 | ORCA adapter 境界、接続設定、HTTP mode、mock/http送信履歴まで実装。実環境疎通は未確認 | 24% |
 | AI算定補助 | UI concept と方針のみ。実API未接続 | 5% |
 
 したがって、次の山は UI ではなく **backend の責務分割 + レセコン最小スライス**。
@@ -236,6 +236,7 @@ Mantaカルテ本体は **外来 1 ループの demo MVP はかなり進んで�
 - ORCA adapter の mock 境界を追加し、請求ドラフトの送信 payload、戻り status、エラーを送信履歴として保存し、病棟ワークスペースで確認できるようにした
 - `claim_draft_lines` を追加し、候補単位だけでなく処方、検査オーダ、実施済み指示、入院基本料を個別明細として保持できるようにした
 - 設定画面に算定ルール管理と ORCA adapter 設定を追加し、管理者が rule と接続 mode/base URL を更新できるようにした
+- ORCA adapter に HTTP mode と接続テストを追加し、BASIC 認証、請求送信 endpoint、health endpoint を設定してレスポンスを送信履歴へ保存できるようにした
 - クリティカルパス master を追加し、疾患/診療科別パスと日別タスクテンプレートを選択して入院エピソードへ展開できるようにした
 - クリティカルパス割当時に予定日、予定時間、担当職種をタスクへ展開し、病棟ワークスペースで確認できるようにした
 - 次の主課題は外部 preview への公開と、マスタの更新者 / 更新日時表示、レビュー運用の整備

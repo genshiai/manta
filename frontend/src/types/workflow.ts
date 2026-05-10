@@ -422,12 +422,22 @@ export type OrcaAdapterSetting = {
   baseUrl?: string;
   authType: 'none' | 'basic' | 'client';
   username?: string;
+  hasPassword: boolean;
   clientId?: string;
   claimEndpoint: string;
+  healthEndpoint: string;
   mode: 'mock' | 'http';
   note?: string;
   updatedBy?: string;
   updatedAt: string;
+};
+
+export type OrcaConnectionTestResult = {
+  ok: boolean;
+  statusCode?: number;
+  url?: string;
+  message: string;
+  responsePayload: Record<string, unknown>;
 };
 
 export type ChartVersion = {

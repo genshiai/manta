@@ -601,11 +601,17 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
                     "base_url": "https://orca.example.test",
                     "auth_type": "none",
                     "username": None,
+                    "password": "secret",
                     "client_id": "manta-test",
                     "claim_endpoint": "/api01rv2/claim",
+                    "health_endpoint": "/api01rv2/systeminfv2",
                     "mode": "mock",
                     "note": "test",
                 },
+            )
+            test_response = client.post(
+                "/api/admin/orca/test-connection",
+                headers={"Authorization": f"Bearer {admin_token}"},
             )
             list_response = client.get(
                 "/api/admin/claim-rules",
@@ -625,6 +631,9 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
     assert update_response.json()["severity"] == "error"
     assert setting_response.status_code == 200
     assert setting_response.json()["base_url"] == "https://orca.example.test"
+    assert setting_response.json()["has_password"] is True
+    assert test_response.status_code == 200
+    assert test_response.json()["ok"] is True
     assert any(item["id"] == rule_id for item in list_response.json())
 
 

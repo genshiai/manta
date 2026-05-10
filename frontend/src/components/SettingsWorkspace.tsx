@@ -27,6 +27,7 @@ import {
   listFacilityClaimRules,
   listUsers,
   resetUserPassword,
+  testOrcaConnection,
   updateChartTemplateMaster,
   updateFacilityClaimRule,
   updateLabSetMaster,
@@ -56,6 +57,7 @@ import type {
   FacilityClaimRule,
   LabSetOption,
   OrcaAdapterSetting,
+  OrcaConnectionTestResult,
   PrescriptionCatalogItem,
   PrescriptionSetMaster,
   ReservationSlot,
@@ -284,8 +286,10 @@ type OrcaSettingFormState = {
   baseUrl: string;
   authType: OrcaAdapterSetting['authType'];
   username: string;
+  password: string;
   clientId: string;
   claimEndpoint: string;
+  healthEndpoint: string;
   mode: OrcaAdapterSetting['mode'];
   note: string;
 };
@@ -553,8 +557,10 @@ const createOrcaSettingForm = (item?: OrcaAdapterSetting | null): OrcaSettingFor
   baseUrl: item?.baseUrl ?? '',
   authType: item?.authType ?? 'none',
   username: item?.username ?? '',
+  password: '',
   clientId: item?.clientId ?? '',
   claimEndpoint: item?.claimEndpoint ?? '/api01rv2/claim',
+  healthEndpoint: item?.healthEndpoint ?? '/api01rv2/systeminfv2',
   mode: item?.mode ?? 'mock',
   note: item?.note ?? '',
 });
@@ -653,6 +659,7 @@ export const SettingsWorkspace = ({
   const [claimRules, setClaimRules] = useState<FacilityClaimRule[]>([]);
   const [selectedClaimRuleId, setSelectedClaimRuleId] = useState('');
   const [orcaSetting, setOrcaSetting] = useState<OrcaAdapterSetting | null>(null);
+  const [orcaConnectionTest, setOrcaConnectionTest] = useState<OrcaConnectionTestResult | null>(null);
   const [prescriptionCreateForm, setPrescriptionCreateForm] = useState<PrescriptionCreateFormState>(
     createPrescriptionCreateForm([]),
   );
@@ -1797,8 +1804,10 @@ export const SettingsWorkspace = ({
         baseUrl: orcaSettingForm.baseUrl.trim() || undefined,
         authType: orcaSettingForm.authType,
         username: orcaSettingForm.username.trim() || undefined,
+        password: orcaSettingForm.password || undefined,
         clientId: orcaSettingForm.clientId.trim() || undefined,
         claimEndpoint: orcaSettingForm.claimEndpoint.trim() || '/api01rv2/claim',
+        healthEndpoint: orcaSettingForm.healthEndpoint.trim() || '/api01rv2/systeminfv2',
         mode: orcaSettingForm.mode,
         note: orcaSettingForm.note.trim() || undefined,
       });
@@ -1814,6 +1823,28 @@ export const SettingsWorkspace = ({
       setFlash({
         tone: 'error',
         text: `ORCA接続設定の更新に失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleTestOrcaConnection = async () => {
+    setIsMutating(true);
+    try {
+      const result = await testOrcaConnection();
+      setOrcaConnectionTest(result);
+      setFlash({ tone: result.ok ? 'success' : 'error', text: result.message });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `ORCA接続テストに失敗しました: ${
           error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
         }`,
       });
@@ -4402,6 +4433,9 @@ export const SettingsWorkspace = ({
                       <Field label='claim_endpoint'>
                         <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, claimEndpoint: event.target.value }))} value={orcaSettingForm.claimEndpoint} />
                       </Field>
+                      <Field label='health_endpoint'>
+                        <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, healthEndpoint: event.target.value }))} value={orcaSettingForm.healthEndpoint} />
+                      </Field>
                       <Field label='auth_type'>
                         <Select blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, authType: event.target.value as OrcaAdapterSetting['authType'] }))} value={orcaSettingForm.authType}>
                           <option value='none'>none</option>
@@ -4411,6 +4445,12 @@ export const SettingsWorkspace = ({
                       </Field>
                       <Field label='client_id'>
                         <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, clientId: event.target.value }))} value={orcaSettingForm.clientId} />
+                      </Field>
+                      <Field label='operator_id'>
+                        <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, username: event.target.value }))} value={orcaSettingForm.username} />
+                      </Field>
+                      <Field label={orcaSetting?.hasPassword ? 'password（設定済み）' : 'password'}>
+                        <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, password: event.target.value }))} type='password' value={orcaSettingForm.password} />
                       </Field>
                     </div>
                     <div className='mt-4'>
@@ -4422,7 +4462,16 @@ export const SettingsWorkspace = ({
                       <Button aria-disabled={isMutating} onClick={handleUpdateOrcaSetting} size='md' type='button' variant='outline'>
                         ORCA設定を更新
                       </Button>
+                      <Button aria-disabled={isMutating} onClick={handleTestOrcaConnection} size='md' type='button' variant='solid-fill'>
+                        接続テスト
+                      </Button>
                     </div>
+                    {orcaConnectionTest ? (
+                      <div className={cn('mt-4 rounded-8 border px-4 py-3', orcaConnectionTest.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-red-200 bg-red-50 text-red-900')}>
+                        <p className='text-[14px] font-bold leading-none'>{orcaConnectionTest.message}</p>
+                        {orcaConnectionTest.url ? <p className='mt-2 text-mono-14N-150'>{orcaConnectionTest.url}</p> : null}
+                      </div>
+                    ) : null}
                   </section>
                 </>
               ) : null}

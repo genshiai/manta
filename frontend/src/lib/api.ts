@@ -13,6 +13,7 @@ import type {
   ClaimDraft,
   FacilityClaimRule,
   OrcaAdapterSetting,
+  OrcaConnectionTestResult,
   ChartOrderConfig,
   ChartTemplate,
   ChartHistoryEntry,
@@ -663,12 +664,22 @@ type ApiOrcaAdapterSetting = {
   base_url: string | null;
   auth_type: 'none' | 'basic' | 'client';
   username: string | null;
+  has_password: boolean;
   client_id: string | null;
   claim_endpoint: string;
+  health_endpoint: string;
   mode: 'mock' | 'http';
   note: string | null;
   updated_by: string | null;
   updated_at: string;
+};
+
+type ApiOrcaConnectionTest = {
+  ok: boolean;
+  status_code: number | null;
+  url: string | null;
+  message: string;
+  response_payload: Record<string, unknown>;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -1383,12 +1394,22 @@ const mapOrcaAdapterSetting = (item: ApiOrcaAdapterSetting): OrcaAdapterSetting 
   baseUrl: item.base_url ?? undefined,
   authType: item.auth_type,
   username: item.username ?? undefined,
+  hasPassword: item.has_password,
   clientId: item.client_id ?? undefined,
   claimEndpoint: item.claim_endpoint,
+  healthEndpoint: item.health_endpoint,
   mode: item.mode,
   note: item.note ?? undefined,
   updatedBy: item.updated_by ?? undefined,
   updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapOrcaConnectionTest = (item: ApiOrcaConnectionTest): OrcaConnectionTestResult => ({
+  ok: item.ok,
+  statusCode: item.status_code ?? undefined,
+  url: item.url ?? undefined,
+  message: item.message,
+  responsePayload: item.response_payload,
 });
 
 export const login = async (userId: string, password: string): Promise<UserSession> => {
@@ -1904,8 +1925,10 @@ export const updateOrcaAdapterSetting = async (payload: {
   baseUrl?: string;
   authType: OrcaAdapterSetting['authType'];
   username?: string;
+  password?: string;
   clientId?: string;
   claimEndpoint: string;
+  healthEndpoint: string;
   mode: OrcaAdapterSetting['mode'];
   note?: string;
 }): Promise<OrcaAdapterSetting> => {
@@ -1916,13 +1939,22 @@ export const updateOrcaAdapterSetting = async (payload: {
       base_url: payload.baseUrl ?? null,
       auth_type: payload.authType,
       username: payload.username ?? null,
+      password: payload.password ?? null,
       client_id: payload.clientId ?? null,
       claim_endpoint: payload.claimEndpoint,
+      health_endpoint: payload.healthEndpoint,
       mode: payload.mode,
       note: payload.note ?? null,
     }),
   });
   return mapOrcaAdapterSetting(setting);
+};
+
+export const testOrcaConnection = async (): Promise<OrcaConnectionTestResult> => {
+  const result = await request<ApiOrcaConnectionTest>('/api/admin/orca/test-connection', {
+    method: 'POST',
+  });
+  return mapOrcaConnectionTest(result);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

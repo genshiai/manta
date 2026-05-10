@@ -6,6 +6,7 @@ import re
 import unicodedata
 from zoneinfo import ZoneInfo
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import case, desc, func, or_, select, true as sa_true
@@ -120,6 +121,7 @@ from .schemas import (
     PatientStatusUpdateRequest,
     OrcaAdapterSettingRead,
     OrcaAdapterSettingUpdateRequest,
+    OrcaConnectionTestRead,
     PatientSummaryRead,
     PatientContextRead,
     PatientContextUpdateRequest,
@@ -1898,7 +1900,50 @@ def _build_orca_claim_payload(draft: ClaimDraft, patient: Patient, lines: list[C
     }
 
 
-def _mock_submit_orca_claim(
+def _orca_setting_to_read(setting: OrcaAdapterSetting) -> OrcaAdapterSettingRead:
+    return OrcaAdapterSettingRead(
+        id=setting.id,
+        is_active=setting.is_active,
+        base_url=setting.base_url,
+        auth_type=setting.auth_type,
+        username=setting.username,
+        has_password=bool(setting.password_secret),
+        client_id=setting.client_id,
+        claim_endpoint=setting.claim_endpoint,
+        health_endpoint=setting.health_endpoint,
+        mode=setting.mode,
+        note=setting.note,
+        updated_by=setting.updated_by,
+        updated_at=setting.updated_at,
+    )
+
+
+def _orca_url(setting: OrcaAdapterSetting, endpoint: str) -> str:
+    if not setting.base_url:
+        raise ValueError("base_url is required")
+    base = setting.base_url.rstrip("/")
+    path = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+    return f"{base}{path}"
+
+
+def _orca_auth(setting: OrcaAdapterSetting) -> httpx.BasicAuth | None:
+    if setting.auth_type != "basic":
+        return None
+    if not setting.username or not setting.password_secret:
+        raise ValueError("basic auth requires username and password")
+    return httpx.BasicAuth(setting.username, setting.password_secret)
+
+
+def _normalize_orca_response(status_code: int, payload: dict[str, object]) -> tuple[str, str | None]:
+    text = str(payload)
+    if status_code >= 400:
+        return "error", f"ORCA HTTP {status_code}"
+    if any(key in text for key in ["エラー", "ERROR", "Error", "警告"]):
+        return "rejected", "ORCA returned warning/error content"
+    return "accepted", None
+
+
+def _submit_orca_claim(
     db: Session,
     *,
     draft: ClaimDraft,
@@ -1919,13 +1964,15 @@ def _mock_submit_orca_claim(
     ).all()
     payload = _build_orca_claim_payload(draft, patient, lines)
     setting = db.get(OrcaAdapterSetting, "default")
+    if setting is None:
+        setting = OrcaAdapterSetting(id="default", mode="mock", claim_endpoint="/api01rv2/claim")
     payload["orca_setting"] = {
-        "mode": setting.mode if setting else "mock",
-        "base_url": setting.base_url if setting else None,
-        "claim_endpoint": setting.claim_endpoint if setting else "/api01rv2/claim",
-        "auth_type": setting.auth_type if setting else "none",
+        "mode": setting.mode,
+        "base_url": setting.base_url,
+        "claim_endpoint": setting.claim_endpoint,
+        "auth_type": setting.auth_type,
     }
-    if setting and setting.mode == "http" and not setting.base_url:
+    if setting.mode == "http" and not setting.base_url:
         return ClaimTransmission(
             claim_draft_id=draft.id,
             adapter="orca",
@@ -1952,6 +1999,38 @@ def _mock_submit_orca_claim(
         )
         draft.status = "error"
         return transmission
+    if setting.mode == "http":
+        try:
+            url = _orca_url(setting, setting.claim_endpoint)
+            with httpx.Client(timeout=15.0, auth=_orca_auth(setting)) as client:
+                response = client.post(url, json=payload)
+            try:
+                response_payload: dict[str, object] = response.json()
+            except ValueError:
+                response_payload = {"raw_text": response.text}
+            response_payload.setdefault("_http_status", response.status_code)
+            status_value, error_message = _normalize_orca_response(response.status_code, response_payload)
+            transmission = ClaimTransmission(
+                claim_draft_id=draft.id,
+                adapter="orca",
+                status=status_value,
+                request_payload=payload,
+                response_payload=response_payload,
+                error_message=error_message,
+                sent_by=current_user.display_name,
+            )
+            draft.status = "submitted" if status_value == "accepted" else "error"
+            return transmission
+        except (httpx.HTTPError, ValueError) as exc:
+            return ClaimTransmission(
+                claim_draft_id=draft.id,
+                adapter="orca",
+                status="error",
+                request_payload=payload,
+                response_payload={"exception": exc.__class__.__name__},
+                error_message=str(exc),
+                sent_by=current_user.display_name,
+            )
     response_payload = {
         "accepted": True,
         "adapter": "orca",
@@ -3394,7 +3473,7 @@ def submit_claim_draft_to_orca(
     if draft is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft not found")
     patient = get_patient_or_404(db, draft.patient_id)
-    transmission = _mock_submit_orca_claim(db, draft=draft, patient=patient, current_user=current_user)
+    transmission = _submit_orca_claim(db, draft=draft, patient=patient, current_user=current_user)
     db.add(transmission)
     draft.updated_at = utcnow()
     if draft.admission_id is not None:
@@ -3606,7 +3685,7 @@ def get_orca_adapter_setting(
         db.add(setting)
         db.commit()
         db.refresh(setting)
-    return OrcaAdapterSettingRead.model_validate(setting)
+    return _orca_setting_to_read(setting)
 
 
 @app.put("/api/admin/orca/settings", response_model=OrcaAdapterSettingRead)
@@ -3619,8 +3698,12 @@ def update_orca_adapter_setting(
     if setting is None:
         setting = OrcaAdapterSetting(id="default")
         db.add(setting)
-    for key, value in payload.model_dump().items():
+    values = payload.model_dump()
+    password = values.pop("password", None)
+    for key, value in values.items():
         setattr(setting, key, value)
+    if password is not None:
+        setting.password_secret = password or None
     setting.updated_by = current_user.display_name
     setting.updated_at = utcnow()
     log_audit(
@@ -3632,7 +3715,35 @@ def update_orca_adapter_setting(
     )
     db.commit()
     db.refresh(setting)
-    return OrcaAdapterSettingRead.model_validate(setting)
+    return _orca_setting_to_read(setting)
+
+
+@app.post("/api/admin/orca/test-connection", response_model=OrcaConnectionTestRead)
+def test_orca_connection(
+    _: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> OrcaConnectionTestRead:
+    setting = db.get(OrcaAdapterSetting, "default")
+    if setting is None or setting.mode == "mock":
+        return OrcaConnectionTestRead(ok=True, message="mock mode: 実ORCAには接続しません。", response_payload={})
+    try:
+        url = _orca_url(setting, setting.health_endpoint)
+        with httpx.Client(timeout=10.0, auth=_orca_auth(setting)) as client:
+            response = client.post(url, json={"Request_Number": "01"})
+        try:
+            response_payload: dict[str, object] = response.json()
+        except ValueError:
+            response_payload = {"raw_text": response.text[:2000]}
+        ok = 200 <= response.status_code < 400
+        return OrcaConnectionTestRead(
+            ok=ok,
+            status_code=response.status_code,
+            url=url,
+            message="ORCA接続に成功しました。" if ok else f"ORCA HTTP {response.status_code}",
+            response_payload=response_payload,
+        )
+    except (httpx.HTTPError, ValueError) as exc:
+        return OrcaConnectionTestRead(ok=False, message=str(exc), response_payload={"exception": exc.__class__.__name__})
 
 
 @app.post(
