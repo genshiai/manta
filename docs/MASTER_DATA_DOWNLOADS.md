@@ -15,6 +15,7 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 1. 厚労省 薬価基準収載品目リスト
 2. PMDA 医療用医薬品添付文書 XML
 3. 支払基金 レセプト電算 医薬品マスター
+4. 支払基金 レセプト電算 医科診療行為マスター
 4. MEDIS 医薬品 HOT コードマスター
 5. 厚労省 一般名処方マスター
 
@@ -233,7 +234,38 @@ uv run python scripts/import_receipt_drug_master.py \
   --dry-run
 ```
 
-## 4. MEDIS 医薬品 HOT コードマスター
+## 4. 支払基金 レセプト電算 医科診療行為マスター
+
+目的: 退院会計候補や将来の ClaimDraft を、診療行為レセ電コードへ寄せる。
+
+公式ページ:
+
+- [社会保険診療報酬支払基金 基本マスター](https://www.ssk.or.jp/seikyushiharai/tensuhyo/kihonmasta/index.html)
+- 医科診療行為マスター
+
+取得すべきファイル:
+
+- 全件: `s_ALL*.zip`
+- 改定分: `s_*.csv`
+- ファイル仕様: 基本マスターの「レセプト電算処理システムマスターファイル仕様説明書」
+
+Manta 実装メモ:
+
+- `receipt_medical_practice_masters` に診療行為コード、名称、カナ、点数、単位、有効期間、カテゴリを保持する。
+- `backend/scripts/import_receipt_medical_practice_master.py` で `s_ALL*.zip` または展開済み CSV を import する。
+- 退院会計候補は `category` を起点に診療行為 master 候補を引き、`receipt_code / receipt_name / receipt_points / receipt_unit` を表示する。
+- 現時点のカテゴリ推定は名称ベースの補助。公式 master 投入後に施設運用の算定 rule と照合する。
+
+取り込み例:
+
+```bash
+cd backend
+uv run python scripts/import_receipt_medical_practice_master.py \
+  /path/to/s_ALL20260414.zip \
+  --dry-run
+```
+
+## 5. MEDIS 医薬品 HOT コードマスター
 
 目的: YJ、レセ電、包装単位、販売名、一般名処方の対応を安定させる。
 
