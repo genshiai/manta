@@ -328,9 +328,13 @@ export type InpatientDischargePlan = {
   status: 'draft' | 'reviewed' | 'ready';
   dischargeMedicationNote: string;
   billingCandidates: Array<{
+    id?: string;
     category: string;
     label: string;
     source: string;
+    evidence?: string;
+    status?: 'candidate' | 'needs_review' | 'accepted' | 'excluded' | string;
+    confidence?: 'high' | 'medium' | 'low' | string;
   }>;
   followUpNote: string;
   reviewedBy: string;

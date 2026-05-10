@@ -484,6 +484,9 @@ def test_get_and_update_inpatient_discharge_plan() -> None:
 
     assert draft["status"] == "draft"
     assert draft["billing_candidates"]
+    assert {"id", "category", "label", "source", "evidence", "status", "confidence"} <= set(
+        draft["billing_candidates"][0]
+    )
     assert plan["status"] == "ready"
     assert plan["follow_up_note"] == "次回外来を予約"
 

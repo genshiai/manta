@@ -886,8 +886,21 @@ export const WardWorkspace = ({
                       </span>
                       {dischargePlan.billingCandidates.map((candidate) => (
                         <div className='rounded-md border border-border bg-surface-subtle p-2' key={`${candidate.category}-${candidate.label}`}>
-                          <p className='text-[12px] font-bold text-text-primary'>{candidate.category}</p>
+                          <div className='flex items-start justify-between gap-2'>
+                            <p className='text-[12px] font-bold text-text-primary'>{candidate.category}</p>
+                            <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold', candidate.status === 'needs_review' ? 'border-yellow-200 bg-yellow-50 text-yellow-1100' : 'border-green-200 bg-green-50 text-green-900')}>
+                              {candidate.status === 'needs_review' ? '要確認' : '候補'}
+                            </span>
+                          </div>
                           <p className='mt-1 text-[12px] leading-normal text-text-secondary'>{candidate.label}</p>
+                          {candidate.evidence ? (
+                            <p className='mt-2 border-t border-border pt-2 text-[11px] leading-normal text-text-tertiary'>
+                              根拠: {candidate.evidence}
+                            </p>
+                          ) : null}
+                          <p className='mt-1 text-[11px] text-text-tertiary'>
+                            {candidate.source} · {candidate.confidence ?? 'medium'}
+                          </p>
                         </div>
                       ))}
                     </div>

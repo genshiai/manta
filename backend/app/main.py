@@ -1464,6 +1464,7 @@ def build_discharge_plan_defaults(
     admission: Admission,
     prescriptions: list[PrescriptionOrder],
     instructions: list[InpatientInstruction],
+    lab_orders: list[LabOrder],
 ) -> tuple[str, list[dict[str, str]], str]:
     latest_by_drug: dict[str, PrescriptionOrder] = {}
     for prescription in prescriptions:
@@ -1474,20 +1475,63 @@ def build_discharge_plan_defaults(
     ) or "- 退院時処方候補なし"
     candidates = [
         {
+            "id": "admission-basic",
             "category": "入院基本料",
             "label": f"{admission.ward_id or '病棟未設定'} 入院日数 {_admission_stay_days(admission)}日",
             "source": "admission",
+            "evidence": f"入院日: {_format_document_date(admission.admitted_at or admission.requested_at)} / 退院日: {_format_document_date(admission.discharged_at)}",
+            "status": "candidate",
+            "confidence": "high",
         },
         {
+            "id": "discharge-support",
             "category": "退院支援",
             "label": "退院支援・退院時指導の算定候補を確認",
             "source": "discharge",
+            "evidence": admission.note or "退院計画・退院時指導文書・次回外来の確認が必要",
+            "status": "candidate",
+            "confidence": "medium",
         },
     ]
     if prescriptions:
-        candidates.append({"category": "投薬", "label": "退院時処方料・薬剤料候補", "source": "prescription"})
-    if any(instruction.status == "done" for instruction in instructions):
-        candidates.append({"category": "処置/指導", "label": "実施済み入院指示から算定候補を確認", "source": "instruction"})
+        candidates.append(
+            {
+                "id": "discharge-medication",
+                "category": "投薬",
+                "label": "退院時処方料・薬剤料候補",
+                "source": "prescription",
+                "evidence": " / ".join(
+                    f"{item.drug_name} {item.dosage} {item.days}" for item in list(latest_by_drug.values())[:4]
+                ),
+                "status": "candidate",
+                "confidence": "medium",
+            }
+        )
+    done_instructions = [instruction for instruction in instructions if instruction.status == "done"]
+    if done_instructions:
+        candidates.append(
+            {
+                "id": "completed-instructions",
+                "category": "処置/指導",
+                "label": "実施済み入院指示から算定候補を確認",
+                "source": "instruction",
+                "evidence": " / ".join(f"{item.category}: {item.title}" for item in done_instructions[:4]),
+                "status": "needs_review",
+                "confidence": "medium",
+            }
+        )
+    if lab_orders:
+        candidates.append(
+            {
+                "id": "lab-orders",
+                "category": "検査",
+                "label": "入院中検査オーダの会計反映を確認",
+                "source": "lab_order",
+                "evidence": " / ".join(f"{item.category}: {', '.join(item.items[:4])}" for item in lab_orders[:3]),
+                "status": "needs_review",
+                "confidence": "medium",
+            }
+        )
     follow_up = admission.note or "退院後外来、再診、検査予定、地域連携の確認"
     return medication_note, candidates, follow_up
 
@@ -2658,10 +2702,17 @@ def get_inpatient_discharge_plan(
         .where(InpatientInstruction.admission_id == admission_id)
         .order_by(desc(InpatientInstruction.created_at))
     ).all()
+    lab_orders = db.scalars(
+        select(LabOrder)
+        .where(LabOrder.patient_id == admission.patient_id)
+        .order_by(desc(LabOrder.created_at))
+        .limit(10)
+    ).all()
     medication_note, candidates, follow_up = build_discharge_plan_defaults(
         admission=admission,
         prescriptions=prescriptions,
         instructions=instructions,
+        lab_orders=lab_orders,
     )
     now = utcnow()
     return InpatientDischargePlanRead(
@@ -2702,6 +2753,12 @@ def upsert_inpatient_discharge_plan(
             ).all(),
             instructions=db.scalars(
                 select(InpatientInstruction).where(InpatientInstruction.admission_id == admission_id)
+            ).all(),
+            lab_orders=db.scalars(
+                select(LabOrder)
+                .where(LabOrder.patient_id == admission.patient_id)
+                .order_by(desc(LabOrder.created_at))
+                .limit(10)
             ).all(),
         )
         plan = InpatientDischargePlan(

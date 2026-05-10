@@ -566,9 +566,13 @@ type ApiInpatientDischargePlan = {
   status: 'draft' | 'reviewed' | 'ready';
   discharge_medication_note: string;
   billing_candidates: Array<{
+    id?: string;
     category: string;
     label: string;
     source: string;
+    evidence?: string;
+    status?: string;
+    confidence?: string;
   }>;
   follow_up_note: string;
   reviewed_by: string;
