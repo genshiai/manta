@@ -276,6 +276,22 @@ class ReceiptLongTermListedDrug(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class ReceiptMedicalPracticeMaster(Base):
+    __tablename__ = "receipt_medical_practice_masters"
+
+    receipt_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    name_kana: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    points: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    unit_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    effective_from: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    effective_to: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    source_file: Mapped[str] = mapped_column(String(255), default="demo")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class HotDrugCodeMapping(Base):
     __tablename__ = "hot_drug_code_mappings"
 

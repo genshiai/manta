@@ -893,6 +893,12 @@ export const WardWorkspace = ({
                             </span>
                           </div>
                           <p className='mt-1 text-[12px] leading-normal text-text-secondary'>{candidate.label}</p>
+                          {candidate.receiptCode ? (
+                            <p className='mt-2 rounded border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-900'>
+                              {candidate.receiptCode} {candidate.receiptName}
+                              {candidate.receiptPoints ? ` / ${candidate.receiptPoints}点${candidate.receiptUnit ? `/${candidate.receiptUnit}` : ''}` : ''}
+                            </p>
+                          ) : null}
                           {candidate.evidence ? (
                             <p className='mt-2 border-t border-border pt-2 text-[11px] leading-normal text-text-tertiary'>
                               根拠: {candidate.evidence}

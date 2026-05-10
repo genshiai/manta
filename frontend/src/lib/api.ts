@@ -573,6 +573,10 @@ type ApiInpatientDischargePlan = {
     evidence?: string;
     status?: string;
     confidence?: string;
+    receipt_code?: string;
+    receipt_name?: string;
+    receipt_points?: string;
+    receipt_unit?: string;
   }>;
   follow_up_note: string;
   reviewed_by: string;
@@ -1203,7 +1207,13 @@ const mapInpatientDischargePlan = (item: ApiInpatientDischargePlan): InpatientDi
   admissionId: item.admission_id,
   status: item.status,
   dischargeMedicationNote: item.discharge_medication_note,
-  billingCandidates: item.billing_candidates,
+  billingCandidates: item.billing_candidates.map((candidate) => ({
+    ...candidate,
+    receiptCode: candidate.receipt_code,
+    receiptName: candidate.receipt_name,
+    receiptPoints: candidate.receipt_points,
+    receiptUnit: candidate.receipt_unit,
+  })),
   followUpNote: item.follow_up_note,
   reviewedBy: item.reviewed_by,
   reviewedAt: formatTimestamp(item.reviewed_at),

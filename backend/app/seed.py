@@ -26,6 +26,7 @@ from .models import (
     PrescriptionCatalogMaster,
     PrescriptionSetMaster,
     PrescriptionOrder,
+    ReceiptMedicalPracticeMaster,
     Reservation,
     ReservationSlotMaster,
     StandardUsageMaster,
@@ -416,6 +417,64 @@ INPATIENT_PATHWAY_MASTER_DATA = [
             {"id": "diabetes-education-005", "sort_order": 50, "day_offset": 5, "category": "治療", "title": "退院後薬物療法と自己管理目標の調整", "role": "医師", "due_time": "午前"},
             {"id": "diabetes-education-006", "sort_order": 60, "day_offset": 8, "category": "退院支援", "title": "退院後外来、療養指導、処方確認", "role": "医師/看護", "due_time": "午前"},
         ],
+    },
+]
+
+RECEIPT_MEDICAL_PRACTICE_MASTER_DATA = [
+    {
+        "receipt_code": "A000001",
+        "name": "入院基本料（候補）",
+        "name_kana": "ニュウインキホンリョウ",
+        "category": "入院基本料",
+        "points": 1000,
+        "unit_name": "日",
+        "effective_from": "20260401",
+        "effective_to": None,
+        "source_file": "demo",
+    },
+    {
+        "receipt_code": "B001001",
+        "name": "退院時共同指導料・退院支援候補",
+        "name_kana": "タイインシエン",
+        "category": "退院支援",
+        "points": 400,
+        "unit_name": "回",
+        "effective_from": "20260401",
+        "effective_to": None,
+        "source_file": "demo",
+    },
+    {
+        "receipt_code": "F000001",
+        "name": "退院時処方料候補",
+        "name_kana": "タイインジショホウ",
+        "category": "投薬",
+        "points": 42,
+        "unit_name": "回",
+        "effective_from": "20260401",
+        "effective_to": None,
+        "source_file": "demo",
+    },
+    {
+        "receipt_code": "D000001",
+        "name": "検体検査実施料候補",
+        "name_kana": "ケンタイケンサ",
+        "category": "検査",
+        "points": 100,
+        "unit_name": "回",
+        "effective_from": "20260401",
+        "effective_to": None,
+        "source_file": "demo",
+    },
+    {
+        "receipt_code": "J000001",
+        "name": "処置・指導料候補",
+        "name_kana": "ショチシドウ",
+        "category": "処置/指導",
+        "points": 100,
+        "unit_name": "回",
+        "effective_from": "20260401",
+        "effective_to": None,
+        "source_file": "demo",
     },
 ]
 
@@ -1506,6 +1565,21 @@ def sync_inpatient_pathway_masters(db: Session) -> bool:
     return updated
 
 
+def sync_receipt_medical_practice_masters(db: Session) -> bool:
+    updated = False
+    for item in RECEIPT_MEDICAL_PRACTICE_MASTER_DATA:
+        existing = db.get(ReceiptMedicalPracticeMaster, item["receipt_code"])
+        if existing is None:
+            db.add(ReceiptMedicalPracticeMaster(**item))
+            updated = True
+            continue
+        for key, value in item.items():
+            if getattr(existing, key) != value:
+                setattr(existing, key, value)
+                updated = True
+    return updated
+
+
 def backfill_demo_prescription_history(db: Session) -> bool:
     updated = False
 
@@ -1941,6 +2015,9 @@ def seed_demo_data(db: Session) -> None:
         if sync_inpatient_pathway_masters(db):
             updated = True
 
+        if sync_receipt_medical_practice_masters(db):
+            updated = True
+
         if sync_diagnosis_masters(db):
             updated = True
 
@@ -1976,6 +2053,7 @@ def seed_demo_data(db: Session) -> None:
     )
     sync_chart_order_masters(db)
     sync_inpatient_pathway_masters(db)
+    sync_receipt_medical_practice_masters(db)
     sync_diagnosis_masters(db)
 
     patients = [
@@ -2176,4 +2254,5 @@ def seed_demo_data(db: Session) -> None:
     backfill_observations_from_patient_json(db)
     sync_inpatient_demo_data(db)
     sync_inpatient_pathway_masters(db)
+    sync_receipt_medical_practice_masters(db)
     db.commit()

@@ -335,6 +335,10 @@ export type InpatientDischargePlan = {
     evidence?: string;
     status?: 'candidate' | 'needs_review' | 'accepted' | 'excluded' | string;
     confidence?: 'high' | 'medium' | 'low' | string;
+    receiptCode?: string;
+    receiptName?: string;
+    receiptPoints?: string;
+    receiptUnit?: string;
   }>;
   followUpNote: string;
   reviewedBy: string;

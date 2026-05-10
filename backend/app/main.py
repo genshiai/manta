@@ -41,6 +41,7 @@ from .models import (
     PmdaPackageInsertSection,
     PrescriptionOrder,
     ReceiptLongTermListedDrug,
+    ReceiptMedicalPracticeMaster,
     ReceiptTransitionalDrug,
     Reservation,
     User,
@@ -1459,7 +1460,40 @@ def get_pathway_master_or_404(db: Session, master_id: str) -> InpatientPathwayMa
     return master
 
 
+def _receipt_practice_candidate(
+    db: Session,
+    *,
+    category: str,
+) -> dict[str, str] | None:
+    master = db.scalar(
+        select(ReceiptMedicalPracticeMaster)
+        .where(ReceiptMedicalPracticeMaster.category == category)
+        .order_by(ReceiptMedicalPracticeMaster.receipt_code)
+    )
+    if master is None:
+        return None
+    return {
+        "receipt_code": master.receipt_code,
+        "receipt_name": master.name,
+        "receipt_points": str(master.points) if master.points is not None else "",
+        "receipt_unit": master.unit_name or "",
+    }
+
+
+def _with_receipt_practice(
+    db: Session,
+    candidate: dict[str, str],
+    *,
+    category: str,
+) -> dict[str, str]:
+    receipt_candidate = _receipt_practice_candidate(db, category=category)
+    if receipt_candidate is None:
+        return candidate
+    return {**candidate, **receipt_candidate}
+
+
 def build_discharge_plan_defaults(
+    db: Session,
     *,
     admission: Admission,
     prescriptions: list[PrescriptionOrder],
@@ -1474,7 +1508,9 @@ def build_discharge_plan_defaults(
         for item in latest_by_drug.values()
     ) or "- 退院時処方候補なし"
     candidates = [
-        {
+        _with_receipt_practice(
+            db,
+            {
             "id": "admission-basic",
             "category": "入院基本料",
             "label": f"{admission.ward_id or '病棟未設定'} 入院日数 {_admission_stay_days(admission)}日",
@@ -1482,8 +1518,12 @@ def build_discharge_plan_defaults(
             "evidence": f"入院日: {_format_document_date(admission.admitted_at or admission.requested_at)} / 退院日: {_format_document_date(admission.discharged_at)}",
             "status": "candidate",
             "confidence": "high",
-        },
-        {
+            },
+            category="入院基本料",
+        ),
+        _with_receipt_practice(
+            db,
+            {
             "id": "discharge-support",
             "category": "退院支援",
             "label": "退院支援・退院時指導の算定候補を確認",
@@ -1491,10 +1531,14 @@ def build_discharge_plan_defaults(
             "evidence": admission.note or "退院計画・退院時指導文書・次回外来の確認が必要",
             "status": "candidate",
             "confidence": "medium",
-        },
+            },
+            category="退院支援",
+        ),
     ]
     if prescriptions:
         candidates.append(
+            _with_receipt_practice(
+                db,
             {
                 "id": "discharge-medication",
                 "category": "投薬",
@@ -1505,11 +1549,15 @@ def build_discharge_plan_defaults(
                 ),
                 "status": "candidate",
                 "confidence": "medium",
-            }
+                },
+                category="投薬",
+            )
         )
     done_instructions = [instruction for instruction in instructions if instruction.status == "done"]
     if done_instructions:
         candidates.append(
+            _with_receipt_practice(
+                db,
             {
                 "id": "completed-instructions",
                 "category": "処置/指導",
@@ -1518,10 +1566,14 @@ def build_discharge_plan_defaults(
                 "evidence": " / ".join(f"{item.category}: {item.title}" for item in done_instructions[:4]),
                 "status": "needs_review",
                 "confidence": "medium",
-            }
+                },
+                category="処置/指導",
+            )
         )
     if lab_orders:
         candidates.append(
+            _with_receipt_practice(
+                db,
             {
                 "id": "lab-orders",
                 "category": "検査",
@@ -1530,7 +1582,9 @@ def build_discharge_plan_defaults(
                 "evidence": " / ".join(f"{item.category}: {', '.join(item.items[:4])}" for item in lab_orders[:3]),
                 "status": "needs_review",
                 "confidence": "medium",
-            }
+                },
+                category="検査",
+            )
         )
     follow_up = admission.note or "退院後外来、再診、検査予定、地域連携の確認"
     return medication_note, candidates, follow_up
@@ -2709,6 +2763,7 @@ def get_inpatient_discharge_plan(
         .limit(10)
     ).all()
     medication_note, candidates, follow_up = build_discharge_plan_defaults(
+        db,
         admission=admission,
         prescriptions=prescriptions,
         instructions=instructions,
@@ -2744,6 +2799,7 @@ def upsert_inpatient_discharge_plan(
     )
     if plan is None:
         medication_note, candidates, follow_up = build_discharge_plan_defaults(
+            db,
             admission=admission,
             prescriptions=db.scalars(
                 select(PrescriptionOrder)
