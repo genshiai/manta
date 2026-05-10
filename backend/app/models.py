@@ -304,6 +304,8 @@ class FacilityClaimRule(Base):
     severity: Mapped[str] = mapped_column(String(32), default="warning")
     message: Mapped[str] = mapped_column(String(255))
     evidence_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    conditions: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    actions: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -617,6 +619,21 @@ class ClaimDraftLine(Base):
     unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     review_status: Mapped[str] = mapped_column(String(32), default="candidate", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ClaimLineAdjustment(Base):
+    __tablename__ = "claim_line_adjustments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    claim_draft_id: Mapped[int] = mapped_column(ForeignKey("claim_drafts.id", ondelete="CASCADE"), index=True)
+    claim_draft_line_id: Mapped[int | None] = mapped_column(ForeignKey("claim_draft_lines.id", ondelete="CASCADE"), nullable=True, index=True)
+    rule_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    adjustment_type: Mapped[str] = mapped_column(String(64), index=True)
+    points_delta: Mapped[int] = mapped_column(Integer, default=0)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), default="suggested", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 

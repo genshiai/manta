@@ -616,6 +616,19 @@ type ApiClaimDraftLine = {
   created_at: string;
 };
 
+type ApiClaimLineAdjustment = {
+  id: number;
+  claim_draft_id: number;
+  claim_draft_line_id: number | null;
+  rule_id: string | null;
+  adjustment_type: string;
+  points_delta: number;
+  comment: string | null;
+  reason: string;
+  status: 'suggested' | 'accepted' | 'ignored';
+  created_at: string;
+};
+
 type ApiClaimDraft = {
   id: number;
   patient_id: string;
@@ -628,6 +641,7 @@ type ApiClaimDraft = {
   created_at: string;
   updated_at: string;
   lines: ApiClaimDraftLine[];
+  adjustments: ApiClaimLineAdjustment[];
   issues: ApiClaimReviewIssue[];
   transmissions: ApiClaimTransmission[];
 };
@@ -655,6 +669,8 @@ type ApiFacilityClaimRule = {
   severity: 'info' | 'warning' | 'error';
   message: string;
   evidence_hint: string | null;
+  conditions: Record<string, unknown>;
+  actions: Record<string, unknown>;
   updated_at: string;
 };
 
@@ -1350,6 +1366,19 @@ const mapClaimDraftLine = (item: ApiClaimDraftLine) => ({
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapClaimLineAdjustment = (item: ApiClaimLineAdjustment) => ({
+  id: item.id,
+  claimDraftId: item.claim_draft_id,
+  claimDraftLineId: item.claim_draft_line_id ?? undefined,
+  ruleId: item.rule_id ?? undefined,
+  adjustmentType: item.adjustment_type,
+  pointsDelta: item.points_delta,
+  comment: item.comment ?? undefined,
+  reason: item.reason,
+  status: item.status,
+  createdAt: formatTimestamp(item.created_at),
+});
+
 const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
   id: item.id,
   patientId: item.patient_id,
@@ -1362,6 +1391,7 @@ const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
   createdAt: formatTimestamp(item.created_at),
   updatedAt: formatTimestamp(item.updated_at),
   lines: item.lines.map(mapClaimDraftLine),
+  adjustments: item.adjustments.map(mapClaimLineAdjustment),
   issues: item.issues.map((issue) => ({
     id: issue.id,
     claimDraftId: issue.claim_draft_id,
@@ -1385,6 +1415,8 @@ const mapFacilityClaimRule = (item: ApiFacilityClaimRule): FacilityClaimRule => 
   severity: item.severity,
   message: item.message,
   evidenceHint: item.evidence_hint ?? undefined,
+  conditions: item.conditions,
+  actions: item.actions,
   updatedAt: formatTimestamp(item.updated_at),
 });
 
@@ -1882,6 +1914,8 @@ type FacilityClaimRulePayload = {
   severity: FacilityClaimRule['severity'];
   message: string;
   evidenceHint?: string;
+  conditions?: Record<string, unknown>;
+  actions?: Record<string, unknown>;
 };
 
 const facilityClaimRuleBody = (payload: FacilityClaimRulePayload) => ({
@@ -1894,6 +1928,8 @@ const facilityClaimRuleBody = (payload: FacilityClaimRulePayload) => ({
   severity: payload.severity,
   message: payload.message,
   evidence_hint: payload.evidenceHint ?? null,
+  conditions: payload.conditions ?? {},
+  actions: payload.actions ?? {},
 });
 
 export const createFacilityClaimRule = async (payload: FacilityClaimRulePayload & { id: string }): Promise<FacilityClaimRule> => {

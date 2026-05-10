@@ -686,6 +686,21 @@ class ClaimDraftLineRead(BaseModel):
     created_at: datetime
 
 
+class ClaimLineAdjustmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    claim_draft_id: int
+    claim_draft_line_id: int | None = None
+    rule_id: str | None = None
+    adjustment_type: str
+    points_delta: int
+    comment: str | None = None
+    reason: str
+    status: Literal["suggested", "accepted", "ignored"]
+    created_at: datetime
+
+
 class ClaimDraftRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -700,6 +715,7 @@ class ClaimDraftRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     lines: list[ClaimDraftLineRead] = []
+    adjustments: list[ClaimLineAdjustmentRead] = []
     issues: list[ClaimReviewIssueRead] = []
     transmissions: list[ClaimTransmissionRead] = []
 
@@ -720,6 +736,8 @@ class FacilityClaimRuleRead(BaseModel):
     severity: ClaimIssueSeverity
     message: str
     evidence_hint: str | None = None
+    conditions: dict[str, object] = {}
+    actions: dict[str, object] = {}
     updated_at: datetime
 
 
@@ -733,6 +751,8 @@ class FacilityClaimRuleCreateRequest(BaseModel):
     severity: ClaimIssueSeverity = "warning"
     message: str
     evidence_hint: str | None = None
+    conditions: dict[str, object] = {}
+    actions: dict[str, object] = {}
 
 
 class FacilityClaimRuleUpdateRequest(BaseModel):
@@ -744,6 +764,8 @@ class FacilityClaimRuleUpdateRequest(BaseModel):
     severity: ClaimIssueSeverity = "warning"
     message: str
     evidence_hint: str | None = None
+    conditions: dict[str, object] = {}
+    actions: dict[str, object] = {}
 
 
 class OrcaAdapterSettingRead(BaseModel):

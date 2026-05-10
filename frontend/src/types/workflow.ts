@@ -374,6 +374,19 @@ export type ClaimDraftLine = {
   createdAt: string;
 };
 
+export type ClaimLineAdjustment = {
+  id: number;
+  claimDraftId: number;
+  claimDraftLineId?: number;
+  ruleId?: string;
+  adjustmentType: string;
+  pointsDelta: number;
+  comment?: string;
+  reason: string;
+  status: 'suggested' | 'accepted' | 'ignored';
+  createdAt: string;
+};
+
 export type ClaimTransmission = {
   id: number;
   claimDraftId: number;
@@ -399,6 +412,7 @@ export type ClaimDraft = {
   createdAt: string;
   updatedAt: string;
   lines: ClaimDraftLine[];
+  adjustments: ClaimLineAdjustment[];
   issues: ClaimReviewIssue[];
   transmissions: ClaimTransmission[];
 };
@@ -413,6 +427,8 @@ export type FacilityClaimRule = {
   severity: 'info' | 'warning' | 'error';
   message: string;
   evidenceHint?: string;
+  conditions: Record<string, unknown>;
+  actions: Record<string, unknown>;
   updatedAt: string;
 };
 

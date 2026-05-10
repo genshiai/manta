@@ -42,6 +42,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `claim_transmissions`: ORCA/レセコン adapter 送信履歴
 - `claim_draft_lines`: 薬剤・検査・処置・入院基本料の請求明細候補
 - `orca_adapter_settings`: ORCA adapter の接続設定
+- `claim_line_adjustments`: 点数調整・摘要候補・病名要件などの請求点検提案
 - `GET /api/inpatient/admissions/{admission_id}/events`: 入院イベント履歴
 - `GET/POST /api/inpatient/admissions/{admission_id}/pathway`: クリティカルパス取得・開始
 - `GET /api/inpatient/pathway-masters`: クリティカルパス master 一覧
@@ -69,6 +70,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - 退院計画候補から `claim_draft_lines` を生成し、処方、検査オーダ、実施済み指示、入院基本料を個別明細として保存・表示するようにした
 - 設定画面に算定ルール管理と ORCA adapter 設定を追加し、管理者が rule の有効化、重要度、対象カテゴリ、接続 mode/base URL を更新できるようにした
 - ORCA adapter の HTTP mode を追加し、`base_url`、BASIC 認証の operator/password、請求送信 endpoint、接続確認 endpoint を設定できるようにした。HTTP 送信時は ORCA レスポンス本文と HTTP status を `claim_transmissions` に保存する
+- 施設別算定ルールに `conditions` / `actions` JSON を追加し、明細単位の点数調整、摘要候補、病名要件、同月回数確認を `claim_line_adjustments` と `ClaimReviewIssue` に展開できるようにした
 
 ## Phase 3 実装範囲
 
@@ -76,7 +78,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
 | 退院許可・退院実施 | backend API 済み | 退院会計の本番レセコン連携 |
-| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft/Line + 施設別rule UI + ORCA HTTP adapter 済み | 実ORCA環境での疎通確認、返戻/査定 workflow、ORCA error code 正規化 |
+| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft/Line + 施設別rule DSL/UI + 点検提案 + ORCA HTTP adapter 済み | 実ORCA環境での疎通確認、返戻/査定 workflow、診療報酬ルールの網羅 |
 | 転棟・転床 | backend API/UI 済み | D&D 操作、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |

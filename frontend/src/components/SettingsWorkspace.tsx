@@ -277,6 +277,8 @@ type ClaimRuleCreateFormState = {
   severity: FacilityClaimRule['severity'];
   message: string;
   evidenceHint: string;
+  conditionsText: string;
+  actionsText: string;
 };
 
 type ClaimRuleEditFormState = Omit<ClaimRuleCreateFormState, 'id'>;
@@ -322,6 +324,13 @@ const toLines = (values: string[]) => values.join('\n');
 const normalizeSortOrder = (value: string) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+};
+const parseJsonObject = (value: string) => {
+  const parsed: unknown = JSON.parse(value || '{}');
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('JSON object expected');
+  }
+  return parsed as Record<string, unknown>;
 };
 
 const createInitialCreateForm = (): CreateFormState => ({
@@ -539,6 +548,8 @@ const createClaimRuleCreateForm = (values: FacilityClaimRule[]): ClaimRuleCreate
   severity: 'warning',
   message: '',
   evidenceHint: '',
+  conditionsText: '{}',
+  actionsText: '{}',
 });
 
 const createClaimRuleEditForm = (item: FacilityClaimRule): ClaimRuleEditFormState => ({
@@ -550,6 +561,8 @@ const createClaimRuleEditForm = (item: FacilityClaimRule): ClaimRuleEditFormStat
   severity: item.severity,
   message: item.message,
   evidenceHint: item.evidenceHint ?? '',
+  conditionsText: JSON.stringify(item.conditions ?? {}, null, 2),
+  actionsText: JSON.stringify(item.actions ?? {}, null, 2),
 });
 
 const createOrcaSettingForm = (item?: OrcaAdapterSetting | null): OrcaSettingFormState => ({
@@ -1728,6 +1741,8 @@ export const SettingsWorkspace = ({
     }
     setIsMutating(true);
     try {
+      const conditions = parseJsonObject(claimRuleCreateForm.conditionsText);
+      const actions = parseJsonObject(claimRuleCreateForm.actionsText);
       const created = await createFacilityClaimRule({
         id: claimRuleCreateForm.id.trim(),
         sortOrder: normalizeSortOrder(claimRuleCreateForm.sortOrder),
@@ -1738,6 +1753,8 @@ export const SettingsWorkspace = ({
         severity: claimRuleCreateForm.severity,
         message: claimRuleCreateForm.message.trim(),
         evidenceHint: claimRuleCreateForm.evidenceHint.trim() || undefined,
+        conditions,
+        actions,
       });
       await loadMasters();
       await loadSystemAuditLogs();
@@ -1766,6 +1783,8 @@ export const SettingsWorkspace = ({
     }
     setIsMutating(true);
     try {
+      const conditions = parseJsonObject(claimRuleEditForm.conditionsText);
+      const actions = parseJsonObject(claimRuleEditForm.actionsText);
       const updated = await updateFacilityClaimRule(selectedClaimRule.id, {
         sortOrder: normalizeSortOrder(claimRuleEditForm.sortOrder),
         isActive: claimRuleEditForm.isActive,
@@ -1775,6 +1794,8 @@ export const SettingsWorkspace = ({
         severity: claimRuleEditForm.severity,
         message: claimRuleEditForm.message.trim(),
         evidenceHint: claimRuleEditForm.evidenceHint.trim() || undefined,
+        conditions,
+        actions,
       });
       await loadMasters();
       await loadSystemAuditLogs();
@@ -4361,6 +4382,14 @@ export const SettingsWorkspace = ({
                         <Textarea className='w-full' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, message: event.target.value }))} rows={3} value={claimRuleCreateForm.message} />
                       </Field>
                     </div>
+                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                      <Field label='conditions JSON'>
+                        <Textarea className='w-full font-mono' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, conditionsText: event.target.value }))} rows={6} value={claimRuleCreateForm.conditionsText} />
+                      </Field>
+                      <Field label='actions JSON'>
+                        <Textarea className='w-full font-mono' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, actionsText: event.target.value }))} rows={6} value={claimRuleCreateForm.actionsText} />
+                      </Field>
+                    </div>
                     <div className='mt-4 flex justify-end'>
                       <Button aria-disabled={isMutating} onClick={handleCreateClaimRule} size='md' type='button' variant='solid-fill'>
                         算定ルールを追加
@@ -4402,6 +4431,14 @@ export const SettingsWorkspace = ({
                         <div className='mt-4'>
                           <Field label='警告メッセージ'>
                             <Textarea className='w-full' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, message: event.target.value } : current)} rows={3} value={claimRuleEditForm.message} />
+                          </Field>
+                        </div>
+                        <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                          <Field label='conditions JSON'>
+                            <Textarea className='w-full font-mono' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, conditionsText: event.target.value } : current)} rows={6} value={claimRuleEditForm.conditionsText} />
+                          </Field>
+                          <Field label='actions JSON'>
+                            <Textarea className='w-full font-mono' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, actionsText: event.target.value } : current)} rows={6} value={claimRuleEditForm.actionsText} />
                           </Field>
                         </div>
                         <div className='mt-4 flex justify-end'>

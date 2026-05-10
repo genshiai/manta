@@ -24,6 +24,7 @@ from .models import (
     ChartNote,
     ClaimDraft,
     ClaimDraftLine,
+    ClaimLineAdjustment,
     ClaimReviewIssue,
     ClaimTransmission,
     DiagnosisAliasMaster,
@@ -74,6 +75,7 @@ from .schemas import (
     ClaimDraftRead,
     ClaimDraftUpdateRequest,
     ClaimDraftLineRead,
+    ClaimLineAdjustmentRead,
     ClaimReviewIssueRead,
     ClaimTransmissionRead,
     ChartOrderMasterRead,
@@ -1833,6 +1835,97 @@ def _build_claim_review_issues(
     return issues
 
 
+def _claim_rule_matches_context(
+    rule: FacilityClaimRule,
+    *,
+    line: ClaimDraftLine | None,
+    patient: Patient,
+    same_month_counts: dict[str, int],
+) -> bool:
+    conditions = rule.conditions or {}
+    if line is not None:
+        line_types = conditions.get("line_types")
+        if isinstance(line_types, list) and line_types and line.line_type not in line_types:
+            return False
+        source_types = conditions.get("source_types")
+        if isinstance(source_types, list) and source_types and line.source_type not in source_types:
+            return False
+        receipt_required = conditions.get("receipt_code_required")
+        if receipt_required is True and not line.receipt_code:
+            return False
+        max_same_month = conditions.get("same_month_count_lte")
+        if isinstance(max_same_month, int) and same_month_counts.get(line.line_type, 0) > max_same_month:
+            return True
+    required_problem = conditions.get("requires_problem")
+    if isinstance(required_problem, str) and required_problem:
+        active_names = [problem.get("name", "") for problem in patient.problems or [] if problem.get("status") == "active"]
+        return not any(required_problem in name for name in active_names)
+    return bool(conditions)
+
+
+def _build_claim_rule_adjustments(
+    *,
+    claim_draft_id: int,
+    patient: Patient,
+    lines: list[ClaimDraftLine],
+    rules: list[FacilityClaimRule],
+) -> tuple[list[ClaimLineAdjustment], list[ClaimReviewIssue]]:
+    adjustments: list[ClaimLineAdjustment] = []
+    issues: list[ClaimReviewIssue] = []
+    same_month_counts: dict[str, int] = {}
+    for line in lines:
+        same_month_counts[line.line_type] = same_month_counts.get(line.line_type, 0) + 1
+
+    for rule in rules:
+        if not (rule.conditions or rule.actions):
+            continue
+        matched_any = False
+        for line in lines:
+            if not _claim_rule_matches_context(rule, line=line, patient=patient, same_month_counts=same_month_counts):
+                continue
+            matched_any = True
+            actions = rule.actions or {}
+            points_delta = actions.get("points_delta")
+            comment = actions.get("comment")
+            if isinstance(points_delta, int) or isinstance(comment, str):
+                adjustments.append(
+                    ClaimLineAdjustment(
+                        claim_draft_id=claim_draft_id,
+                        claim_draft_line_id=line.id,
+                        rule_id=rule.id,
+                        adjustment_type=str(actions.get("type") or "rule_suggestion"),
+                        points_delta=points_delta if isinstance(points_delta, int) else 0,
+                        comment=comment if isinstance(comment, str) else None,
+                        reason=rule.message,
+                    )
+                )
+            issue_type = actions.get("issue_type")
+            if isinstance(issue_type, str):
+                issues.append(
+                    ClaimReviewIssue(
+                        claim_draft_id=claim_draft_id,
+                        issue_type=issue_type,
+                        severity=rule.severity,
+                        message=rule.message,
+                        evidence=line.evidence or rule.evidence_hint,
+                    )
+                )
+        if not matched_any and _claim_rule_matches_context(rule, line=None, patient=patient, same_month_counts=same_month_counts):
+            actions = rule.actions or {}
+            issue_type = actions.get("issue_type")
+            if isinstance(issue_type, str):
+                issues.append(
+                    ClaimReviewIssue(
+                        claim_draft_id=claim_draft_id,
+                        issue_type=issue_type,
+                        severity=rule.severity,
+                        message=rule.message,
+                        evidence=rule.evidence_hint,
+                    )
+                )
+    return adjustments, issues
+
+
 def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
     lines = db.scalars(
         select(ClaimDraftLine)
@@ -1843,6 +1936,11 @@ def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
         select(ClaimReviewIssue)
         .where(ClaimReviewIssue.claim_draft_id == draft.id)
         .order_by(ClaimReviewIssue.severity.desc(), ClaimReviewIssue.id)
+    ).all()
+    adjustments = db.scalars(
+        select(ClaimLineAdjustment)
+        .where(ClaimLineAdjustment.claim_draft_id == draft.id)
+        .order_by(ClaimLineAdjustment.id)
     ).all()
     transmissions = db.scalars(
         select(ClaimTransmission)
@@ -1862,6 +1960,7 @@ def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
         created_at=draft.created_at,
         updated_at=draft.updated_at,
         lines=[ClaimDraftLineRead.model_validate(line) for line in lines],
+        adjustments=[ClaimLineAdjustmentRead.model_validate(item) for item in adjustments],
         issues=[ClaimReviewIssueRead.model_validate(issue) for issue in issues],
         transmissions=[ClaimTransmissionRead.model_validate(item) for item in transmissions],
     )
@@ -3396,6 +3495,7 @@ def create_inpatient_claim_draft(
     draft.total_points = sum(line.points * line.quantity for line in lines)
     for line in lines:
         db.add(line)
+    db.flush()
     for issue in _build_claim_review_issues(
         db=db,
         claim_draft_id=draft.id,
@@ -3406,6 +3506,21 @@ def create_inpatient_claim_draft(
         instructions=instructions,
         lab_orders=lab_orders,
     ):
+        db.add(issue)
+    rules = db.scalars(
+        select(FacilityClaimRule)
+        .where(FacilityClaimRule.is_active == sa_true())
+        .order_by(FacilityClaimRule.sort_order, FacilityClaimRule.id)
+    ).all()
+    adjustments, rule_issues = _build_claim_rule_adjustments(
+        claim_draft_id=draft.id,
+        patient=patient,
+        lines=lines,
+        rules=rules,
+    )
+    for adjustment in adjustments:
+        db.add(adjustment)
+    for issue in rule_issues:
         db.add(issue)
     add_inpatient_event(
         db,

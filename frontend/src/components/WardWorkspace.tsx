@@ -1071,6 +1071,18 @@ export const WardWorkspace = ({
                                 ) : null}
                               </div>
                             ))}
+                            {claimDraft.adjustments.slice(0, 4).map((adjustment) => (
+                              <div className='rounded border border-purple-100 bg-white px-2 py-1.5' key={adjustment.id}>
+                                <div className='flex flex-wrap items-center justify-between gap-2'>
+                                  <p className='text-[11px] font-bold text-purple-950'>{adjustment.adjustmentType}</p>
+                                  <span className='text-[10px] font-bold text-purple-900'>
+                                    {adjustment.pointsDelta > 0 ? '+' : ''}{adjustment.pointsDelta}点
+                                  </span>
+                                </div>
+                                <p className='mt-1 text-[11px] leading-normal text-text-secondary'>{adjustment.reason}</p>
+                                {adjustment.comment ? <p className='mt-1 text-[10px] text-text-tertiary'>摘要候補: {adjustment.comment}</p> : null}
+                              </div>
+                            ))}
                             {claimDraft.issues.slice(0, 4).map((issue) => (
                               <div className='rounded border border-blue-100 bg-white px-2 py-1.5' key={issue.id}>
                                 <p className={cn('text-[11px] font-bold', issue.severity === 'error' ? 'text-red-900' : issue.severity === 'warning' ? 'text-yellow-1100' : 'text-blue-900')}>

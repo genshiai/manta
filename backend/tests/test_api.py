@@ -536,6 +536,8 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert draft["billing_candidates"]
     assert draft["lines"]
     assert {"line_type", "source_type", "label", "points", "quantity"} <= set(draft["lines"][0])
+    assert "adjustments" in draft
+    assert any(item["adjustment_type"] == "review_comment" for item in draft["adjustments"])
     assert isinstance(draft["total_points"], int)
     assert "issues" in draft
     assert get_response.status_code == 200
@@ -577,6 +579,8 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
                     "severity": "warning",
                     "message": "テスト算定ルール",
                     "evidence_hint": "test evidence",
+                    "conditions": {"line_types": ["検査"]},
+                    "actions": {"type": "review_comment", "comment": "テスト摘要"},
                 },
             )
             update_response = client.patch(
@@ -591,6 +595,8 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
                     "severity": "error",
                     "message": "テスト算定ルール更新",
                     "evidence_hint": "updated evidence",
+                    "conditions": {"line_types": ["投薬"]},
+                    "actions": {"type": "diagnosis_requirement", "issue_type": "test_issue"},
                 },
             )
             setting_response = client.put(
@@ -629,6 +635,8 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
     assert update_response.status_code == 200
     assert update_response.json()["is_active"] is False
     assert update_response.json()["severity"] == "error"
+    assert update_response.json()["conditions"] == {"line_types": ["投薬"]}
+    assert update_response.json()["actions"]["issue_type"] == "test_issue"
     assert setting_response.status_code == 200
     assert setting_response.json()["base_url"] == "https://orca.example.test"
     assert setting_response.json()["has_password"] is True
