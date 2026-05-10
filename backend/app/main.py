@@ -21,6 +21,8 @@ from .models import (
     AuditLog,
     BedMaster,
     ChartNote,
+    ClaimDraft,
+    ClaimReviewIssue,
     DiagnosisAliasMaster,
     DiagnosisMaster,
     InpatientDocument,
@@ -64,6 +66,9 @@ from .schemas import (
     AdmissionTransferRequest,
     BedBoardItemRead,
     BedStatusUpdateRequest,
+    ClaimDraftRead,
+    ClaimDraftUpdateRequest,
+    ClaimReviewIssueRead,
     ChartOrderMasterRead,
     ChartTemplateCreateRequest,
     ChartTemplateRead,
@@ -1590,6 +1595,98 @@ def build_discharge_plan_defaults(
     return medication_note, candidates, follow_up
 
 
+def _candidate_points(candidate: dict[str, str], admission: Admission) -> int:
+    raw_points = str(candidate.get("receipt_points") or "").strip()
+    if not raw_points:
+        return 0
+    try:
+        points = int(float(raw_points.replace(",", "")))
+    except ValueError:
+        return 0
+    if candidate.get("id") == "admission-basic" and candidate.get("receipt_unit") == "日":
+        return points * _admission_stay_days(admission)
+    return points
+
+
+def _claim_total_points(candidates: list[dict[str, str]], admission: Admission) -> int:
+    return sum(_candidate_points(candidate, admission) for candidate in candidates)
+
+
+def _build_claim_review_issues(
+    *,
+    claim_draft_id: int,
+    patient: Patient,
+    candidates: list[dict[str, str]],
+) -> list[ClaimReviewIssue]:
+    issues: list[ClaimReviewIssue] = []
+    for candidate in candidates:
+        label = candidate.get("label") or candidate.get("category") or "会計候補"
+        if not candidate.get("receipt_code"):
+            issues.append(
+                ClaimReviewIssue(
+                    claim_draft_id=claim_draft_id,
+                    issue_type="missing_receipt_code",
+                    severity="warning",
+                    message=f"{label} にレセ電コード候補がありません。",
+                    evidence=candidate.get("evidence"),
+                )
+            )
+        if candidate.get("status") == "needs_review":
+            issues.append(
+                ClaimReviewIssue(
+                    claim_draft_id=claim_draft_id,
+                    issue_type="candidate_needs_review",
+                    severity="warning",
+                    message=f"{label} は実施記録・算定条件の確認が必要です。",
+                    evidence=candidate.get("evidence"),
+                )
+            )
+
+    active_problems = [problem for problem in patient.problems or [] if problem.get("status") == "active"]
+    if not active_problems:
+        issues.append(
+            ClaimReviewIssue(
+                claim_draft_id=claim_draft_id,
+                issue_type="missing_active_diagnosis",
+                severity="error",
+                message="請求前に有効な傷病名の登録が必要です。",
+                evidence="患者プロブレムリストに active の傷病名がありません。",
+            )
+        )
+    elif not any(problem.get("claim_code") or problem.get("management_number") for problem in active_problems):
+        issues.append(
+            ClaimReviewIssue(
+                claim_draft_id=claim_draft_id,
+                issue_type="diagnosis_claim_code_review",
+                severity="warning",
+                message="傷病名の請求コード確認が必要です。",
+                evidence="有効傷病名に claim_code / management_number がありません。",
+            )
+        )
+    return issues
+
+
+def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
+    issues = db.scalars(
+        select(ClaimReviewIssue)
+        .where(ClaimReviewIssue.claim_draft_id == draft.id)
+        .order_by(ClaimReviewIssue.severity.desc(), ClaimReviewIssue.id)
+    ).all()
+    return ClaimDraftRead(
+        id=draft.id,
+        patient_id=draft.patient_id,
+        admission_id=draft.admission_id,
+        status=draft.status,
+        source_type=draft.source_type,
+        billing_candidates=draft.billing_candidates,
+        total_points=draft.total_points,
+        created_by=draft.created_by,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
+        issues=[ClaimReviewIssueRead.model_validate(issue) for issue in issues],
+    )
+
+
 def get_chart_order_masters_read(
     db: Session,
     *,
@@ -2856,6 +2953,127 @@ def upsert_inpatient_discharge_plan(
     db.commit()
     db.refresh(plan)
     return plan
+
+
+@app.get("/api/inpatient/admissions/{admission_id}/claim-draft", response_model=ClaimDraftRead | None)
+def get_inpatient_claim_draft(
+    admission_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimDraftRead | None:
+    get_admission_or_404(db, admission_id)
+    draft = db.scalar(
+        select(ClaimDraft)
+        .where(ClaimDraft.admission_id == admission_id)
+        .order_by(desc(ClaimDraft.updated_at), desc(ClaimDraft.id))
+    )
+    if draft is None:
+        return None
+    return _claim_draft_to_read(db, draft)
+
+
+@app.post("/api/inpatient/admissions/{admission_id}/claim-draft", response_model=ClaimDraftRead, status_code=status.HTTP_201_CREATED)
+def create_inpatient_claim_draft(
+    admission_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimDraftRead:
+    admission = get_admission_or_404(db, admission_id)
+    patient = get_patient_or_404(db, admission.patient_id)
+    plan = db.scalar(
+        select(InpatientDischargePlan)
+        .where(InpatientDischargePlan.admission_id == admission_id)
+        .order_by(desc(InpatientDischargePlan.updated_at), desc(InpatientDischargePlan.id))
+    )
+    if plan is None:
+        _, candidates, _ = build_discharge_plan_defaults(
+            db,
+            admission=admission,
+            prescriptions=db.scalars(
+                select(PrescriptionOrder)
+                .where(PrescriptionOrder.patient_id == admission.patient_id)
+                .order_by(desc(PrescriptionOrder.created_at))
+                .limit(20)
+            ).all(),
+            instructions=db.scalars(
+                select(InpatientInstruction).where(InpatientInstruction.admission_id == admission_id)
+            ).all(),
+            lab_orders=db.scalars(
+                select(LabOrder)
+                .where(LabOrder.patient_id == admission.patient_id)
+                .order_by(desc(LabOrder.created_at))
+                .limit(10)
+            ).all(),
+        )
+    else:
+        candidates = plan.billing_candidates
+    draft = ClaimDraft(
+        patient_id=admission.patient_id,
+        admission_id=admission_id,
+        status="draft",
+        source_type="inpatient_discharge",
+        billing_candidates=candidates,
+        total_points=_claim_total_points(candidates, admission),
+        created_by=current_user.display_name,
+    )
+    db.add(draft)
+    db.flush()
+    for issue in _build_claim_review_issues(claim_draft_id=draft.id, patient=patient, candidates=candidates):
+        db.add(issue)
+    add_inpatient_event(
+        db,
+        admission_id=admission_id,
+        event_type="claim_draft_created",
+        title="請求ドラフト作成",
+        detail=f"候補 {len(candidates)}件 / 合計 {draft.total_points}点",
+        actor=current_user.display_name,
+    )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="請求ドラフト作成",
+        scope="billing",
+        detail=f"退院計画から請求ドラフトを作成しました。候補 {len(candidates)}件。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(draft)
+    return _claim_draft_to_read(db, draft)
+
+
+@app.patch("/api/claim-drafts/{claim_draft_id}", response_model=ClaimDraftRead)
+def update_claim_draft(
+    claim_draft_id: int,
+    payload: ClaimDraftUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimDraftRead:
+    draft = db.get(ClaimDraft, claim_draft_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft not found")
+    patient = get_patient_or_404(db, draft.patient_id)
+    draft.status = payload.status
+    draft.updated_at = utcnow()
+    if draft.admission_id is not None:
+        add_inpatient_event(
+            db,
+            admission_id=draft.admission_id,
+            event_type="claim_draft_updated",
+            title="請求ドラフト更新",
+            detail=f"状態: {payload.status}",
+            actor=current_user.display_name,
+        )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="請求ドラフト更新",
+        scope="billing",
+        detail=f"請求ドラフトを {payload.status} に更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(draft)
+    return _claim_draft_to_read(db, draft)
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])

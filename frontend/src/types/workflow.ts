@@ -346,6 +346,31 @@ export type InpatientDischargePlan = {
   updatedAt: string;
 };
 
+export type ClaimReviewIssue = {
+  id: number;
+  claimDraftId: number;
+  issueType: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  evidence?: string;
+  status: 'open' | 'resolved' | 'ignored';
+  createdAt: string;
+};
+
+export type ClaimDraft = {
+  id: number;
+  patientId: string;
+  admissionId?: number;
+  status: 'draft' | 'reviewed' | 'ready' | 'submitted' | 'error';
+  sourceType: string;
+  billingCandidates: InpatientDischargePlan['billingCandidates'];
+  totalPoints: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  issues: ClaimReviewIssue[];
+};
+
 export type ChartVersion = {
   version: number;
   savedAt: string;

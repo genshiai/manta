@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, Bed, CheckCircle2, ClipboardList, FilePenLine, FileText, MoveRight, UserRoundCheck } from 'lucide-react';
 import {
+  createInpatientClaimDraft,
   createInpatientDocument,
   createInpatientPathway,
   createInpatientSummaryReview,
   createNursingNote,
   getInpatientPathway,
+  getInpatientClaimDraft,
   getInpatientDischargePlan,
   getInpatientProgress,
   getInpatientSummaryDraft,
@@ -20,6 +22,7 @@ import {
   listInpatientSummaryReviews,
   transferInpatientAdmission,
   updateInpatientBedStatus,
+  updateClaimDraftStatus,
   updateInpatientDocument,
   updateInpatientDischargePlan,
   updateInpatientInstructionStatus,
@@ -30,6 +33,7 @@ import type {
   InpatientAdmission,
   InpatientAiSummaryReview,
   InpatientBed,
+  ClaimDraft,
   InpatientDocument,
   InpatientDocumentType,
   InpatientDischargePlan,
@@ -136,6 +140,7 @@ export const WardWorkspace = ({
   const [selectedPathwayMasterId, setSelectedPathwayMasterId] = useState('');
   const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
   const [dischargePlan, setDischargePlan] = useState<InpatientDischargePlan | null>(null);
+  const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -144,6 +149,7 @@ export const WardWorkspace = ({
   const [isStartingPathway, setIsStartingPathway] = useState(false);
   const [isReviewingSummary, setIsReviewingSummary] = useState(false);
   const [isSavingDischargePlan, setIsSavingDischargePlan] = useState(false);
+  const [isSavingClaimDraft, setIsSavingClaimDraft] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -170,6 +176,7 @@ export const WardWorkspace = ({
       setPathway(null);
       setSummaryReviews([]);
       setDischargePlan(null);
+      setClaimDraft(null);
       return;
     }
 
@@ -190,6 +197,7 @@ export const WardWorkspace = ({
           nextPathwayMasters,
           nextSummaryReviews,
           nextDischargePlan,
+          nextClaimDraft,
         ] = await Promise.all([
           listInpatientInstructions(selectedAdmission.id),
           listNursingNotes(selectedAdmission.id),
@@ -201,6 +209,7 @@ export const WardWorkspace = ({
           listInpatientPathwayMasters(),
           listInpatientSummaryReviews(selectedAdmission.id),
           getInpatientDischargePlan(selectedAdmission.id),
+          getInpatientClaimDraft(selectedAdmission.id),
         ]);
         if (cancelled) {
           return;
@@ -216,6 +225,7 @@ export const WardWorkspace = ({
         setSelectedPathwayMasterId(nextPathway?.pathwayMasterId ?? nextPathwayMasters[0]?.id ?? '');
         setSummaryReviews(nextSummaryReviews);
         setDischargePlan(nextDischargePlan);
+        setClaimDraft(nextClaimDraft);
       } catch (error) {
         if (cancelled) {
           return;
@@ -488,6 +498,50 @@ export const WardWorkspace = ({
       setErrorMessage(error instanceof Error ? error.message : '退院計画の保存に失敗しました。');
     } finally {
       setIsSavingDischargePlan(false);
+    }
+  };
+
+  const handleCreateClaimDraft = async () => {
+    if (!selectedAdmission || isSavingClaimDraft) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const draft = await createInpatientClaimDraft(selectedAdmission.id);
+      setClaimDraft(draft);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '請求ドラフトの作成に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
+    }
+  };
+
+  const handleUpdateClaimDraftStatus = async (status: ClaimDraft['status']) => {
+    if (!claimDraft || isSavingClaimDraft) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const draft = await updateClaimDraftStatus(claimDraft.id, status);
+      setClaimDraft(draft);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '請求ドラフトの更新に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
     }
   };
 
@@ -909,6 +963,65 @@ export const WardWorkspace = ({
                           </p>
                         </div>
                       ))}
+                      <div className='rounded-md border border-blue-100 bg-blue-50 p-3'>
+                        <div className='flex flex-wrap items-start justify-between gap-2'>
+                          <div>
+                            <p className='text-[12px] font-bold text-blue-950'>請求ドラフト</p>
+                            <p className='mt-1 text-[11px] leading-normal text-blue-900'>
+                              {claimDraft
+                                ? `${claimDraft.billingCandidates.length}候補 / ${claimDraft.totalPoints.toLocaleString()}点 / 未解決 ${claimDraft.issues.filter((issue) => issue.status === 'open').length}件`
+                                : '退院計画の会計候補から作成'}
+                            </p>
+                          </div>
+                          {claimDraft ? (
+                            <div className='flex flex-wrap gap-2'>
+                              <Button
+                                disabled={isSavingClaimDraft || claimDraft.status === 'reviewed'}
+                                onClick={() => handleUpdateClaimDraftStatus('reviewed')}
+                                size='xs'
+                                type='button'
+                                variant='outline'
+                              >
+                                請求レビュー済
+                              </Button>
+                              <Button
+                                disabled={isSavingClaimDraft || claimDraft.status === 'ready'}
+                                onClick={() => handleUpdateClaimDraftStatus('ready')}
+                                size='xs'
+                                type='button'
+                                variant='ghost'
+                              >
+                                請求準備完了
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              disabled={isSavingClaimDraft}
+                              onClick={handleCreateClaimDraft}
+                              size='xs'
+                              type='button'
+                              variant='outline'
+                            >
+                              作成
+                            </Button>
+                          )}
+                        </div>
+                        {claimDraft ? (
+                          <div className='mt-3 space-y-2'>
+                            <span className={cn('inline-flex rounded-md border px-2 py-1 text-[11px] font-bold', claimDraft.status === 'ready' ? 'border-green-200 bg-green-50 text-green-900' : 'border-yellow-200 bg-yellow-50 text-yellow-1100')}>
+                              {claimDraft.status === 'ready' ? '請求準備完了' : claimDraft.status === 'reviewed' ? 'レビュー済' : '下書き'}
+                            </span>
+                            {claimDraft.issues.slice(0, 4).map((issue) => (
+                              <div className='rounded border border-blue-100 bg-white px-2 py-1.5' key={issue.id}>
+                                <p className={cn('text-[11px] font-bold', issue.severity === 'error' ? 'text-red-900' : issue.severity === 'warning' ? 'text-yellow-1100' : 'text-blue-900')}>
+                                  {issue.severity === 'error' ? '要修正' : issue.severity === 'warning' ? '要確認' : '情報'}: {issue.message}
+                                </p>
+                                {issue.evidence ? <p className='mt-1 text-[10px] leading-normal text-text-tertiary'>根拠: {issue.evidence}</p> : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 ) : (

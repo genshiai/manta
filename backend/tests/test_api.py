@@ -10,6 +10,7 @@ from app.main import app
 from app.models import (
     ChartTemplateMaster,
     BedMaster,
+    ClaimDraft,
     DiagnosisAliasMaster,
     DiagnosisMaster,
     InpatientDocument,
@@ -494,6 +495,50 @@ def test_get_and_update_inpatient_discharge_plan() -> None:
     if plan_id is not None:
         with SessionLocal() as db:
             persisted = db.get(InpatientDischargePlan, plan_id)
+            if persisted is not None:
+                db.delete(persisted)
+                db.commit()
+
+
+def test_create_and_update_inpatient_claim_draft() -> None:
+    draft_id: int | None = None
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        create_response = client.post(
+            f"/api/inpatient/admissions/{admission_id}/claim-draft",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_response.status_code == 201
+        draft = create_response.json()
+        draft_id = draft["id"]
+        get_response = client.get(
+            f"/api/inpatient/admissions/{admission_id}/claim-draft",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        update_response = client.patch(
+            f"/api/claim-drafts/{draft_id}",
+            json={"status": "ready"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert draft["status"] == "draft"
+    assert draft["admission_id"] == admission_id
+    assert draft["billing_candidates"]
+    assert isinstance(draft["total_points"], int)
+    assert "issues" in draft
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == draft_id
+    assert update_response.status_code == 200
+    assert update_response.json()["status"] == "ready"
+
+    if draft_id is not None:
+        with SessionLocal() as db:
+            persisted = db.get(ClaimDraft, draft_id)
             if persisted is not None:
                 db.delete(persisted)
                 db.commit()

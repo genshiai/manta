@@ -10,6 +10,7 @@ import { readStorage } from './storage';
 import type {
   AdminUserSummary,
   AuditLogEntry,
+  ClaimDraft,
   ChartOrderConfig,
   ChartTemplate,
   ChartHistoryEntry,
@@ -582,6 +583,31 @@ type ApiInpatientDischargePlan = {
   reviewed_by: string;
   reviewed_at: string;
   updated_at: string;
+};
+
+type ApiClaimReviewIssue = {
+  id: number;
+  claim_draft_id: number;
+  issue_type: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  evidence: string | null;
+  status: 'open' | 'resolved' | 'ignored';
+  created_at: string;
+};
+
+type ApiClaimDraft = {
+  id: number;
+  patient_id: string;
+  admission_id: number | null;
+  status: 'draft' | 'reviewed' | 'ready' | 'submitted' | 'error';
+  source_type: string;
+  billing_candidates: ApiInpatientDischargePlan['billing_candidates'];
+  total_points: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  issues: ApiClaimReviewIssue[];
 };
 
 type ApiDiagnosisSearchResult = {
@@ -1202,22 +1228,47 @@ const mapInpatientAiSummaryReview = (item: ApiInpatientAiSummaryReview): Inpatie
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapBillingCandidate = (candidate: ApiInpatientDischargePlan['billing_candidates'][number]) => ({
+  ...candidate,
+  receiptCode: candidate.receipt_code,
+  receiptName: candidate.receipt_name,
+  receiptPoints: candidate.receipt_points,
+  receiptUnit: candidate.receipt_unit,
+});
+
 const mapInpatientDischargePlan = (item: ApiInpatientDischargePlan): InpatientDischargePlan => ({
   id: item.id,
   admissionId: item.admission_id,
   status: item.status,
   dischargeMedicationNote: item.discharge_medication_note,
-  billingCandidates: item.billing_candidates.map((candidate) => ({
-    ...candidate,
-    receiptCode: candidate.receipt_code,
-    receiptName: candidate.receipt_name,
-    receiptPoints: candidate.receipt_points,
-    receiptUnit: candidate.receipt_unit,
-  })),
+  billingCandidates: item.billing_candidates.map(mapBillingCandidate),
   followUpNote: item.follow_up_note,
   reviewedBy: item.reviewed_by,
   reviewedAt: formatTimestamp(item.reviewed_at),
   updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
+  id: item.id,
+  patientId: item.patient_id,
+  admissionId: item.admission_id ?? undefined,
+  status: item.status,
+  sourceType: item.source_type,
+  billingCandidates: item.billing_candidates.map(mapBillingCandidate),
+  totalPoints: item.total_points,
+  createdBy: item.created_by,
+  createdAt: formatTimestamp(item.created_at),
+  updatedAt: formatTimestamp(item.updated_at),
+  issues: item.issues.map((issue) => ({
+    id: issue.id,
+    claimDraftId: issue.claim_draft_id,
+    issueType: issue.issue_type,
+    severity: issue.severity,
+    message: issue.message,
+    evidence: issue.evidence ?? undefined,
+    status: issue.status,
+    createdAt: formatTimestamp(issue.created_at),
+  })),
 });
 
 export const login = async (userId: string, password: string): Promise<UserSession> => {
@@ -1643,6 +1694,29 @@ export const updateInpatientDischargePlan = async (
     },
   );
   return mapInpatientDischargePlan(plan);
+};
+
+export const getInpatientClaimDraft = async (admissionId: number): Promise<ClaimDraft | null> => {
+  const draft = await request<ApiClaimDraft | null>(`/api/inpatient/admissions/${admissionId}/claim-draft`);
+  return draft ? mapClaimDraft(draft) : null;
+};
+
+export const createInpatientClaimDraft = async (admissionId: number): Promise<ClaimDraft> => {
+  const draft = await request<ApiClaimDraft>(`/api/inpatient/admissions/${admissionId}/claim-draft`, {
+    method: 'POST',
+  });
+  return mapClaimDraft(draft);
+};
+
+export const updateClaimDraftStatus = async (
+  claimDraftId: number,
+  status: ClaimDraft['status'],
+): Promise<ClaimDraft> => {
+  const draft = await request<ApiClaimDraft>(`/api/claim-drafts/${claimDraftId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return mapClaimDraft(draft);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

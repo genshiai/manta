@@ -16,6 +16,8 @@ InpatientDocumentType = Literal["admission_care_plan", "discharge_summary", "dis
 PathwayTaskStatus = Literal["pending", "done", "variance", "skipped"]
 AiSummaryReviewStatus = Literal["accepted", "rejected"]
 DischargePlanStatus = Literal["draft", "reviewed", "ready"]
+ClaimDraftStatus = Literal["draft", "reviewed", "ready", "submitted", "error"]
+ClaimIssueSeverity = Literal["info", "warning", "error"]
 
 
 class DetailItem(BaseModel):
@@ -634,6 +636,39 @@ class InpatientDischargePlanUpdateRequest(BaseModel):
     discharge_medication_note: str | None = None
     billing_candidates: list[dict[str, str]] | None = None
     follow_up_note: str | None = None
+
+
+class ClaimReviewIssueRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    claim_draft_id: int
+    issue_type: str
+    severity: ClaimIssueSeverity
+    message: str
+    evidence: str | None = None
+    status: Literal["open", "resolved", "ignored"]
+    created_at: datetime
+
+
+class ClaimDraftRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    patient_id: str
+    admission_id: int | None = None
+    status: ClaimDraftStatus
+    source_type: str
+    billing_candidates: list[dict[str, str]]
+    total_points: int
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    issues: list[ClaimReviewIssueRead] = []
+
+
+class ClaimDraftUpdateRequest(BaseModel):
+    status: ClaimDraftStatus
 
 
 class AdmissionRead(BaseModel):

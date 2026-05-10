@@ -37,12 +37,15 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `inpatient_pathway_masters` / `inpatient_pathway_task_masters`: 疾患/診療科別クリティカルパス master
 - `inpatient_ai_summary_reviews`: Mock AI 要約案の採用/差し戻し履歴
 - `inpatient_discharge_plans`: 退院計画・会計候補レビュー
+- `claim_drafts` / `claim_review_issues`: 退院会計候補から作る請求前レビュー
 - `GET /api/inpatient/admissions/{admission_id}/events`: 入院イベント履歴
 - `GET/POST /api/inpatient/admissions/{admission_id}/pathway`: クリティカルパス取得・開始
 - `GET /api/inpatient/pathway-masters`: クリティカルパス master 一覧
 - `PATCH /api/inpatient/pathway-tasks/{task_id}`: パスタスク完了・逸脱
 - `GET/POST /api/inpatient/admissions/{admission_id}/summary-reviews`: AI 要約レビュー履歴
 - `GET/PUT /api/inpatient/admissions/{admission_id}/discharge-plan`: 退院時処方メモ・会計候補レビュー
+- `GET/POST /api/inpatient/admissions/{admission_id}/claim-draft`: 入院退院計画から請求ドラフト取得・作成
+- `PATCH /api/claim-drafts/{claim_draft_id}`: 請求ドラフト状態更新
 - 病棟ワークスペースで入院診療計画書、退院サマリ、退院時指導文書のドラフト生成、本文確認、署名状態への更新に対応した
 - 病棟ワークスペースで入院経過要約案を表示し、そのまま退院サマリ文書へ保存できるようにした
 - 病棟ワークスペースで標準クリティカルパス開始、日別タスク完了、逸脱記録、入院イベント履歴、要約案の採用/差し戻しを操作できるようにした
@@ -53,6 +56,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `receipt_medical_practice_masters`: 診療行為レセ電 master の受け皿
 - 退院会計候補へ診療行為レセ電コード候補、名称、点数、単位を付与し、UIで確認できるようにした
 - 支払基金 医科診療行為マスター importer を追加し、`s_ALL*.zip` / 展開済み CSV から `receipt_medical_practice_masters` に同期できるようにした
+- 退院計画の会計候補から請求ドラフトを作成し、レセ電コード不足、要確認候補、傷病名コード確認を `ClaimReviewIssue` として保存・表示できるようにした
 
 ## Phase 3 実装範囲
 
@@ -60,7 +64,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
 | 退院許可・退院実施 | backend API 済み | 退院会計の本番レセコン連携 |
-| 退院時処方・会計候補 | レセ電候補付き API/UI + importer 済み | ORCA/会計連携、施設別算定 rule |
+| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft 済み | ORCA/会計連携、施設別算定 rule、診療行為の実施記録厳密照合 |
 | 転棟・転床 | backend API/UI 済み | D&D 操作、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |
