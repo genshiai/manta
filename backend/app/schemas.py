@@ -667,6 +667,25 @@ class ClaimTransmissionRead(BaseModel):
     created_at: datetime
 
 
+class ClaimDraftLineRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    claim_draft_id: int
+    line_type: str
+    source_type: str
+    source_id: str | None = None
+    label: str
+    receipt_code: str | None = None
+    receipt_name: str | None = None
+    points: int
+    quantity: int
+    unit: str | None = None
+    evidence: str | None = None
+    review_status: str
+    created_at: datetime
+
+
 class ClaimDraftRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -680,12 +699,78 @@ class ClaimDraftRead(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    lines: list[ClaimDraftLineRead] = []
     issues: list[ClaimReviewIssueRead] = []
     transmissions: list[ClaimTransmissionRead] = []
 
 
 class ClaimDraftUpdateRequest(BaseModel):
     status: ClaimDraftStatus
+
+
+class FacilityClaimRuleRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    sort_order: int
+    is_active: bool
+    category: str
+    target_category: str
+    rule_type: str
+    severity: ClaimIssueSeverity
+    message: str
+    evidence_hint: str | None = None
+    updated_at: datetime
+
+
+class FacilityClaimRuleCreateRequest(BaseModel):
+    id: str
+    sort_order: int
+    is_active: bool = True
+    category: str
+    target_category: str
+    rule_type: str
+    severity: ClaimIssueSeverity = "warning"
+    message: str
+    evidence_hint: str | None = None
+
+
+class FacilityClaimRuleUpdateRequest(BaseModel):
+    sort_order: int
+    is_active: bool = True
+    category: str
+    target_category: str
+    rule_type: str
+    severity: ClaimIssueSeverity = "warning"
+    message: str
+    evidence_hint: str | None = None
+
+
+class OrcaAdapterSettingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    is_active: bool
+    base_url: str | None = None
+    auth_type: str
+    username: str | None = None
+    client_id: str | None = None
+    claim_endpoint: str
+    mode: Literal["mock", "http"]
+    note: str | None = None
+    updated_by: str | None = None
+    updated_at: datetime
+
+
+class OrcaAdapterSettingUpdateRequest(BaseModel):
+    is_active: bool = False
+    base_url: str | None = None
+    auth_type: Literal["none", "basic", "client"] = "none"
+    username: str | None = None
+    client_id: str | None = None
+    claim_endpoint: str = "/api01rv2/claim"
+    mode: Literal["mock", "http"] = "mock"
+    note: str | None = None
 
 
 class AdmissionRead(BaseModel):

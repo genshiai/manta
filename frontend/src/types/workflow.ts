@@ -357,6 +357,23 @@ export type ClaimReviewIssue = {
   createdAt: string;
 };
 
+export type ClaimDraftLine = {
+  id: number;
+  claimDraftId: number;
+  lineType: string;
+  sourceType: string;
+  sourceId?: string;
+  label: string;
+  receiptCode?: string;
+  receiptName?: string;
+  points: number;
+  quantity: number;
+  unit?: string;
+  evidence?: string;
+  reviewStatus: string;
+  createdAt: string;
+};
+
 export type ClaimTransmission = {
   id: number;
   claimDraftId: number;
@@ -381,8 +398,36 @@ export type ClaimDraft = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  lines: ClaimDraftLine[];
   issues: ClaimReviewIssue[];
   transmissions: ClaimTransmission[];
+};
+
+export type FacilityClaimRule = {
+  id: string;
+  sortOrder: number;
+  isActive: boolean;
+  category: string;
+  targetCategory: string;
+  ruleType: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  evidenceHint?: string;
+  updatedAt: string;
+};
+
+export type OrcaAdapterSetting = {
+  id: string;
+  isActive: boolean;
+  baseUrl?: string;
+  authType: 'none' | 'basic' | 'client';
+  username?: string;
+  clientId?: string;
+  claimEndpoint: string;
+  mode: 'mock' | 'http';
+  note?: string;
+  updatedBy?: string;
+  updatedAt: string;
 };
 
 export type ChartVersion = {

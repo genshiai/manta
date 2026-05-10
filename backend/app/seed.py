@@ -23,6 +23,7 @@ from .models import (
     LabSetMaster,
     NursingNote,
     Observation,
+    OrcaAdapterSetting,
     Patient,
     PrescriptionCatalogMaster,
     PrescriptionSetMaster,
@@ -1643,6 +1644,23 @@ def sync_facility_claim_rules(db: Session) -> bool:
     return updated
 
 
+def sync_orca_adapter_setting(db: Session) -> bool:
+    setting = db.get(OrcaAdapterSetting, "default")
+    if setting is not None:
+        return False
+    db.add(
+        OrcaAdapterSetting(
+            id="default",
+            is_active=False,
+            mode="mock",
+            auth_type="none",
+            claim_endpoint="/api01rv2/claim",
+            note="実ORCA接続情報が決まるまでは mock mode で送信履歴のみ保存する。",
+        )
+    )
+    return True
+
+
 def backfill_demo_prescription_history(db: Session) -> bool:
     updated = False
 
@@ -2084,6 +2102,9 @@ def seed_demo_data(db: Session) -> None:
         if sync_facility_claim_rules(db):
             updated = True
 
+        if sync_orca_adapter_setting(db):
+            updated = True
+
         if sync_diagnosis_masters(db):
             updated = True
 
@@ -2121,6 +2142,7 @@ def seed_demo_data(db: Session) -> None:
     sync_inpatient_pathway_masters(db)
     sync_receipt_medical_practice_masters(db)
     sync_facility_claim_rules(db)
+    sync_orca_adapter_setting(db)
     sync_diagnosis_masters(db)
 
     patients = [

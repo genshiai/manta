@@ -22,6 +22,7 @@ from .models import (
     BedMaster,
     ChartNote,
     ClaimDraft,
+    ClaimDraftLine,
     ClaimReviewIssue,
     ClaimTransmission,
     DiagnosisAliasMaster,
@@ -39,6 +40,7 @@ from .models import (
     LabOrder,
     NursingNote,
     Observation,
+    OrcaAdapterSetting,
     Patient,
     PmdaDrugInteraction,
     PmdaDrugInteractionMatch,
@@ -70,6 +72,7 @@ from .schemas import (
     BedStatusUpdateRequest,
     ClaimDraftRead,
     ClaimDraftUpdateRequest,
+    ClaimDraftLineRead,
     ClaimReviewIssueRead,
     ClaimTransmissionRead,
     ChartOrderMasterRead,
@@ -79,6 +82,9 @@ from .schemas import (
     ChartSaveRequest,
     ChartWorkspaceRead,
     DiagnosisMasterRead,
+    FacilityClaimRuleCreateRequest,
+    FacilityClaimRuleRead,
+    FacilityClaimRuleUpdateRequest,
     ImagingOrderCreateRequest,
     ImagingOrderItem,
     InpatientInstructionCreateRequest,
@@ -112,6 +118,8 @@ from .schemas import (
     NursingNoteCreateRequest,
     NursingNoteRead,
     PatientStatusUpdateRequest,
+    OrcaAdapterSettingRead,
+    OrcaAdapterSettingUpdateRequest,
     PatientSummaryRead,
     PatientContextRead,
     PatientContextUpdateRequest,
@@ -374,6 +382,13 @@ def get_chart_template_master_or_404(db: Session, master_id: str) -> ChartTempla
     if master is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chart template not found")
     return master
+
+
+def get_facility_claim_rule_or_404(db: Session, rule_id: str) -> FacilityClaimRule:
+    rule = db.get(FacilityClaimRule, rule_id)
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Facility claim rule not found")
+    return rule
 
 
 def resolve_pmda_info_url(pmda_info_url: str | None, yj_code: str | None) -> str | None:
@@ -1615,6 +1630,110 @@ def _claim_total_points(candidates: list[dict[str, str]], admission: Admission) 
     return sum(_candidate_points(candidate, admission) for candidate in candidates)
 
 
+def _candidate_base_points(candidate: dict[str, str]) -> int:
+    raw_points = str(candidate.get("receipt_points") or "").strip()
+    if not raw_points:
+        return 0
+    try:
+        return int(float(raw_points.replace(",", "")))
+    except ValueError:
+        return 0
+
+
+def _build_claim_draft_lines(
+    *,
+    claim_draft_id: int,
+    admission: Admission,
+    candidates: list[dict[str, str]],
+    prescriptions: list[PrescriptionOrder],
+    instructions: list[InpatientInstruction],
+    lab_orders: list[LabOrder],
+) -> list[ClaimDraftLine]:
+    by_category = {candidate.get("category"): candidate for candidate in candidates}
+    lines: list[ClaimDraftLine] = []
+
+    admission_candidate = by_category.get("入院基本料")
+    if admission_candidate:
+        quantity = _admission_stay_days(admission)
+        lines.append(
+            ClaimDraftLine(
+                claim_draft_id=claim_draft_id,
+                line_type="入院基本料",
+                source_type="admission",
+                source_id=str(admission.id),
+                label=admission_candidate.get("label") or "入院基本料",
+                receipt_code=admission_candidate.get("receipt_code") or None,
+                receipt_name=admission_candidate.get("receipt_name") or None,
+                points=_candidate_base_points(admission_candidate),
+                quantity=quantity,
+                unit=admission_candidate.get("receipt_unit") or "日",
+                evidence=admission_candidate.get("evidence"),
+                review_status=admission_candidate.get("status") or "candidate",
+            )
+        )
+
+    prescription_candidate = by_category.get("投薬")
+    for prescription in prescriptions[:20]:
+        lines.append(
+            ClaimDraftLine(
+                claim_draft_id=claim_draft_id,
+                line_type="投薬",
+                source_type="prescription_order",
+                source_id=str(prescription.id),
+                label=f"{prescription.drug_name} {prescription.dosage} / {prescription.days}",
+                receipt_code=prescription_candidate.get("receipt_code") if prescription_candidate else None,
+                receipt_name=prescription_candidate.get("receipt_name") if prescription_candidate else None,
+                points=_candidate_base_points(prescription_candidate or {}),
+                quantity=1,
+                unit=prescription_candidate.get("receipt_unit") if prescription_candidate else "回",
+                evidence=f"処方日: {_format_document_date(prescription.created_at)}",
+                review_status="candidate",
+            )
+        )
+
+    lab_candidate = by_category.get("検査")
+    for order in lab_orders[:20]:
+        for item in order.items:
+            lines.append(
+                ClaimDraftLine(
+                    claim_draft_id=claim_draft_id,
+                    line_type="検査",
+                    source_type="lab_order",
+                    source_id=str(order.id),
+                    label=f"{order.category}: {item}",
+                    receipt_code=lab_candidate.get("receipt_code") if lab_candidate else None,
+                    receipt_name=lab_candidate.get("receipt_name") if lab_candidate else None,
+                    points=_candidate_base_points(lab_candidate or {}),
+                    quantity=1,
+                    unit=lab_candidate.get("receipt_unit") if lab_candidate else "回",
+                    evidence=f"オーダ日: {_format_document_date(order.created_at)} / status={order.status}",
+                    review_status="candidate" if order.status in {"ordered", "completed", "done"} else "needs_review",
+                )
+            )
+
+    instruction_candidate = by_category.get("処置/指導") or by_category.get("退院支援")
+    for instruction in instructions:
+        if instruction.status != "done":
+            continue
+        lines.append(
+            ClaimDraftLine(
+                claim_draft_id=claim_draft_id,
+                line_type=instruction.category,
+                source_type="inpatient_instruction",
+                source_id=str(instruction.id),
+                label=instruction.title,
+                receipt_code=instruction_candidate.get("receipt_code") if instruction_candidate else None,
+                receipt_name=instruction_candidate.get("receipt_name") if instruction_candidate else None,
+                points=_candidate_base_points(instruction_candidate or {}),
+                quantity=1,
+                unit=instruction_candidate.get("receipt_unit") if instruction_candidate else "回",
+                evidence=f"実施済み指示: {_format_document_date(instruction.due_at or instruction.created_at)}",
+                review_status="candidate",
+            )
+        )
+    return lines
+
+
 def _build_claim_review_issues(
     *,
     db: Session,
@@ -1713,6 +1832,11 @@ def _build_claim_review_issues(
 
 
 def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
+    lines = db.scalars(
+        select(ClaimDraftLine)
+        .where(ClaimDraftLine.claim_draft_id == draft.id)
+        .order_by(ClaimDraftLine.id)
+    ).all()
     issues = db.scalars(
         select(ClaimReviewIssue)
         .where(ClaimReviewIssue.claim_draft_id == draft.id)
@@ -1735,12 +1859,13 @@ def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
         created_by=draft.created_by,
         created_at=draft.created_at,
         updated_at=draft.updated_at,
+        lines=[ClaimDraftLineRead.model_validate(line) for line in lines],
         issues=[ClaimReviewIssueRead.model_validate(issue) for issue in issues],
         transmissions=[ClaimTransmissionRead.model_validate(item) for item in transmissions],
     )
 
 
-def _build_orca_claim_payload(draft: ClaimDraft, patient: Patient) -> dict[str, object]:
+def _build_orca_claim_payload(draft: ClaimDraft, patient: Patient, lines: list[ClaimDraftLine]) -> dict[str, object]:
     return {
         "adapter": "orca",
         "mode": "mock",
@@ -1755,15 +1880,19 @@ def _build_orca_claim_payload(draft: ClaimDraft, patient: Patient) -> dict[str, 
             "total_points": draft.total_points,
             "items": [
                 {
-                    "category": candidate.get("category", ""),
-                    "label": candidate.get("label", ""),
-                    "receipt_code": candidate.get("receipt_code", ""),
-                    "receipt_name": candidate.get("receipt_name", ""),
-                    "points": candidate.get("receipt_points", ""),
-                    "unit": candidate.get("receipt_unit", ""),
-                    "evidence": candidate.get("evidence", ""),
+                    "line_id": line.id,
+                    "line_type": line.line_type,
+                    "source_type": line.source_type,
+                    "source_id": line.source_id,
+                    "label": line.label,
+                    "receipt_code": line.receipt_code,
+                    "receipt_name": line.receipt_name,
+                    "points": line.points,
+                    "quantity": line.quantity,
+                    "unit": line.unit,
+                    "evidence": line.evidence,
                 }
-                for candidate in draft.billing_candidates
+                for line in lines
             ],
         },
     }
@@ -1783,7 +1912,29 @@ def _mock_submit_orca_claim(
             ClaimReviewIssue.severity == "error",
         )
     ).all()
-    payload = _build_orca_claim_payload(draft, patient)
+    lines = db.scalars(
+        select(ClaimDraftLine)
+        .where(ClaimDraftLine.claim_draft_id == draft.id)
+        .order_by(ClaimDraftLine.id)
+    ).all()
+    payload = _build_orca_claim_payload(draft, patient, lines)
+    setting = db.get(OrcaAdapterSetting, "default")
+    payload["orca_setting"] = {
+        "mode": setting.mode if setting else "mock",
+        "base_url": setting.base_url if setting else None,
+        "claim_endpoint": setting.claim_endpoint if setting else "/api01rv2/claim",
+        "auth_type": setting.auth_type if setting else "none",
+    }
+    if setting and setting.mode == "http" and not setting.base_url:
+        return ClaimTransmission(
+            claim_draft_id=draft.id,
+            adapter="orca",
+            status="error",
+            request_payload=payload,
+            response_payload={"accepted": False, "messages": ["base_url is required for http mode"]},
+            error_message="ORCA実接続モードには base_url が必要です。",
+            sent_by=current_user.display_name,
+        )
     if open_errors:
         response_payload: dict[str, object] = {
             "accepted": False,
@@ -3155,6 +3306,17 @@ def create_inpatient_claim_draft(
     )
     db.add(draft)
     db.flush()
+    lines = _build_claim_draft_lines(
+        claim_draft_id=draft.id,
+        admission=admission,
+        candidates=candidates,
+        prescriptions=prescriptions,
+        instructions=instructions,
+        lab_orders=lab_orders,
+    )
+    draft.total_points = sum(line.points * line.quantity for line in lines)
+    for line in lines:
+        db.add(line)
     for issue in _build_claim_review_issues(
         db=db,
         claim_draft_id=draft.id,
@@ -3373,6 +3535,104 @@ def search_diagnosis_masters(
         )
         for item in items
     ]
+
+
+@app.get("/api/admin/claim-rules", response_model=list[FacilityClaimRuleRead])
+def list_facility_claim_rules(
+    _: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> list[FacilityClaimRuleRead]:
+    return [
+        FacilityClaimRuleRead.model_validate(rule)
+        for rule in db.scalars(
+            select(FacilityClaimRule).order_by(FacilityClaimRule.sort_order, FacilityClaimRule.id)
+        ).all()
+    ]
+
+
+@app.post("/api/admin/claim-rules", response_model=FacilityClaimRuleRead, status_code=status.HTTP_201_CREATED)
+def create_facility_claim_rule(
+    payload: FacilityClaimRuleCreateRequest,
+    current_user: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> FacilityClaimRuleRead:
+    if db.get(FacilityClaimRule, payload.id) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Facility claim rule already exists")
+    rule = FacilityClaimRule(**payload.model_dump())
+    db.add(rule)
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="施設別算定ルール作成",
+        scope="system",
+        detail=f"算定ルール {payload.id} / {payload.message} を作成しました。",
+    )
+    db.commit()
+    db.refresh(rule)
+    return FacilityClaimRuleRead.model_validate(rule)
+
+
+@app.patch("/api/admin/claim-rules/{rule_id}", response_model=FacilityClaimRuleRead)
+def update_facility_claim_rule(
+    rule_id: str,
+    payload: FacilityClaimRuleUpdateRequest,
+    current_user: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> FacilityClaimRuleRead:
+    rule = get_facility_claim_rule_or_404(db, rule_id)
+    for key, value in payload.model_dump().items():
+        setattr(rule, key, value)
+    rule.updated_at = utcnow()
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="施設別算定ルール更新",
+        scope="system",
+        detail=f"算定ルール {rule_id} を更新しました。",
+    )
+    db.commit()
+    db.refresh(rule)
+    return FacilityClaimRuleRead.model_validate(rule)
+
+
+@app.get("/api/admin/orca/settings", response_model=OrcaAdapterSettingRead)
+def get_orca_adapter_setting(
+    _: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> OrcaAdapterSettingRead:
+    setting = db.get(OrcaAdapterSetting, "default")
+    if setting is None:
+        setting = OrcaAdapterSetting(id="default", mode="mock", claim_endpoint="/api01rv2/claim")
+        db.add(setting)
+        db.commit()
+        db.refresh(setting)
+    return OrcaAdapterSettingRead.model_validate(setting)
+
+
+@app.put("/api/admin/orca/settings", response_model=OrcaAdapterSettingRead)
+def update_orca_adapter_setting(
+    payload: OrcaAdapterSettingUpdateRequest,
+    current_user: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> OrcaAdapterSettingRead:
+    setting = db.get(OrcaAdapterSetting, "default")
+    if setting is None:
+        setting = OrcaAdapterSetting(id="default")
+        db.add(setting)
+    for key, value in payload.model_dump().items():
+        setattr(setting, key, value)
+    setting.updated_by = current_user.display_name
+    setting.updated_at = utcnow()
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="ORCA接続設定更新",
+        scope="system",
+        detail=f"ORCA adapter setting を {payload.mode} で更新しました。",
+    )
+    db.commit()
+    db.refresh(setting)
+    return OrcaAdapterSettingRead.model_validate(setting)
 
 
 @app.post(

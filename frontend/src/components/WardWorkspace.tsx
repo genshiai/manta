@@ -996,7 +996,7 @@ export const WardWorkspace = ({
                             <p className='text-[12px] font-bold text-blue-950'>請求ドラフト</p>
                             <p className='mt-1 text-[11px] leading-normal text-blue-900'>
                               {claimDraft
-                                ? `${claimDraft.billingCandidates.length}候補 / ${claimDraft.totalPoints.toLocaleString()}点 / 未解決 ${claimDraft.issues.filter((issue) => issue.status === 'open').length}件`
+                                ? `${claimDraft.lines.length}明細 / ${claimDraft.totalPoints.toLocaleString()}点 / 未解決 ${claimDraft.issues.filter((issue) => issue.status === 'open').length}件`
                                 : '退院計画の会計候補から作成'}
                             </p>
                           </div>
@@ -1057,6 +1057,20 @@ export const WardWorkspace = ({
                                 ) : null}
                               </div>
                             ) : null}
+                            {claimDraft.lines.slice(0, 5).map((line) => (
+                              <div className='rounded border border-blue-100 bg-white px-2 py-1.5' key={line.id}>
+                                <div className='flex flex-wrap items-center justify-between gap-2'>
+                                  <p className='text-[11px] font-bold text-blue-950'>{line.lineType}</p>
+                                  <span className='text-[10px] font-bold text-text-tertiary'>
+                                    {line.points.toLocaleString()}点 x {line.quantity}{line.unit ?? ''}
+                                  </span>
+                                </div>
+                                <p className='mt-1 text-[11px] leading-normal text-text-secondary'>{line.label}</p>
+                                {line.receiptCode ? (
+                                  <p className='mt-1 text-[10px] font-bold text-blue-900'>{line.receiptCode} {line.receiptName}</p>
+                                ) : null}
+                              </div>
+                            ))}
                             {claimDraft.issues.slice(0, 4).map((issue) => (
                               <div className='rounded border border-blue-100 bg-white px-2 py-1.5' key={issue.id}>
                                 <p className={cn('text-[11px] font-bold', issue.severity === 'error' ? 'text-red-900' : issue.severity === 'warning' ? 'text-yellow-1100' : 'text-blue-900')}>

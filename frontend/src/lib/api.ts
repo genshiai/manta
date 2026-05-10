@@ -11,6 +11,8 @@ import type {
   AdminUserSummary,
   AuditLogEntry,
   ClaimDraft,
+  FacilityClaimRule,
+  OrcaAdapterSetting,
   ChartOrderConfig,
   ChartTemplate,
   ChartHistoryEntry,
@@ -596,6 +598,23 @@ type ApiClaimReviewIssue = {
   created_at: string;
 };
 
+type ApiClaimDraftLine = {
+  id: number;
+  claim_draft_id: number;
+  line_type: string;
+  source_type: string;
+  source_id: string | null;
+  label: string;
+  receipt_code: string | null;
+  receipt_name: string | null;
+  points: number;
+  quantity: number;
+  unit: string | null;
+  evidence: string | null;
+  review_status: string;
+  created_at: string;
+};
+
 type ApiClaimDraft = {
   id: number;
   patient_id: string;
@@ -607,6 +626,7 @@ type ApiClaimDraft = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  lines: ApiClaimDraftLine[];
   issues: ApiClaimReviewIssue[];
   transmissions: ApiClaimTransmission[];
 };
@@ -622,6 +642,33 @@ type ApiClaimTransmission = {
   sent_by: string;
   sent_at: string;
   created_at: string;
+};
+
+type ApiFacilityClaimRule = {
+  id: string;
+  sort_order: number;
+  is_active: boolean;
+  category: string;
+  target_category: string;
+  rule_type: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  evidence_hint: string | null;
+  updated_at: string;
+};
+
+type ApiOrcaAdapterSetting = {
+  id: string;
+  is_active: boolean;
+  base_url: string | null;
+  auth_type: 'none' | 'basic' | 'client';
+  username: string | null;
+  client_id: string | null;
+  claim_endpoint: string;
+  mode: 'mock' | 'http';
+  note: string | null;
+  updated_by: string | null;
+  updated_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -1275,6 +1322,23 @@ const mapClaimTransmission = (item: ApiClaimTransmission) => ({
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapClaimDraftLine = (item: ApiClaimDraftLine) => ({
+  id: item.id,
+  claimDraftId: item.claim_draft_id,
+  lineType: item.line_type,
+  sourceType: item.source_type,
+  sourceId: item.source_id ?? undefined,
+  label: item.label,
+  receiptCode: item.receipt_code ?? undefined,
+  receiptName: item.receipt_name ?? undefined,
+  points: item.points,
+  quantity: item.quantity,
+  unit: item.unit ?? undefined,
+  evidence: item.evidence ?? undefined,
+  reviewStatus: item.review_status,
+  createdAt: formatTimestamp(item.created_at),
+});
+
 const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
   id: item.id,
   patientId: item.patient_id,
@@ -1286,6 +1350,7 @@ const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
   createdBy: item.created_by,
   createdAt: formatTimestamp(item.created_at),
   updatedAt: formatTimestamp(item.updated_at),
+  lines: item.lines.map(mapClaimDraftLine),
   issues: item.issues.map((issue) => ({
     id: issue.id,
     claimDraftId: issue.claim_draft_id,
@@ -1297,6 +1362,33 @@ const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
     createdAt: formatTimestamp(issue.created_at),
   })),
   transmissions: item.transmissions.map(mapClaimTransmission),
+});
+
+const mapFacilityClaimRule = (item: ApiFacilityClaimRule): FacilityClaimRule => ({
+  id: item.id,
+  sortOrder: item.sort_order,
+  isActive: item.is_active,
+  category: item.category,
+  targetCategory: item.target_category,
+  ruleType: item.rule_type,
+  severity: item.severity,
+  message: item.message,
+  evidenceHint: item.evidence_hint ?? undefined,
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapOrcaAdapterSetting = (item: ApiOrcaAdapterSetting): OrcaAdapterSetting => ({
+  id: item.id,
+  isActive: item.is_active,
+  baseUrl: item.base_url ?? undefined,
+  authType: item.auth_type,
+  username: item.username ?? undefined,
+  clientId: item.client_id ?? undefined,
+  claimEndpoint: item.claim_endpoint,
+  mode: item.mode,
+  note: item.note ?? undefined,
+  updatedBy: item.updated_by ?? undefined,
+  updatedAt: formatTimestamp(item.updated_at),
 });
 
 export const login = async (userId: string, password: string): Promise<UserSession> => {
@@ -1752,6 +1844,85 @@ export const submitClaimDraftToOrca = async (claimDraftId: number): Promise<Clai
     method: 'POST',
   });
   return mapClaimTransmission(transmission);
+};
+
+export const listFacilityClaimRules = async (): Promise<FacilityClaimRule[]> => {
+  const rules = await request<ApiFacilityClaimRule[]>('/api/admin/claim-rules');
+  return rules.map(mapFacilityClaimRule);
+};
+
+type FacilityClaimRulePayload = {
+  id?: string;
+  sortOrder: number;
+  isActive?: boolean;
+  category: string;
+  targetCategory: string;
+  ruleType: string;
+  severity: FacilityClaimRule['severity'];
+  message: string;
+  evidenceHint?: string;
+};
+
+const facilityClaimRuleBody = (payload: FacilityClaimRulePayload) => ({
+  ...(payload.id ? { id: payload.id } : {}),
+  sort_order: payload.sortOrder,
+  is_active: payload.isActive ?? true,
+  category: payload.category,
+  target_category: payload.targetCategory,
+  rule_type: payload.ruleType,
+  severity: payload.severity,
+  message: payload.message,
+  evidence_hint: payload.evidenceHint ?? null,
+});
+
+export const createFacilityClaimRule = async (payload: FacilityClaimRulePayload & { id: string }): Promise<FacilityClaimRule> => {
+  const rule = await request<ApiFacilityClaimRule>('/api/admin/claim-rules', {
+    method: 'POST',
+    body: JSON.stringify(facilityClaimRuleBody(payload)),
+  });
+  return mapFacilityClaimRule(rule);
+};
+
+export const updateFacilityClaimRule = async (
+  ruleId: string,
+  payload: FacilityClaimRulePayload,
+): Promise<FacilityClaimRule> => {
+  const rule = await request<ApiFacilityClaimRule>(`/api/admin/claim-rules/${encodeURIComponent(ruleId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(facilityClaimRuleBody(payload)),
+  });
+  return mapFacilityClaimRule(rule);
+};
+
+export const getOrcaAdapterSetting = async (): Promise<OrcaAdapterSetting> => {
+  const setting = await request<ApiOrcaAdapterSetting>('/api/admin/orca/settings');
+  return mapOrcaAdapterSetting(setting);
+};
+
+export const updateOrcaAdapterSetting = async (payload: {
+  isActive?: boolean;
+  baseUrl?: string;
+  authType: OrcaAdapterSetting['authType'];
+  username?: string;
+  clientId?: string;
+  claimEndpoint: string;
+  mode: OrcaAdapterSetting['mode'];
+  note?: string;
+}): Promise<OrcaAdapterSetting> => {
+  const setting = await request<ApiOrcaAdapterSetting>('/api/admin/orca/settings', {
+    method: 'PUT',
+    body: JSON.stringify({
+      is_active: payload.isActive ?? false,
+      base_url: payload.baseUrl ?? null,
+      auth_type: payload.authType,
+      username: payload.username ?? null,
+      client_id: payload.clientId ?? null,
+      claim_endpoint: payload.claimEndpoint,
+      mode: payload.mode,
+      note: payload.note ?? null,
+    }),
+  });
+  return mapOrcaAdapterSetting(setting);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

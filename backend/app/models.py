@@ -601,6 +601,25 @@ class ClaimDraft(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class ClaimDraftLine(Base):
+    __tablename__ = "claim_draft_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    claim_draft_id: Mapped[int] = mapped_column(ForeignKey("claim_drafts.id", ondelete="CASCADE"), index=True)
+    line_type: Mapped[str] = mapped_column(String(64), index=True)
+    source_type: Mapped[str] = mapped_column(String(64), index=True)
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    label: Mapped[str] = mapped_column(String(255))
+    receipt_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    receipt_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_status: Mapped[str] = mapped_column(String(32), default="candidate", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class ClaimReviewIssue(Base):
     __tablename__ = "claim_review_issues"
 
@@ -627,6 +646,22 @@ class ClaimTransmission(Base):
     sent_by: Mapped[str] = mapped_column(String(128))
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class OrcaAdapterSetting(Base):
+    __tablename__ = "orca_adapter_settings"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    base_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    auth_type: Mapped[str] = mapped_column(String(32), default="none")
+    username: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    client_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    claim_endpoint: Mapped[str] = mapped_column(String(255), default="/api01rv2/claim")
+    mode: Mapped[str] = mapped_column(String(32), default="mock", index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class ChartTemplateMaster(Base):

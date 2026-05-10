@@ -12,6 +12,7 @@ import {
 } from '../vendor/dads';
 import {
   createChartTemplateMaster,
+  createFacilityClaimRule,
   createLabSetMaster,
   createPrescriptionCatalogItem,
   createPrescriptionSetMaster,
@@ -19,13 +20,17 @@ import {
   createStandardUsageMaster,
   createUser,
   getChartOrderConfig,
+  getOrcaAdapterSetting,
   isForbiddenError,
   isUnauthorizedError,
   listAuditLogs,
+  listFacilityClaimRules,
   listUsers,
   resetUserPassword,
   updateChartTemplateMaster,
+  updateFacilityClaimRule,
   updateLabSetMaster,
+  updateOrcaAdapterSetting,
   updatePrescriptionCatalogItem,
   updatePrescriptionSetMaster,
   updateReservationSlotMaster,
@@ -48,7 +53,9 @@ import type {
   ChartOrderConfig,
   ChartTemplate,
   DrugCategory,
+  FacilityClaimRule,
   LabSetOption,
+  OrcaAdapterSetting,
   PrescriptionCatalogItem,
   PrescriptionSetMaster,
   ReservationSlot,
@@ -70,7 +77,7 @@ type FlashState = {
   text: string;
 } | null;
 
-type ManagementTab = 'users' | 'prescription' | 'usage' | 'rxset' | 'labset' | 'slot' | 'template';
+type ManagementTab = 'users' | 'prescription' | 'usage' | 'rxset' | 'labset' | 'slot' | 'template' | 'claimRule';
 
 type CreateFormState = {
   userId: string;
@@ -256,6 +263,31 @@ type ChartTemplateEditFormState = {
   objective: string;
   assessment: string;
   plan: string;
+};
+
+type ClaimRuleCreateFormState = {
+  id: string;
+  sortOrder: string;
+  isActive: boolean;
+  category: string;
+  targetCategory: string;
+  ruleType: string;
+  severity: FacilityClaimRule['severity'];
+  message: string;
+  evidenceHint: string;
+};
+
+type ClaimRuleEditFormState = Omit<ClaimRuleCreateFormState, 'id'>;
+
+type OrcaSettingFormState = {
+  isActive: boolean;
+  baseUrl: string;
+  authType: OrcaAdapterSetting['authType'];
+  username: string;
+  clientId: string;
+  claimEndpoint: string;
+  mode: OrcaAdapterSetting['mode'];
+  note: string;
 };
 
 const surfaceClassName = 'rounded-8 border border-solid-gray-200 bg-white';
@@ -493,6 +525,40 @@ const createChartTemplateEditForm = (item: ChartTemplate): ChartTemplateEditForm
   plan: item.plan,
 });
 
+const createClaimRuleCreateForm = (values: FacilityClaimRule[]): ClaimRuleCreateFormState => ({
+  id: '',
+  sortOrder: nextSortOrder(values),
+  isActive: true,
+  category: '入院',
+  targetCategory: '入院基本料',
+  ruleType: 'requires_admission_dates',
+  severity: 'warning',
+  message: '',
+  evidenceHint: '',
+});
+
+const createClaimRuleEditForm = (item: FacilityClaimRule): ClaimRuleEditFormState => ({
+  sortOrder: String(item.sortOrder),
+  isActive: item.isActive,
+  category: item.category,
+  targetCategory: item.targetCategory,
+  ruleType: item.ruleType,
+  severity: item.severity,
+  message: item.message,
+  evidenceHint: item.evidenceHint ?? '',
+});
+
+const createOrcaSettingForm = (item?: OrcaAdapterSetting | null): OrcaSettingFormState => ({
+  isActive: item?.isActive ?? false,
+  baseUrl: item?.baseUrl ?? '',
+  authType: item?.authType ?? 'none',
+  username: item?.username ?? '',
+  clientId: item?.clientId ?? '',
+  claimEndpoint: item?.claimEndpoint ?? '/api01rv2/claim',
+  mode: item?.mode ?? 'mock',
+  note: item?.note ?? '',
+});
+
 const formatAdminError = (message: string) => {
   if (message === 'User already exists') {
     return '同じ利用者 ID が既に存在します。';
@@ -584,6 +650,9 @@ export const SettingsWorkspace = ({
   const [selectedLabSetId, setSelectedLabSetId] = useState('');
   const [selectedReservationSlotId, setSelectedReservationSlotId] = useState('');
   const [selectedChartTemplateId, setSelectedChartTemplateId] = useState('');
+  const [claimRules, setClaimRules] = useState<FacilityClaimRule[]>([]);
+  const [selectedClaimRuleId, setSelectedClaimRuleId] = useState('');
+  const [orcaSetting, setOrcaSetting] = useState<OrcaAdapterSetting | null>(null);
   const [prescriptionCreateForm, setPrescriptionCreateForm] = useState<PrescriptionCreateFormState>(
     createPrescriptionCreateForm([]),
   );
@@ -606,6 +675,11 @@ export const SettingsWorkspace = ({
     createChartTemplateCreateForm([]),
   );
   const [chartTemplateEditForm, setChartTemplateEditForm] = useState<ChartTemplateEditFormState | null>(null);
+  const [claimRuleCreateForm, setClaimRuleCreateForm] = useState<ClaimRuleCreateFormState>(
+    createClaimRuleCreateForm([]),
+  );
+  const [claimRuleEditForm, setClaimRuleEditForm] = useState<ClaimRuleEditFormState | null>(null);
+  const [orcaSettingForm, setOrcaSettingForm] = useState<OrcaSettingFormState>(createOrcaSettingForm(null));
   const [flash, setFlash] = useState<FlashState>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [masterError, setMasterError] = useState<string | null>(null);
@@ -661,13 +735,21 @@ export const SettingsWorkspace = ({
 
     try {
       const nextConfig = await getChartOrderConfig({ includeInactive: true });
+      const [nextClaimRules, nextOrcaSetting] = await Promise.all([
+        listFacilityClaimRules(),
+        getOrcaAdapterSetting(),
+      ]);
       setOrderConfig(nextConfig);
+      setClaimRules(nextClaimRules);
+      setOrcaSetting(nextOrcaSetting);
       setPrescriptionCreateForm(createPrescriptionCreateForm(nextConfig.prescriptionCatalog));
       setStandardUsageCreateForm(createStandardUsageCreateForm(nextConfig.standardUsageMasters));
       setPrescriptionSetCreateForm(createPrescriptionSetCreateForm(nextConfig.prescriptionSets));
       setLabSetCreateForm(createLabSetCreateForm(nextConfig.labSetOptions));
       setReservationSlotCreateForm(createReservationSlotCreateForm(nextConfig.reservationSlots));
       setChartTemplateCreateForm(createChartTemplateCreateForm(nextConfig.chartTemplates));
+      setClaimRuleCreateForm(createClaimRuleCreateForm(nextClaimRules));
+      setOrcaSettingForm(createOrcaSettingForm(nextOrcaSetting));
       return nextConfig;
     } catch (error) {
       if (isUnauthorizedError(error)) {
@@ -749,6 +831,7 @@ export const SettingsWorkspace = ({
       setSelectedLabSetId('');
       setSelectedReservationSlotId('');
       setSelectedChartTemplateId('');
+      setSelectedClaimRuleId('');
       return;
     }
 
@@ -802,7 +885,14 @@ export const SettingsWorkspace = ({
     ) {
       setSelectedChartTemplateId(orderConfig.chartTemplates[0].id);
     }
+
+    if (claimRules.length === 0) {
+      setSelectedClaimRuleId('');
+    } else if (!selectedClaimRuleId || !claimRules.some((item) => item.id === selectedClaimRuleId)) {
+      setSelectedClaimRuleId(claimRules[0].id);
+    }
   }, [
+    claimRules,
     orderConfig.chartTemplates,
     isAdmin,
     orderConfig.labSetOptions,
@@ -816,6 +906,7 @@ export const SettingsWorkspace = ({
     selectedPrescriptionSetId,
     selectedReservationSlotId,
     selectedStandardUsageId,
+    selectedClaimRuleId,
   ]);
 
   const selectedUser = useMemo(
@@ -845,6 +936,10 @@ export const SettingsWorkspace = ({
   const selectedChartTemplate = useMemo(
     () => orderConfig.chartTemplates.find((item) => item.id === selectedChartTemplateId) ?? null,
     [orderConfig.chartTemplates, selectedChartTemplateId],
+  );
+  const selectedClaimRule = useMemo(
+    () => claimRules.find((item) => item.id === selectedClaimRuleId) ?? null,
+    [claimRules, selectedClaimRuleId],
   );
   const prescriptionCreatePmdaPreviewUrl =
     prescriptionCreateForm.pmdaInfoUrl.trim() || buildPmdaDrugInfoUrl(prescriptionCreateForm.yjCode);
@@ -888,6 +983,10 @@ export const SettingsWorkspace = ({
       selectedChartTemplate ? createChartTemplateEditForm(selectedChartTemplate) : null,
     );
   }, [selectedChartTemplate]);
+
+  useEffect(() => {
+    setClaimRuleEditForm(selectedClaimRule ? createClaimRuleEditForm(selectedClaimRule) : null);
+  }, [selectedClaimRule]);
 
   const handleCreateUser = async () => {
     if (
@@ -1615,6 +1714,114 @@ export const SettingsWorkspace = ({
     }
   };
 
+  const handleCreateClaimRule = async () => {
+    if (!claimRuleCreateForm.id.trim() || !claimRuleCreateForm.message.trim()) {
+      setFlash({ tone: 'error', text: '算定ルールの ID とメッセージを入力してください。' });
+      return;
+    }
+    setIsMutating(true);
+    try {
+      const created = await createFacilityClaimRule({
+        id: claimRuleCreateForm.id.trim(),
+        sortOrder: normalizeSortOrder(claimRuleCreateForm.sortOrder),
+        isActive: claimRuleCreateForm.isActive,
+        category: claimRuleCreateForm.category.trim(),
+        targetCategory: claimRuleCreateForm.targetCategory.trim(),
+        ruleType: claimRuleCreateForm.ruleType.trim(),
+        severity: claimRuleCreateForm.severity,
+        message: claimRuleCreateForm.message.trim(),
+        evidenceHint: claimRuleCreateForm.evidenceHint.trim() || undefined,
+      });
+      await loadMasters();
+      await loadSystemAuditLogs();
+      setSelectedClaimRuleId(created.id);
+      setFlash({ tone: 'success', text: `算定ルール ${created.id} を作成しました。` });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `算定ルール作成に失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleUpdateClaimRule = async () => {
+    if (!selectedClaimRule || !claimRuleEditForm?.message.trim()) {
+      setFlash({ tone: 'error', text: '算定ルールの必須項目を入力してください。' });
+      return;
+    }
+    setIsMutating(true);
+    try {
+      const updated = await updateFacilityClaimRule(selectedClaimRule.id, {
+        sortOrder: normalizeSortOrder(claimRuleEditForm.sortOrder),
+        isActive: claimRuleEditForm.isActive,
+        category: claimRuleEditForm.category.trim(),
+        targetCategory: claimRuleEditForm.targetCategory.trim(),
+        ruleType: claimRuleEditForm.ruleType.trim(),
+        severity: claimRuleEditForm.severity,
+        message: claimRuleEditForm.message.trim(),
+        evidenceHint: claimRuleEditForm.evidenceHint.trim() || undefined,
+      });
+      await loadMasters();
+      await loadSystemAuditLogs();
+      setSelectedClaimRuleId(updated.id);
+      setFlash({ tone: 'success', text: `算定ルール ${updated.id} を更新しました。` });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `算定ルール更新に失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleUpdateOrcaSetting = async () => {
+    setIsMutating(true);
+    try {
+      const updated = await updateOrcaAdapterSetting({
+        isActive: orcaSettingForm.isActive,
+        baseUrl: orcaSettingForm.baseUrl.trim() || undefined,
+        authType: orcaSettingForm.authType,
+        username: orcaSettingForm.username.trim() || undefined,
+        clientId: orcaSettingForm.clientId.trim() || undefined,
+        claimEndpoint: orcaSettingForm.claimEndpoint.trim() || '/api01rv2/claim',
+        mode: orcaSettingForm.mode,
+        note: orcaSettingForm.note.trim() || undefined,
+      });
+      setOrcaSetting(updated);
+      setOrcaSettingForm(createOrcaSettingForm(updated));
+      await loadSystemAuditLogs();
+      setFlash({ tone: 'success', text: 'ORCA接続設定を更新しました。' });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `ORCA接続設定の更新に失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   const managementTabs = [
     { key: 'users' as const, label: '利用者', count: users.length },
     { key: 'prescription' as const, label: '処方候補', count: orderConfig.prescriptionCatalog.length },
@@ -1623,6 +1830,7 @@ export const SettingsWorkspace = ({
     { key: 'labset' as const, label: '検査セット', count: orderConfig.labSetOptions.length },
     { key: 'slot' as const, label: '予約枠', count: orderConfig.reservationSlots.length },
     { key: 'template' as const, label: 'テンプレート', count: orderConfig.chartTemplates.length },
+    { key: 'claimRule' as const, label: '算定ルール', count: claimRules.length },
   ];
   const currentHomeProfileConfig = homeProfileConfigs[homeSettings.profile];
   const availableHomeViews = currentHomeProfileConfig.views;
@@ -2099,6 +2307,47 @@ export const SettingsWorkspace = ({
                         </div>
                         <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
                         <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>{item.department}</p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {managementTab === 'claimRule' ? (
+                <section className={cn(surfaceClassName, 'p-5')}>
+                  <div className='flex items-center justify-between gap-3'>
+                    <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>算定ルール一覧</p>
+                    <ChipLabel color='gray' variant='filled-outline'>
+                      {claimRules.length}件
+                    </ChipLabel>
+                  </div>
+                  <p className='mt-2 text-[14px] font-normal leading-none text-solid-gray-536'>
+                    請求ドラフト作成時の施設別チェックを管理します。
+                  </p>
+                  {isLoadingMasters ? <LoadingBanner text='算定ルールを読み込み中です。' /> : null}
+                  {masterError ? <ErrorBanner text={masterError} /> : null}
+                  <div className='mt-4 flex flex-col gap-3'>
+                    {claimRules.map((item) => (
+                      <button
+                        className={cn(
+                          buttonBaseStyle,
+                          'rounded-8 border px-4 py-3 text-left transition-colors',
+                          selectedClaimRuleId === item.id
+                            ? 'border-blue-900 bg-blue-50'
+                            : 'border-solid-gray-200 bg-white hover:bg-solid-gray-50',
+                        )}
+                        key={item.id}
+                        onClick={() => setSelectedClaimRuleId(item.id)}
+                        type='button'
+                      >
+                        <div className='flex flex-wrap items-center justify-between gap-2'>
+                          <p className='text-[16px] font-bold leading-none text-solid-gray-900'>{item.targetCategory}</p>
+                          <ChipLabel color={masterStatusColor(item.isActive)} variant='filled-outline'>
+                            {masterStatusLabel(item.isActive)}
+                          </ChipLabel>
+                        </div>
+                        <p className='mt-1 text-mono-14N-150 text-solid-gray-700'>{item.id}</p>
+                        <p className='mt-2 text-[14px] font-normal leading-snug text-solid-gray-536'>{item.message}</p>
                       </button>
                     ))}
                   </div>
@@ -4027,6 +4276,153 @@ export const SettingsWorkspace = ({
                     ) : (
                       <EmptyState text='更新対象のカルテテンプレートを選択してください。' />
                     )}
+                  </section>
+                </>
+              ) : null}
+
+              {managementTab === 'claimRule' ? (
+                <>
+                  <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
+                    <SectionHeader
+                      chip='算定ルール'
+                      title='新規算定ルールを追加'
+                      tone='blue'
+                      description='請求ドラフト作成時に実施記録と照合する施設別ルールを登録します。'
+                    />
+                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                      <Field label='ルール ID'>
+                        <Input blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, id: event.target.value }))} value={claimRuleCreateForm.id} />
+                      </Field>
+                      <Field label='表示順'>
+                        <Input blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, sortOrder: event.target.value }))} type='number' value={claimRuleCreateForm.sortOrder} />
+                      </Field>
+                      <Field label='公開状態'>
+                        <ActivationSelect isActive={claimRuleCreateForm.isActive} onChange={(isActive) => setClaimRuleCreateForm((current) => ({ ...current, isActive }))} />
+                      </Field>
+                      <Field label='重要度'>
+                        <Select blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, severity: event.target.value as FacilityClaimRule['severity'] }))} value={claimRuleCreateForm.severity}>
+                          <option value='info'>info</option>
+                          <option value='warning'>warning</option>
+                          <option value='error'>error</option>
+                        </Select>
+                      </Field>
+                      <Field label='分類'>
+                        <Input blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, category: event.target.value }))} value={claimRuleCreateForm.category} />
+                      </Field>
+                      <Field label='対象カテゴリ'>
+                        <Input blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, targetCategory: event.target.value }))} value={claimRuleCreateForm.targetCategory} />
+                      </Field>
+                      <Field label='rule_type'>
+                        <Select blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, ruleType: event.target.value }))} value={claimRuleCreateForm.ruleType}>
+                          <option value='requires_admission_dates'>requires_admission_dates</option>
+                          <option value='requires_done_instruction'>requires_done_instruction</option>
+                          <option value='requires_prescription'>requires_prescription</option>
+                          <option value='requires_lab_order'>requires_lab_order</option>
+                          <option value='requires_receipt_code'>requires_receipt_code</option>
+                        </Select>
+                      </Field>
+                      <Field label='根拠ヒント'>
+                        <Input blockSize='md' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, evidenceHint: event.target.value }))} value={claimRuleCreateForm.evidenceHint} />
+                      </Field>
+                    </div>
+                    <div className='mt-4'>
+                      <Field label='警告メッセージ'>
+                        <Textarea className='w-full' onChange={(event) => setClaimRuleCreateForm((current) => ({ ...current, message: event.target.value }))} rows={3} value={claimRuleCreateForm.message} />
+                      </Field>
+                    </div>
+                    <div className='mt-4 flex justify-end'>
+                      <Button aria-disabled={isMutating} onClick={handleCreateClaimRule} size='md' type='button' variant='solid-fill'>
+                        算定ルールを追加
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
+                    <SectionHeader chip={selectedClaimRule?.id ?? '未選択'} title='算定ルールを更新' tone='purple' description='施設別チェックの有効化、対象カテゴリ、重要度を更新します。' />
+                    {selectedClaimRule && claimRuleEditForm ? (
+                      <>
+                        <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                          <Field label='表示順'>
+                            <Input blockSize='md' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, sortOrder: event.target.value } : current)} type='number' value={claimRuleEditForm.sortOrder} />
+                          </Field>
+                          <Field label='公開状態'>
+                            <ActivationSelect isActive={claimRuleEditForm.isActive} onChange={(isActive) => setClaimRuleEditForm((current) => current ? { ...current, isActive } : current)} />
+                          </Field>
+                          <Field label='重要度'>
+                            <Select blockSize='md' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, severity: event.target.value as FacilityClaimRule['severity'] } : current)} value={claimRuleEditForm.severity}>
+                              <option value='info'>info</option>
+                              <option value='warning'>warning</option>
+                              <option value='error'>error</option>
+                            </Select>
+                          </Field>
+                          <Field label='分類'>
+                            <Input blockSize='md' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, category: event.target.value } : current)} value={claimRuleEditForm.category} />
+                          </Field>
+                          <Field label='対象カテゴリ'>
+                            <Input blockSize='md' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, targetCategory: event.target.value } : current)} value={claimRuleEditForm.targetCategory} />
+                          </Field>
+                          <Field label='rule_type'>
+                            <Input blockSize='md' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, ruleType: event.target.value } : current)} value={claimRuleEditForm.ruleType} />
+                          </Field>
+                          <Field label='根拠ヒント'>
+                            <Input blockSize='md' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, evidenceHint: event.target.value } : current)} value={claimRuleEditForm.evidenceHint} />
+                          </Field>
+                        </div>
+                        <div className='mt-4'>
+                          <Field label='警告メッセージ'>
+                            <Textarea className='w-full' onChange={(event) => setClaimRuleEditForm((current) => current ? { ...current, message: event.target.value } : current)} rows={3} value={claimRuleEditForm.message} />
+                          </Field>
+                        </div>
+                        <div className='mt-4 flex justify-end'>
+                          <Button aria-disabled={isMutating} onClick={handleUpdateClaimRule} size='md' type='button' variant='outline'>
+                            算定ルールを更新
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <EmptyState text='更新対象の算定ルールを選択してください。' />
+                    )}
+                  </section>
+
+                  <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
+                    <SectionHeader chip={orcaSetting?.mode ?? 'mock'} title='ORCA adapter 設定' tone='yellow' description='実接続情報が決まるまでは mock mode で送信履歴だけ保存します。' />
+                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                      <Field label='接続モード'>
+                        <Select blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, mode: event.target.value as OrcaAdapterSetting['mode'] }))} value={orcaSettingForm.mode}>
+                          <option value='mock'>mock</option>
+                          <option value='http'>http</option>
+                        </Select>
+                      </Field>
+                      <Field label='有効状態'>
+                        <ActivationSelect isActive={orcaSettingForm.isActive} onChange={(isActive) => setOrcaSettingForm((current) => ({ ...current, isActive }))} />
+                      </Field>
+                      <Field label='base_url'>
+                        <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, baseUrl: event.target.value }))} placeholder='https://orca.example.jp' value={orcaSettingForm.baseUrl} />
+                      </Field>
+                      <Field label='claim_endpoint'>
+                        <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, claimEndpoint: event.target.value }))} value={orcaSettingForm.claimEndpoint} />
+                      </Field>
+                      <Field label='auth_type'>
+                        <Select blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, authType: event.target.value as OrcaAdapterSetting['authType'] }))} value={orcaSettingForm.authType}>
+                          <option value='none'>none</option>
+                          <option value='basic'>basic</option>
+                          <option value='client'>client</option>
+                        </Select>
+                      </Field>
+                      <Field label='client_id'>
+                        <Input blockSize='md' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, clientId: event.target.value }))} value={orcaSettingForm.clientId} />
+                      </Field>
+                    </div>
+                    <div className='mt-4'>
+                      <Field label='運用メモ'>
+                        <Textarea className='w-full' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, note: event.target.value }))} rows={3} value={orcaSettingForm.note} />
+                      </Field>
+                    </div>
+                    <div className='mt-4 flex justify-end'>
+                      <Button aria-disabled={isMutating} onClick={handleUpdateOrcaSetting} size='md' type='button' variant='outline'>
+                        ORCA設定を更新
+                      </Button>
+                    </div>
                   </section>
                 </>
               ) : null}

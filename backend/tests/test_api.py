@@ -13,6 +13,7 @@ from app.models import (
     ClaimDraft,
     DiagnosisAliasMaster,
     DiagnosisMaster,
+    FacilityClaimRule,
     InpatientDocument,
     InpatientAiSummaryReview,
     InpatientDischargePlan,
@@ -533,6 +534,8 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert draft["status"] == "draft"
     assert draft["admission_id"] == admission_id
     assert draft["billing_candidates"]
+    assert draft["lines"]
+    assert {"line_type", "source_type", "label", "points", "quantity"} <= set(draft["lines"][0])
     assert isinstance(draft["total_points"], int)
     assert "issues" in draft
     assert get_response.status_code == 200
@@ -549,6 +552,80 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             if persisted is not None:
                 db.delete(persisted)
                 db.commit()
+
+
+def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
+    rule_id = f"test-rule-{uuid4().hex[:6]}"
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            admin_token = login(client, "admin.sato", "manta-admin")
+            forbidden_response = client.get(
+                "/api/admin/claim-rules",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+            create_response = client.post(
+                "/api/admin/claim-rules",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "id": rule_id,
+                    "sort_order": 999,
+                    "is_active": True,
+                    "category": "検査",
+                    "target_category": "検査",
+                    "rule_type": "requires_lab_order",
+                    "severity": "warning",
+                    "message": "テスト算定ルール",
+                    "evidence_hint": "test evidence",
+                },
+            )
+            update_response = client.patch(
+                f"/api/admin/claim-rules/{rule_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "sort_order": 998,
+                    "is_active": False,
+                    "category": "投薬",
+                    "target_category": "投薬",
+                    "rule_type": "requires_prescription",
+                    "severity": "error",
+                    "message": "テスト算定ルール更新",
+                    "evidence_hint": "updated evidence",
+                },
+            )
+            setting_response = client.put(
+                "/api/admin/orca/settings",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "is_active": False,
+                    "base_url": "https://orca.example.test",
+                    "auth_type": "none",
+                    "username": None,
+                    "client_id": "manta-test",
+                    "claim_endpoint": "/api01rv2/claim",
+                    "mode": "mock",
+                    "note": "test",
+                },
+            )
+            list_response = client.get(
+                "/api/admin/claim-rules",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+    finally:
+        with SessionLocal() as db:
+            rule = db.get(FacilityClaimRule, rule_id)
+            if rule is not None:
+                db.delete(rule)
+                db.commit()
+
+    assert forbidden_response.status_code == 403
+    assert create_response.status_code == 201
+    assert update_response.status_code == 200
+    assert update_response.json()["is_active"] is False
+    assert update_response.json()["severity"] == "error"
+    assert setting_response.status_code == 200
+    assert setting_response.json()["base_url"] == "https://orca.example.test"
+    assert any(item["id"] == rule_id for item in list_response.json())
 
 
 def test_reject_patients_without_token() -> None:
