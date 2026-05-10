@@ -357,6 +357,19 @@ export type ClaimReviewIssue = {
   createdAt: string;
 };
 
+export type ClaimTransmission = {
+  id: number;
+  claimDraftId: number;
+  adapter: string;
+  status: 'accepted' | 'rejected' | 'error';
+  requestPayload: Record<string, unknown>;
+  responsePayload: Record<string, unknown>;
+  errorMessage?: string;
+  sentBy: string;
+  sentAt: string;
+  createdAt: string;
+};
+
 export type ClaimDraft = {
   id: number;
   patientId: string;
@@ -369,6 +382,7 @@ export type ClaimDraft = {
   createdAt: string;
   updatedAt: string;
   issues: ClaimReviewIssue[];
+  transmissions: ClaimTransmission[];
 };
 
 export type ChartVersion = {

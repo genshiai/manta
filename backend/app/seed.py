@@ -15,6 +15,7 @@ from .models import (
     ChartTemplateMaster,
     Condition,
     DiagnosisMaster,
+    FacilityClaimRule,
     InpatientInstruction,
     InpatientPathwayMaster,
     InpatientPathwayTaskMaster,
@@ -475,6 +476,53 @@ RECEIPT_MEDICAL_PRACTICE_MASTER_DATA = [
         "effective_from": "20260401",
         "effective_to": None,
         "source_file": "demo",
+    },
+]
+
+FACILITY_CLAIM_RULE_DATA = [
+    {
+        "id": "inpatient-basic-requires-admission-dates",
+        "sort_order": 10,
+        "is_active": True,
+        "category": "入院",
+        "target_category": "入院基本料",
+        "rule_type": "requires_admission_dates",
+        "severity": "error",
+        "message": "入院基本料は入院日と退院日または請求基準日の確認が必要です。",
+        "evidence_hint": "admissions.admitted_at / admissions.discharged_at",
+    },
+    {
+        "id": "discharge-support-requires-done-instruction",
+        "sort_order": 20,
+        "is_active": True,
+        "category": "退院",
+        "target_category": "退院支援",
+        "rule_type": "requires_done_instruction",
+        "severity": "warning",
+        "message": "退院支援の算定前に退院指導または退院調整の実施済み指示を確認してください。",
+        "evidence_hint": "inpatient_instructions.status=done",
+    },
+    {
+        "id": "prescription-requires-prescription-order",
+        "sort_order": 30,
+        "is_active": True,
+        "category": "投薬",
+        "target_category": "投薬",
+        "rule_type": "requires_prescription",
+        "severity": "error",
+        "message": "投薬候補には処方実績が必要です。",
+        "evidence_hint": "prescription_orders",
+    },
+    {
+        "id": "lab-requires-lab-order",
+        "sort_order": 40,
+        "is_active": True,
+        "category": "検査",
+        "target_category": "検査",
+        "rule_type": "requires_lab_order",
+        "severity": "error",
+        "message": "検査候補には検査オーダまたは検査結果の確認が必要です。",
+        "evidence_hint": "lab_orders / observations",
     },
 ]
 
@@ -1580,6 +1628,21 @@ def sync_receipt_medical_practice_masters(db: Session) -> bool:
     return updated
 
 
+def sync_facility_claim_rules(db: Session) -> bool:
+    updated = False
+    for item in FACILITY_CLAIM_RULE_DATA:
+        existing = db.get(FacilityClaimRule, item["id"])
+        if existing is None:
+            db.add(FacilityClaimRule(**item))
+            updated = True
+            continue
+        for key, value in item.items():
+            if getattr(existing, key) != value:
+                setattr(existing, key, value)
+                updated = True
+    return updated
+
+
 def backfill_demo_prescription_history(db: Session) -> bool:
     updated = False
 
@@ -2018,6 +2081,9 @@ def seed_demo_data(db: Session) -> None:
         if sync_receipt_medical_practice_masters(db):
             updated = True
 
+        if sync_facility_claim_rules(db):
+            updated = True
+
         if sync_diagnosis_masters(db):
             updated = True
 
@@ -2054,6 +2120,7 @@ def seed_demo_data(db: Session) -> None:
     sync_chart_order_masters(db)
     sync_inpatient_pathway_masters(db)
     sync_receipt_medical_practice_masters(db)
+    sync_facility_claim_rules(db)
     sync_diagnosis_masters(db)
 
     patients = [

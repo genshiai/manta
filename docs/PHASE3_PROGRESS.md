@@ -38,6 +38,8 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `inpatient_ai_summary_reviews`: Mock AI 要約案の採用/差し戻し履歴
 - `inpatient_discharge_plans`: 退院計画・会計候補レビュー
 - `claim_drafts` / `claim_review_issues`: 退院会計候補から作る請求前レビュー
+- `facility_claim_rules`: 施設別算定ルール
+- `claim_transmissions`: ORCA/レセコン adapter 送信履歴
 - `GET /api/inpatient/admissions/{admission_id}/events`: 入院イベント履歴
 - `GET/POST /api/inpatient/admissions/{admission_id}/pathway`: クリティカルパス取得・開始
 - `GET /api/inpatient/pathway-masters`: クリティカルパス master 一覧
@@ -46,6 +48,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `GET/PUT /api/inpatient/admissions/{admission_id}/discharge-plan`: 退院時処方メモ・会計候補レビュー
 - `GET/POST /api/inpatient/admissions/{admission_id}/claim-draft`: 入院退院計画から請求ドラフト取得・作成
 - `PATCH /api/claim-drafts/{claim_draft_id}`: 請求ドラフト状態更新
+- `POST /api/claim-drafts/{claim_draft_id}/transmissions/orca`: ORCA adapter 送信試行
 - 病棟ワークスペースで入院診療計画書、退院サマリ、退院時指導文書のドラフト生成、本文確認、署名状態への更新に対応した
 - 病棟ワークスペースで入院経過要約案を表示し、そのまま退院サマリ文書へ保存できるようにした
 - 病棟ワークスペースで標準クリティカルパス開始、日別タスク完了、逸脱記録、入院イベント履歴、要約案の採用/差し戻しを操作できるようにした
@@ -57,6 +60,8 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - 退院会計候補へ診療行為レセ電コード候補、名称、点数、単位を付与し、UIで確認できるようにした
 - 支払基金 医科診療行為マスター importer を追加し、`s_ALL*.zip` / 展開済み CSV から `receipt_medical_practice_masters` に同期できるようにした
 - 退院計画の会計候補から請求ドラフトを作成し、レセ電コード不足、要確認候補、傷病名コード確認を `ClaimReviewIssue` として保存・表示できるようにした
+- 施設別算定ルールを `facility_claim_rules` として seed 同期し、入院基本料、退院支援、投薬、検査の必要記録を請求ドラフト作成時に照合するようにした
+- Mock ORCA adapter を追加し、送信 payload、戻り status、エラー内容を `claim_transmissions` に保存し、病棟ワークスペースから送信試行と結果確認ができるようにした
 
 ## Phase 3 実装範囲
 
@@ -64,7 +69,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
 | 退院許可・退院実施 | backend API 済み | 退院会計の本番レセコン連携 |
-| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft 済み | ORCA/会計連携、施設別算定 rule、診療行為の実施記録厳密照合 |
+| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft + 施設別rule + Mock ORCA adapter 済み | 実ORCA接続、返戻/査定 workflow、施設rule UI |
 | 転棟・転床 | backend API/UI 済み | D&D 操作、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |

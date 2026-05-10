@@ -20,6 +20,7 @@ import {
   listInpatientPathwayMasters,
   listNursingNotes,
   listInpatientSummaryReviews,
+  submitClaimDraftToOrca,
   transferInpatientAdmission,
   updateInpatientBedStatus,
   updateClaimDraftStatus,
@@ -545,6 +546,32 @@ export const WardWorkspace = ({
     }
   };
 
+  const handleSubmitClaimDraftToOrca = async () => {
+    if (!claimDraft || isSavingClaimDraft) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const transmission = await submitClaimDraftToOrca(claimDraft.id);
+      setClaimDraft((current) => current ? {
+        ...current,
+        status: transmission.status === 'accepted' ? 'submitted' : 'error',
+        transmissions: [transmission, ...current.transmissions],
+      } : current);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : 'ORCA送信に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
+    }
+  };
+
   const pendingInstructions = instructions.filter((instruction) => instruction.status === 'pending');
   const progressRows = progress?.rows ?? [];
   const pathwayTaskCounts = pathway?.tasks.reduce(
@@ -993,6 +1020,15 @@ export const WardWorkspace = ({
                               >
                                 請求準備完了
                               </Button>
+                              <Button
+                                disabled={isSavingClaimDraft || claimDraft.status === 'submitted'}
+                                onClick={handleSubmitClaimDraftToOrca}
+                                size='xs'
+                                type='button'
+                                variant='outline'
+                              >
+                                ORCA送信
+                              </Button>
                             </div>
                           ) : (
                             <Button
@@ -1009,8 +1045,18 @@ export const WardWorkspace = ({
                         {claimDraft ? (
                           <div className='mt-3 space-y-2'>
                             <span className={cn('inline-flex rounded-md border px-2 py-1 text-[11px] font-bold', claimDraft.status === 'ready' ? 'border-green-200 bg-green-50 text-green-900' : 'border-yellow-200 bg-yellow-50 text-yellow-1100')}>
-                              {claimDraft.status === 'ready' ? '請求準備完了' : claimDraft.status === 'reviewed' ? 'レビュー済' : '下書き'}
+                              {claimDraft.status === 'submitted' ? '送信済' : claimDraft.status === 'error' ? '送信エラー' : claimDraft.status === 'ready' ? '請求準備完了' : claimDraft.status === 'reviewed' ? 'レビュー済' : '下書き'}
                             </span>
+                            {claimDraft.transmissions[0] ? (
+                              <div className='rounded border border-blue-100 bg-white px-2 py-1.5'>
+                                <p className='text-[11px] font-bold text-blue-950'>
+                                  {claimDraft.transmissions[0].adapter.toUpperCase()} {claimDraft.transmissions[0].status} · {claimDraft.transmissions[0].sentAt}
+                                </p>
+                                {claimDraft.transmissions[0].errorMessage ? (
+                                  <p className='mt-1 text-[10px] leading-normal text-red-900'>{claimDraft.transmissions[0].errorMessage}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
                             {claimDraft.issues.slice(0, 4).map((issue) => (
                               <div className='rounded border border-blue-100 bg-white px-2 py-1.5' key={issue.id}>
                                 <p className={cn('text-[11px] font-bold', issue.severity === 'error' ? 'text-red-900' : issue.severity === 'warning' ? 'text-yellow-1100' : 'text-blue-900')}>

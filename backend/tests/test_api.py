@@ -525,6 +525,10 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             json={"status": "ready"},
             headers={"Authorization": f"Bearer {token}"},
         )
+        transmit_response = client.post(
+            f"/api/claim-drafts/{draft_id}/transmissions/orca",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
     assert draft["status"] == "draft"
     assert draft["admission_id"] == admission_id
@@ -535,6 +539,9 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert get_response.json()["id"] == draft_id
     assert update_response.status_code == 200
     assert update_response.json()["status"] == "ready"
+    assert transmit_response.status_code == 201
+    assert transmit_response.json()["adapter"] == "orca"
+    assert transmit_response.json()["status"] in {"accepted", "rejected"}
 
     if draft_id is not None:
         with SessionLocal() as db:

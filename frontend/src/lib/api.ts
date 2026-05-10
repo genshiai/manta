@@ -608,6 +608,20 @@ type ApiClaimDraft = {
   created_at: string;
   updated_at: string;
   issues: ApiClaimReviewIssue[];
+  transmissions: ApiClaimTransmission[];
+};
+
+type ApiClaimTransmission = {
+  id: number;
+  claim_draft_id: number;
+  adapter: string;
+  status: 'accepted' | 'rejected' | 'error';
+  request_payload: Record<string, unknown>;
+  response_payload: Record<string, unknown>;
+  error_message: string | null;
+  sent_by: string;
+  sent_at: string;
+  created_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -1248,6 +1262,19 @@ const mapInpatientDischargePlan = (item: ApiInpatientDischargePlan): InpatientDi
   updatedAt: formatTimestamp(item.updated_at),
 });
 
+const mapClaimTransmission = (item: ApiClaimTransmission) => ({
+  id: item.id,
+  claimDraftId: item.claim_draft_id,
+  adapter: item.adapter,
+  status: item.status,
+  requestPayload: item.request_payload,
+  responsePayload: item.response_payload,
+  errorMessage: item.error_message ?? undefined,
+  sentBy: item.sent_by,
+  sentAt: formatTimestamp(item.sent_at),
+  createdAt: formatTimestamp(item.created_at),
+});
+
 const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
   id: item.id,
   patientId: item.patient_id,
@@ -1269,6 +1296,7 @@ const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
     status: issue.status,
     createdAt: formatTimestamp(issue.created_at),
   })),
+  transmissions: item.transmissions.map(mapClaimTransmission),
 });
 
 export const login = async (userId: string, password: string): Promise<UserSession> => {
@@ -1717,6 +1745,13 @@ export const updateClaimDraftStatus = async (
     body: JSON.stringify({ status }),
   });
   return mapClaimDraft(draft);
+};
+
+export const submitClaimDraftToOrca = async (claimDraftId: number): Promise<ClaimDraft['transmissions'][number]> => {
+  const transmission = await request<ApiClaimTransmission>(`/api/claim-drafts/${claimDraftId}/transmissions/orca`, {
+    method: 'POST',
+  });
+  return mapClaimTransmission(transmission);
 };
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {

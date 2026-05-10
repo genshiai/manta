@@ -18,6 +18,7 @@ AiSummaryReviewStatus = Literal["accepted", "rejected"]
 DischargePlanStatus = Literal["draft", "reviewed", "ready"]
 ClaimDraftStatus = Literal["draft", "reviewed", "ready", "submitted", "error"]
 ClaimIssueSeverity = Literal["info", "warning", "error"]
+ClaimTransmissionStatus = Literal["accepted", "rejected", "error"]
 
 
 class DetailItem(BaseModel):
@@ -651,6 +652,21 @@ class ClaimReviewIssueRead(BaseModel):
     created_at: datetime
 
 
+class ClaimTransmissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    claim_draft_id: int
+    adapter: str
+    status: ClaimTransmissionStatus
+    request_payload: dict[str, object]
+    response_payload: dict[str, object]
+    error_message: str | None = None
+    sent_by: str
+    sent_at: datetime
+    created_at: datetime
+
+
 class ClaimDraftRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -665,6 +681,7 @@ class ClaimDraftRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     issues: list[ClaimReviewIssueRead] = []
+    transmissions: list[ClaimTransmissionRead] = []
 
 
 class ClaimDraftUpdateRequest(BaseModel):

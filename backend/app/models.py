@@ -292,6 +292,22 @@ class ReceiptMedicalPracticeMaster(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class FacilityClaimRule(Base):
+    __tablename__ = "facility_claim_rules"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    target_category: Mapped[str] = mapped_column(String(64), index=True)
+    rule_type: Mapped[str] = mapped_column(String(64), index=True)
+    severity: Mapped[str] = mapped_column(String(32), default="warning")
+    message: Mapped[str] = mapped_column(String(255))
+    evidence_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class HotDrugCodeMapping(Base):
     __tablename__ = "hot_drug_code_mappings"
 
@@ -595,6 +611,21 @@ class ClaimReviewIssue(Base):
     message: Mapped[str] = mapped_column(String(255))
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ClaimTransmission(Base):
+    __tablename__ = "claim_transmissions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    claim_draft_id: Mapped[int] = mapped_column(ForeignKey("claim_drafts.id", ondelete="CASCADE"), index=True)
+    adapter: Mapped[str] = mapped_column(String(64), default="orca", index=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    request_payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    response_payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_by: Mapped[str] = mapped_column(String(128))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 

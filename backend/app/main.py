@@ -23,8 +23,10 @@ from .models import (
     ChartNote,
     ClaimDraft,
     ClaimReviewIssue,
+    ClaimTransmission,
     DiagnosisAliasMaster,
     DiagnosisMaster,
+    FacilityClaimRule,
     InpatientDocument,
     InpatientAiSummaryReview,
     InpatientDischargePlan,
@@ -69,6 +71,7 @@ from .schemas import (
     ClaimDraftRead,
     ClaimDraftUpdateRequest,
     ClaimReviewIssueRead,
+    ClaimTransmissionRead,
     ChartOrderMasterRead,
     ChartTemplateCreateRequest,
     ChartTemplateRead,
@@ -1614,9 +1617,14 @@ def _claim_total_points(candidates: list[dict[str, str]], admission: Admission) 
 
 def _build_claim_review_issues(
     *,
+    db: Session,
     claim_draft_id: int,
+    admission: Admission,
     patient: Patient,
     candidates: list[dict[str, str]],
+    prescriptions: list[PrescriptionOrder],
+    instructions: list[InpatientInstruction],
+    lab_orders: list[LabOrder],
 ) -> list[ClaimReviewIssue]:
     issues: list[ClaimReviewIssue] = []
     for candidate in candidates:
@@ -1639,6 +1647,44 @@ def _build_claim_review_issues(
                     severity="warning",
                     message=f"{label} は実施記録・算定条件の確認が必要です。",
                     evidence=candidate.get("evidence"),
+                )
+            )
+
+    done_instructions = [instruction for instruction in instructions if instruction.status == "done"]
+    rules = db.scalars(
+        select(FacilityClaimRule)
+        .where(FacilityClaimRule.is_active == sa_true())
+        .order_by(FacilityClaimRule.sort_order, FacilityClaimRule.id)
+    ).all()
+    for rule in rules:
+        matching_candidates = [candidate for candidate in candidates if candidate.get("category") == rule.target_category]
+        if not matching_candidates:
+            continue
+        evidence = rule.evidence_hint
+        passed = True
+        if rule.rule_type == "requires_admission_dates":
+            passed = admission.admitted_at is not None
+            evidence = f"入院日: {_format_document_date(admission.admitted_at)} / 退院日: {_format_document_date(admission.discharged_at)}"
+        elif rule.rule_type == "requires_done_instruction":
+            passed = bool(done_instructions)
+            evidence = " / ".join(f"{item.category}: {item.title}" for item in done_instructions[:4]) or rule.evidence_hint
+        elif rule.rule_type == "requires_prescription":
+            passed = bool(prescriptions)
+            evidence = " / ".join(f"{item.drug_name} {item.dosage}" for item in prescriptions[:4]) or rule.evidence_hint
+        elif rule.rule_type == "requires_lab_order":
+            passed = bool(lab_orders)
+            evidence = " / ".join(f"{item.category}: {', '.join(item.items[:4])}" for item in lab_orders[:3]) or rule.evidence_hint
+        elif rule.rule_type == "requires_receipt_code":
+            passed = all(candidate.get("receipt_code") for candidate in matching_candidates)
+            evidence = rule.evidence_hint
+        if not passed:
+            issues.append(
+                ClaimReviewIssue(
+                    claim_draft_id=claim_draft_id,
+                    issue_type=f"facility_rule:{rule.id}",
+                    severity=rule.severity,
+                    message=rule.message,
+                    evidence=evidence,
                 )
             )
 
@@ -1672,6 +1718,12 @@ def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
         .where(ClaimReviewIssue.claim_draft_id == draft.id)
         .order_by(ClaimReviewIssue.severity.desc(), ClaimReviewIssue.id)
     ).all()
+    transmissions = db.scalars(
+        select(ClaimTransmission)
+        .where(ClaimTransmission.claim_draft_id == draft.id)
+        .order_by(desc(ClaimTransmission.sent_at), desc(ClaimTransmission.id))
+        .limit(5)
+    ).all()
     return ClaimDraftRead(
         id=draft.id,
         patient_id=draft.patient_id,
@@ -1684,7 +1736,87 @@ def _claim_draft_to_read(db: Session, draft: ClaimDraft) -> ClaimDraftRead:
         created_at=draft.created_at,
         updated_at=draft.updated_at,
         issues=[ClaimReviewIssueRead.model_validate(issue) for issue in issues],
+        transmissions=[ClaimTransmissionRead.model_validate(item) for item in transmissions],
     )
+
+
+def _build_orca_claim_payload(draft: ClaimDraft, patient: Patient) -> dict[str, object]:
+    return {
+        "adapter": "orca",
+        "mode": "mock",
+        "patient": {
+            "id": patient.id,
+            "name": patient.name,
+            "department": patient.department,
+        },
+        "claim": {
+            "draft_id": draft.id,
+            "admission_id": draft.admission_id,
+            "total_points": draft.total_points,
+            "items": [
+                {
+                    "category": candidate.get("category", ""),
+                    "label": candidate.get("label", ""),
+                    "receipt_code": candidate.get("receipt_code", ""),
+                    "receipt_name": candidate.get("receipt_name", ""),
+                    "points": candidate.get("receipt_points", ""),
+                    "unit": candidate.get("receipt_unit", ""),
+                    "evidence": candidate.get("evidence", ""),
+                }
+                for candidate in draft.billing_candidates
+            ],
+        },
+    }
+
+
+def _mock_submit_orca_claim(
+    db: Session,
+    *,
+    draft: ClaimDraft,
+    patient: Patient,
+    current_user: User,
+) -> ClaimTransmission:
+    open_errors = db.scalars(
+        select(ClaimReviewIssue).where(
+            ClaimReviewIssue.claim_draft_id == draft.id,
+            ClaimReviewIssue.status == "open",
+            ClaimReviewIssue.severity == "error",
+        )
+    ).all()
+    payload = _build_orca_claim_payload(draft, patient)
+    if open_errors:
+        response_payload: dict[str, object] = {
+            "accepted": False,
+            "adapter": "orca",
+            "messages": [issue.message for issue in open_errors],
+        }
+        transmission = ClaimTransmission(
+            claim_draft_id=draft.id,
+            adapter="orca",
+            status="rejected",
+            request_payload=payload,
+            response_payload=response_payload,
+            error_message="未解決のerror issueがあるため送信できません。",
+            sent_by=current_user.display_name,
+        )
+        draft.status = "error"
+        return transmission
+    response_payload = {
+        "accepted": True,
+        "adapter": "orca",
+        "receipt_control_number": f"MOCK-{draft.id:08d}",
+        "messages": ["mock adapter accepted"],
+    }
+    transmission = ClaimTransmission(
+        claim_draft_id=draft.id,
+        adapter="orca",
+        status="accepted",
+        request_payload=payload,
+        response_payload=response_payload,
+        sent_by=current_user.display_name,
+    )
+    draft.status = "submitted"
+    return transmission
 
 
 def get_chart_order_masters_read(
@@ -2985,25 +3117,30 @@ def create_inpatient_claim_draft(
         .where(InpatientDischargePlan.admission_id == admission_id)
         .order_by(desc(InpatientDischargePlan.updated_at), desc(InpatientDischargePlan.id))
     )
+    prescriptions = db.scalars(
+        select(PrescriptionOrder)
+        .where(PrescriptionOrder.patient_id == admission.patient_id)
+        .order_by(desc(PrescriptionOrder.created_at))
+        .limit(20)
+    ).all()
+    instructions = db.scalars(
+        select(InpatientInstruction)
+        .where(InpatientInstruction.admission_id == admission_id)
+        .order_by(desc(InpatientInstruction.created_at))
+    ).all()
+    lab_orders = db.scalars(
+        select(LabOrder)
+        .where(LabOrder.patient_id == admission.patient_id)
+        .order_by(desc(LabOrder.created_at))
+        .limit(10)
+    ).all()
     if plan is None:
         _, candidates, _ = build_discharge_plan_defaults(
             db,
             admission=admission,
-            prescriptions=db.scalars(
-                select(PrescriptionOrder)
-                .where(PrescriptionOrder.patient_id == admission.patient_id)
-                .order_by(desc(PrescriptionOrder.created_at))
-                .limit(20)
-            ).all(),
-            instructions=db.scalars(
-                select(InpatientInstruction).where(InpatientInstruction.admission_id == admission_id)
-            ).all(),
-            lab_orders=db.scalars(
-                select(LabOrder)
-                .where(LabOrder.patient_id == admission.patient_id)
-                .order_by(desc(LabOrder.created_at))
-                .limit(10)
-            ).all(),
+            prescriptions=prescriptions,
+            instructions=instructions,
+            lab_orders=lab_orders,
         )
     else:
         candidates = plan.billing_candidates
@@ -3018,7 +3155,16 @@ def create_inpatient_claim_draft(
     )
     db.add(draft)
     db.flush()
-    for issue in _build_claim_review_issues(claim_draft_id=draft.id, patient=patient, candidates=candidates):
+    for issue in _build_claim_review_issues(
+        db=db,
+        claim_draft_id=draft.id,
+        admission=admission,
+        patient=patient,
+        candidates=candidates,
+        prescriptions=prescriptions,
+        instructions=instructions,
+        lab_orders=lab_orders,
+    ):
         db.add(issue)
     add_inpatient_event(
         db,
@@ -3074,6 +3220,41 @@ def update_claim_draft(
     db.commit()
     db.refresh(draft)
     return _claim_draft_to_read(db, draft)
+
+
+@app.post("/api/claim-drafts/{claim_draft_id}/transmissions/orca", response_model=ClaimTransmissionRead, status_code=status.HTTP_201_CREATED)
+def submit_claim_draft_to_orca(
+    claim_draft_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimTransmissionRead:
+    draft = db.get(ClaimDraft, claim_draft_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft not found")
+    patient = get_patient_or_404(db, draft.patient_id)
+    transmission = _mock_submit_orca_claim(db, draft=draft, patient=patient, current_user=current_user)
+    db.add(transmission)
+    draft.updated_at = utcnow()
+    if draft.admission_id is not None:
+        add_inpatient_event(
+            db,
+            admission_id=draft.admission_id,
+            event_type="claim_orca_transmission",
+            title="ORCA送信試行",
+            detail=f"adapter=orca / status={transmission.status}",
+            actor=current_user.display_name,
+        )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="ORCA送信試行",
+        scope="billing",
+        detail=f"請求ドラフト {draft.id} を ORCA adapter に送信しました。status={transmission.status}",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(transmission)
+    return transmission
 
 
 @app.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])
