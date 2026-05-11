@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from typing import Protocol
+
 from sqlalchemy.orm import Session
 
-from ...models import AuditLog, Patient
+from .models import AuditLog
+
+
+class _PatientRef(Protocol):
+    id: str
+    name: str
 
 
 def log_audit(
@@ -12,7 +19,7 @@ def log_audit(
     action: str,
     scope: str,
     detail: str,
-    patient: Patient | None = None,
+    patient: _PatientRef | None = None,
 ) -> None:
     db.add(
         AuditLog(

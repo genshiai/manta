@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi.testclient import TestClient
 
 from app.db import SessionLocal
-from app.fhir.mappers.appointment import orm_to_fhir
+from app.modules.gateway.fhir.mappers.appointment import orm_to_fhir
 from app.main import app
 from app.models import Reservation
 

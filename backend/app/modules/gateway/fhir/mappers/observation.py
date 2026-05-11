@@ -18,7 +18,7 @@ from fhir.resources.R4B.observation import Observation as FhirObservation
 from fhir.resources.R4B.quantity import Quantity
 from fhir.resources.R4B.reference import Reference
 
-from app.fhir.loinc import LOINC_SYSTEM, UCUM_SYSTEM
+from app.modules.gateway.fhir.loinc import LOINC_SYSTEM, UCUM_SYSTEM
 from app.models import Observation as ObservationRow
 
 

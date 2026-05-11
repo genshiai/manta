@@ -4,16 +4,11 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ....models import (
-    ClaimDraft,
-    ClaimDraftLine,
-    ClaimReviewIssue,
-    ClaimTransmission,
-    OrcaAdapterSetting,
-    Patient,
-    User,
-)
-from ....schemas import OrcaAdapterSettingRead, OrcaConnectionTestRead
+from ...auth.models import User
+from ...karte.models import Patient
+from ...rececon.models import ClaimDraft, ClaimDraftLine, ClaimReviewIssue, ClaimTransmission
+from .models import OrcaAdapterSetting
+from .schemas import OrcaAdapterSettingRead, OrcaConnectionTestRead
 
 
 def orca_setting_to_read(setting: OrcaAdapterSetting) -> OrcaAdapterSettingRead:

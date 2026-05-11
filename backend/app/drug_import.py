@@ -11,7 +11,7 @@ from typing import Iterable, Literal
 
 from sqlalchemy.orm import Session
 
-from .models import PrescriptionCatalogMaster
+from .modules.master_data.models import PrescriptionCatalogMaster
 
 DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
 PMDA_BASE_URL = "https://www.pmda.go.jp/PmdaSearch/rdSearch/02"

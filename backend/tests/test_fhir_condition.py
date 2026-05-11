@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db import SessionLocal
-from app.fhir.mappers.condition import (
+from app.modules.gateway.fhir.mappers.condition import (
     ICD10_SYSTEM,
     MEDIS_MANAGEMENT_SYSTEM,
     apply_fhir_to_orm,

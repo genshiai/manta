@@ -58,45 +58,45 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.fhir.capability_statement import build_capability_statement
-from app.fhir.mappers.appointment import (
+from app.modules.gateway.fhir.capability_statement import build_capability_statement
+from app.modules.gateway.fhir.mappers.appointment import (
     apply_fhir_to_orm as apply_fhir_to_appointment,
     fhir_to_orm_create as fhir_to_appointment_create,
     orm_to_fhir as appointment_to_fhir,
 )
-from app.fhir.mappers.condition import (
+from app.modules.gateway.fhir.mappers.condition import (
     apply_fhir_to_orm as apply_fhir_to_condition,
     fhir_to_orm_create as fhir_to_condition_create,
     orm_to_fhir as condition_to_fhir,
 )
-from app.fhir.mappers.composition import orm_to_fhir as composition_to_fhir
-from app.fhir.mappers.diagnostic_report import (
+from app.modules.gateway.fhir.mappers.composition import orm_to_fhir as composition_to_fhir
+from app.modules.gateway.fhir.mappers.diagnostic_report import (
     LAB_REPORT_CODE,
     build_diagnostic_report,
     diagnostic_report_id,
     group_lab_results_by_report_date,
 )
-from app.fhir.mappers.encounter import patient_encounters_to_fhir
-from app.fhir.mappers.observation import (
+from app.modules.gateway.fhir.mappers.encounter import patient_encounters_to_fhir
+from app.modules.gateway.fhir.mappers.observation import (
     apply_fhir_to_orm as apply_fhir_to_observation,
     fhir_to_orm_create as fhir_to_observation_create,
     orm_to_fhir as observation_to_fhir,
 )
-from app.fhir.mappers.medication_request import (
+from app.modules.gateway.fhir.mappers.medication_request import (
     apply_fhir_to_orm as apply_fhir_to_medication_request,
     fhir_to_orm_create as fhir_to_medication_request_create,
     orm_to_fhir as medication_request_to_fhir,
 )
-from app.fhir.mappers.patient import (
+from app.modules.gateway.fhir.mappers.patient import (
     apply_fhir_to_orm,
     fhir_to_orm_create,
     orm_to_fhir,
 )
-from app.fhir.mappers.service_request import (
+from app.modules.gateway.fhir.mappers.service_request import (
     lab_order_to_fhir,
     patient_json_orders_to_fhir,
 )
-from app.fhir.validators.jp_core import (
+from app.modules.gateway.fhir.validators.jp_core import (
     FhirValidationError,
     validate_jp_appointment,
     validate_jp_condition,

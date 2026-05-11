@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import get_db
-from .models import User
+from .modules.auth.models import User
 
 password_hash = PasswordHasher()
 bearer_scheme = HTTPBearer(auto_error=False)

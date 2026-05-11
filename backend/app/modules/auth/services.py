@@ -5,8 +5,8 @@ from datetime import datetime
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ...models import User
-from ...schemas import UserSessionRead, UserSummaryRead
+from .models import User
+from .schemas import UserSessionRead, UserSummaryRead
 
 
 def user_to_session(user: User, *, logged_in_at: datetime) -> UserSessionRead:

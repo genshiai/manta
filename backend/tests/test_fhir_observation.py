@@ -18,8 +18,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db import SessionLocal
-from app.fhir.loinc import LOINC_SYSTEM
-from app.fhir.mappers.observation import (
+from app.modules.gateway.fhir.loinc import LOINC_SYSTEM
+from app.modules.gateway.fhir.mappers.observation import (
     apply_fhir_to_orm,
     fhir_to_orm_create,
     orm_to_fhir,

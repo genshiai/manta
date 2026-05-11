@@ -7,10 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .db import SessionLocal
-from .fhir.router import router as fhir_router
 from .migrations import run_migrations
 from .modules.admin.router import router as admin_router
 from .modules.auth.router import router as auth_router
+from .modules.gateway.fhir.router import router as fhir_router
+from .modules.gateway.orca.router import router as orca_router
 from .modules.inpatient.router import router as inpatient_router
 from .modules.karte.router import router as karte_router
 from .modules.master_data.router import router as master_data_router
@@ -42,6 +43,7 @@ app.include_router(master_data_router)
 app.include_router(karte_router)
 app.include_router(inpatient_router)
 app.include_router(rececon_router)
+app.include_router(orca_router)
 app.include_router(admin_router)
 
 

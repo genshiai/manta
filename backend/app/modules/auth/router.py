@@ -6,8 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...db import get_db
-from ...models import User
-from ...schemas import AuthTokenRead, LoginRequest, UserSessionRead
 from ...security import (
     AuthenticatedContext,
     create_access_token,
@@ -18,6 +16,8 @@ from ...security import (
 )
 from ..common.audit import log_audit
 from ..common.time import utcnow
+from .models import User
+from .schemas import AuthTokenRead, LoginRequest, UserSessionRead
 from .services import user_to_session
 
 

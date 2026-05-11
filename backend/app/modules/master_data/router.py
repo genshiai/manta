@@ -5,9 +5,10 @@ from sqlalchemy import case, or_, select
 from sqlalchemy.orm import Session
 
 from ...db import get_db
-from ...models import DiagnosisAliasMaster, DiagnosisMaster, User
-from ...schemas import ChartOrderMasterRead, DiagnosisMasterRead
 from ...security import get_current_user
+from ..auth.models import User
+from .models import DiagnosisAliasMaster, DiagnosisMaster
+from .schemas import ChartOrderMasterRead, DiagnosisMasterRead
 from .services import (
     get_chart_order_masters_read,
     normalize_diagnosis_search_query,

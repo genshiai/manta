@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.db import SessionLocal
-from app.fhir.mappers.medication_request import (
+from app.modules.gateway.fhir.mappers.medication_request import (
     HOT13_SYSTEM,
     YJ_SYSTEM,
     orm_to_fhir,

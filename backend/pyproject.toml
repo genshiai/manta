@@ -19,8 +19,43 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "import-linter>=2.0,<3.0",
   "pytest>=8.4.2,<9.0.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+name = "Module layers"
+type = "layers"
+layers = [
+  "app.modules.admin",
+  "app.modules.gateway",
+  "app.modules.rececon",
+  "app.modules.inpatient",
+  "app.modules.karte : app.modules.master_data",
+  "app.modules.auth",
+  "app.modules.common",
+]
+
+[[tool.importlinter.contracts]]
+name = "Modules do not import from main"
+type = "forbidden"
+source_modules = [
+  "app.modules.admin",
+  "app.modules.auth",
+  "app.modules.common",
+  "app.modules.gateway",
+  "app.modules.inpatient",
+  "app.modules.karte",
+  "app.modules.master_data",
+  "app.modules.rececon",
+]
+forbidden_modules = [
+  "app.main",
+]

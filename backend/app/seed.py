@@ -1834,7 +1834,7 @@ def backfill_observations_from_patient_json(db: Session) -> bool:
     """
     from uuid import uuid4
 
-    from .fhir.loinc import (
+    from .modules.gateway.fhir.loinc import (
         INTERPRETATION_MAP,
         LOINC_SYSTEM,
         UCUM_SYSTEM,

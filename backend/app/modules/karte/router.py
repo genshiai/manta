@@ -7,18 +7,15 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from ...db import get_db
-from ...models import (
-    AuditLog,
-    ChartNote,
-    LabOrder,
-    Observation,
-    Patient,
-    PrescriptionCatalogMaster,
-    PrescriptionOrder,
-    Reservation,
-    User,
-)
-from ...schemas import (
+from ...security import get_current_user
+from ..auth.models import User
+from ..common.audit import log_audit
+from ..common.models import AuditLog
+from ..common.time import TOKYO_TZ
+from ..master_data.models import PrescriptionCatalogMaster
+from ..master_data.services import get_reservation_slot_master_or_404
+from .models import ChartNote, LabOrder, Observation, Patient, PrescriptionOrder, Reservation
+from .schemas import (
     ChartSaveRequest,
     ChartWorkspaceRead,
     ImagingOrderCreateRequest,
@@ -43,10 +40,6 @@ from ...schemas import (
     ReservationRead,
     ReservationUpsertRequest,
 )
-from ...security import get_current_user
-from ..common.audit import log_audit
-from ..common.time import TOKYO_TZ
-from ..master_data.services import get_reservation_slot_master_or_404
 from .services import (
     build_lab_long_trends,
     build_prescription_copy_preview,

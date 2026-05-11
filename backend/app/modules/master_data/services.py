@@ -6,16 +6,16 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from ...models import (
+from ..karte.models import Reservation
+from .models import (
     ChartTemplateMaster,
     LabSetMaster,
     PrescriptionCatalogMaster,
     PrescriptionSetMaster,
-    Reservation,
     ReservationSlotMaster,
     StandardUsageMaster,
 )
-from ...schemas import (
+from .schemas import (
     ChartOrderMasterRead,
     ChartTemplateRead,
     LabSetOptionRead,

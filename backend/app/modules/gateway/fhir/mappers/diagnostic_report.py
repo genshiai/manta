@@ -9,7 +9,7 @@ from fhir.resources.R4B.diagnosticreport import DiagnosticReport
 from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.reference import Reference
 
-from app.fhir.loinc import LOINC_SYSTEM
+from app.modules.gateway.fhir.loinc import LOINC_SYSTEM
 from app.models import Patient
 
 

@@ -1,1155 +1,266 @@
+"""Back-compat re-export shim.
+
+Pydantic schemas live in `app.modules.<domain>.schemas`. This module re-exports
+them so existing imports (`from app.schemas import X`) continue to work.
+New code should import directly from the module that owns the schema.
+"""
+
 from __future__ import annotations
 
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Literal
-
-from pydantic import BaseModel, ConfigDict
-
-UserRole = Literal["医師", "管理者"]
-DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
-AdmissionStatus = Literal["planned", "active", "discharge_permitted", "discharged", "cancelled"]
-BedStatus = Literal["available", "occupied", "cleaning", "blocked"]
-InstructionStatus = Literal["pending", "done", "cancelled"]
-InpatientDocumentStatus = Literal["draft", "signed", "archived"]
-InpatientDocumentType = Literal["admission_care_plan", "discharge_summary", "discharge_instruction"]
-PathwayTaskStatus = Literal["pending", "done", "variance", "skipped"]
-AiSummaryReviewStatus = Literal["accepted", "rejected"]
-DischargePlanStatus = Literal["draft", "reviewed", "ready"]
-ClaimDraftStatus = Literal["draft", "reviewed", "ready", "submitted", "error"]
-ClaimIssueSeverity = Literal["info", "warning", "error"]
-ClaimTransmissionStatus = Literal["accepted", "rejected", "error"]
-
-
-class DetailItem(BaseModel):
-    label: str
-    value: str
-
-
-class AlertItem(BaseModel):
-    label: str
-    color: str
-
-
-class PatientProfileItem(BaseModel):
-    label: str
-    value: str
-
-
-class ProblemItem(BaseModel):
-    name: str
-    since: str
-    status: Literal["active", "resolved"]
-    management_number: str | None = None
-    icd10_code: str | None = None
-    diagnosis_type: Literal["principal", "secondary"] | None = None
-
-
-class VisitHistoryItem(BaseModel):
-    date: str
-    department: str
-    summary: str
-    active: bool = False
-
-
-class VitalItem(BaseModel):
-    label: str
-    value: str
-    unit: str
-
-
-class LabTrendPoint(BaseModel):
-    date: str
-    value: str
-    flag: Literal["high", "normal"] = "normal"
-
-
-class LabResultItem(BaseModel):
-    item: str
-    result: str
-    baseline: str
-    previous: str
-    flag: Literal["high", "normal"]
-    reported_at: str | None = None
-    history: list[LabTrendPoint] = []
-
-
-class LabLongTrendPoint(BaseModel):
-    date: str
-    value: str
-    numeric_value: float | None = None
-    unit: str | None = None
-    flag: Literal["high", "normal"] = "normal"
-    observation_id: str
-
-
-class LabLongTrendItem(BaseModel):
-    item: str
-    code: str | None = None
-    display: str | None = None
-    baseline: str | None = None
-    latest_value: str | None = None
-    previous_value: str | None = None
-    latest_date: str | None = None
-    delta: float | None = None
-    delta_label: str = "比較不可"
-    abnormal_count: int = 0
-    point_count: int
-    points: list[LabLongTrendPoint]
-
-
-class ChartHistoryItem(BaseModel):
-    date: str
-    department: str
-    title: str
-    summary: str
-
-
-class ImagingOrderItem(BaseModel):
-    category: str
-    status: Literal["scheduled", "draft"]
-    scheduled_at: str
-    note: str
-
-
-class ImagingOrderCreateRequest(BaseModel):
-    category: str
-    status: Literal["scheduled", "draft"]
-    scheduled_at: str
-    note: str
-    actor: str
-
-
-class ProcedureOrderItem(BaseModel):
-    title: str
-    status: Literal["planned", "done"]
-    note: str
-
-
-class ProcedureOrderCreateRequest(BaseModel):
-    title: str
-    status: Literal["planned", "done"]
-    note: str
-    actor: str
-
-
-class PrescriptionCatalogItemRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    drug_name: str
-    category: DrugCategory
-    dosage_options: list[str]
-    generic_name: str | None = None
-    name_kana: str | None = None
-    aliases: list[str] = []
-    yj_code: str | None = None
-    hot_code: str | None = None
-    dosage_form: str | None = None
-    strength: str | None = None
-    standard_usage_code: str | None = None
-    default_days: str | None = None
-    pmda_info_url: str | None = None
-    allergy_conflict_label: str | None = None
-    related_problem: str | None = None
-    manufacturer: str | None = None
-    drug_price: Decimal | None = None
-    generic_reimbursement_flag: str | None = None
-    brand_flag: str | None = None
-    has_generic: bool | None = None
-    transitional_expiry: str | None = None
-    source_note: str | None = None
-
-
-class PrescriptionCatalogItemCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    drug_name: str
-    category: DrugCategory
-    dosage_options: list[str]
-    generic_name: str | None = None
-    name_kana: str | None = None
-    aliases: list[str] = []
-    yj_code: str | None = None
-    hot_code: str | None = None
-    dosage_form: str | None = None
-    strength: str | None = None
-    standard_usage_code: str | None = None
-    default_days: str | None = None
-    pmda_info_url: str | None = None
-    allergy_conflict_label: str | None = None
-    related_problem: str | None = None
-    manufacturer: str | None = None
-    drug_price: Decimal | None = None
-    generic_reimbursement_flag: str | None = None
-    brand_flag: str | None = None
-    has_generic: bool | None = None
-    transitional_expiry: str | None = None
-    source_note: str | None = None
-
-
-class PrescriptionCatalogItemUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    drug_name: str
-    category: DrugCategory
-    dosage_options: list[str]
-    generic_name: str | None = None
-    name_kana: str | None = None
-    aliases: list[str] = []
-    yj_code: str | None = None
-    hot_code: str | None = None
-    dosage_form: str | None = None
-    strength: str | None = None
-    standard_usage_code: str | None = None
-    default_days: str | None = None
-    pmda_info_url: str | None = None
-    allergy_conflict_label: str | None = None
-    related_problem: str | None = None
-    manufacturer: str | None = None
-    drug_price: Decimal | None = None
-    generic_reimbursement_flag: str | None = None
-    brand_flag: str | None = None
-    has_generic: bool | None = None
-    transitional_expiry: str | None = None
-    source_note: str | None = None
-
-
-class StandardUsageMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    label: str
-    category: DrugCategory
-    instruction: str
-    default_days: str
-    note: str | None = None
-
-
-class StandardUsageMasterCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    label: str
-    category: DrugCategory
-    instruction: str
-    default_days: str
-    note: str | None = None
-
-
-class StandardUsageMasterUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    label: str
-    category: DrugCategory
-    instruction: str
-    default_days: str
-    note: str | None = None
-
-
-class PrescriptionSetMasterItem(BaseModel):
-    drug_id: str
-    dosage: str
-    days: str
-    note: str | None = None
-
-
-class PrescriptionSetMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    label: str
-    department: str
-    related_problem: str | None = None
-    note: str | None = None
-    items: list[PrescriptionSetMasterItem]
-    included_set_ids: list[str] = []
-
-
-class PrescriptionSetMasterCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    label: str
-    department: str
-    related_problem: str | None = None
-    note: str | None = None
-    items: list[PrescriptionSetMasterItem]
-    included_set_ids: list[str] = []
-
-
-class PrescriptionSetMasterUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    label: str
-    department: str
-    related_problem: str | None = None
-    note: str | None = None
-    items: list[PrescriptionSetMasterItem]
-    included_set_ids: list[str] = []
-
-
-class LabSetOptionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    label: str
-    items: list[str]
-    included_set_ids: list[str] = []
-
-
-class LabSetOptionCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    label: str
-    items: list[str]
-    included_set_ids: list[str] = []
-
-
-class LabSetOptionUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    label: str
-    items: list[str]
-    included_set_ids: list[str] = []
-
-
-class ReservationSlotRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    date: str
-    time: str
-    department: str
-    doctor: str
-    state: Literal["available", "few", "full"]
-    capacity: int = 1
-    booked_count: int = 0
-    remaining_count: int = 1
-
-
-class ChartTemplateRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    label: str
-    department: str
-    subjective: str
-    objective: str
-    assessment: str
-    plan: str
-
-
-class ChartTemplateCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    label: str
-    department: str
-    subjective: str
-    objective: str
-    assessment: str
-    plan: str
-
-
-class ChartTemplateUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    label: str
-    department: str
-    subjective: str
-    objective: str
-    assessment: str
-    plan: str
-
-
-class WardMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    name: str
-    floor: str
-    department: str
-    note: str | None = None
-
-
-class BedMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    ward_id: str
-    sort_order: int
-    is_active: bool
-    room_number: str
-    bed_number: str
-    bed_label: str
-    status: BedStatus
-    note: str | None = None
-
-
-class BedBoardItemRead(BaseModel):
-    bed: BedMasterRead
-    ward: WardMasterRead
-    current_admission_id: int | None = None
-    current_patient: PatientSummaryRead | None = None
-    stay_days: int | None = None
-
-
-class BedStatusUpdateRequest(BaseModel):
-    status: BedStatus
-    note: str | None = None
-
-
-class InpatientInstructionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    admission_id: int
-    category: str
-    title: str
-    status: InstructionStatus
-    due_at: datetime | None = None
-    created_by: str
-    created_at: datetime
-
-
-class InpatientInstructionCreateRequest(BaseModel):
-    category: str
-    title: str
-    due_at: datetime | None = None
-
-
-class InpatientInstructionUpdateRequest(BaseModel):
-    status: InstructionStatus
-
-
-class NursingNoteRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    admission_id: int
-    note_type: str
-    focus: str | None = None
-    subjective: str
-    objective: str
-    assessment: str
-    plan: str
-    recorded_by: str
-    recorded_at: datetime
-
-
-class NursingNoteCreateRequest(BaseModel):
-    note_type: str = "SOAP"
-    focus: str | None = None
-    subjective: str = ""
-    objective: str = ""
-    assessment: str = ""
-    plan: str = ""
-
-
-class InpatientDocumentRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    admission_id: int
-    document_type: InpatientDocumentType
-    title: str
-    status: InpatientDocumentStatus
-    body: str
-    created_by: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class InpatientDocumentCreateRequest(BaseModel):
-    document_type: InpatientDocumentType
-    title: str | None = None
-    body: str | None = None
-
-
-class InpatientDocumentUpdateRequest(BaseModel):
-    title: str | None = None
-    body: str | None = None
-    status: InpatientDocumentStatus | None = None
-
-
-class InpatientProgressDateRow(BaseModel):
-    date: str
-    vitals: list[str] = []
-    labs: list[str] = []
-    prescriptions: list[str] = []
-    lab_orders: list[str] = []
-    instructions: list[str] = []
-    nursing_notes: list[str] = []
-
-
-class InpatientProgressRead(BaseModel):
-    admission_id: int
-    patient_id: str
-    rows: list[InpatientProgressDateRow]
-
-
-class InpatientSummaryDraftRead(BaseModel):
-    admission_id: int
-    patient_id: str
-    title: str
-    period_label: str
-    source_counts: dict[str, int]
-    key_events: list[str]
-    body: str
-    generated_at: datetime
-
-
-class InpatientEventRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    admission_id: int
-    event_type: str
-    title: str
-    detail: str | None = None
-    actor: str
-    occurred_at: datetime
-
-
-class InpatientPathwayTaskRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    pathway_assignment_id: int
-    day_offset: int
-    category: str
-    title: str
-    role: str | None = None
-    due_on: date | None = None
-    due_time: str | None = None
-    status: PathwayTaskStatus
-    variance_note: str | None = None
-    updated_by: str | None = None
-    updated_at: datetime
-
-
-class InpatientPathwayRead(BaseModel):
-    id: int
-    admission_id: int
-    pathway_master_id: str | None = None
-    pathway_name: str
-    status: str
-    started_on: date
-    assigned_by: str
-    created_at: datetime
-    updated_at: datetime
-    tasks: list[InpatientPathwayTaskRead]
-
-
-class InpatientPathwayTaskMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    pathway_master_id: str
-    sort_order: int
-    day_offset: int
-    category: str
-    title: str
-    role: str | None = None
-    due_time: str | None = None
-
-
-class InpatientPathwayMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    name: str
-    department: str
-    primary_diagnosis: str | None = None
-    expected_days: int
-    note: str | None = None
-    tasks: list[InpatientPathwayTaskMasterRead] = []
-
-
-class InpatientPathwayCreateRequest(BaseModel):
-    pathway_master_id: str | None = None
-    pathway_name: str = "標準入院パス"
-    started_on: date | None = None
-
-
-class InpatientPathwayTaskUpdateRequest(BaseModel):
-    status: PathwayTaskStatus
-    variance_note: str | None = None
-
-
-class InpatientAiSummaryReviewRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    admission_id: int
-    summary_title: str
-    summary_body: str
-    status: AiSummaryReviewStatus
-    source_counts: dict[str, int]
-    reviewed_by: str
-    review_note: str | None = None
-    created_at: datetime
-
-
-class InpatientAiSummaryReviewCreateRequest(BaseModel):
-    summary_title: str
-    summary_body: str
-    status: AiSummaryReviewStatus
-    source_counts: dict[str, int] = {}
-    review_note: str | None = None
-
-
-class InpatientDischargePlanRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    admission_id: int
-    status: DischargePlanStatus
-    discharge_medication_note: str
-    billing_candidates: list[dict[str, str]]
-    follow_up_note: str
-    reviewed_by: str
-    reviewed_at: datetime
-    updated_at: datetime
-
-
-class InpatientDischargePlanUpdateRequest(BaseModel):
-    status: DischargePlanStatus = "reviewed"
-    discharge_medication_note: str | None = None
-    billing_candidates: list[dict[str, str]] | None = None
-    follow_up_note: str | None = None
-
-
-class ClaimReviewIssueRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    claim_draft_id: int
-    issue_type: str
-    severity: ClaimIssueSeverity
-    message: str
-    evidence: str | None = None
-    status: Literal["open", "resolved", "ignored"]
-    created_at: datetime
-
-
-class ClaimTransmissionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    claim_draft_id: int
-    adapter: str
-    status: ClaimTransmissionStatus
-    request_payload: dict[str, object]
-    response_payload: dict[str, object]
-    error_message: str | None = None
-    sent_by: str
-    sent_at: datetime
-    created_at: datetime
-
-
-class ClaimDraftLineRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    claim_draft_id: int
-    line_type: str
-    source_type: str
-    source_id: str | None = None
-    label: str
-    receipt_code: str | None = None
-    receipt_name: str | None = None
-    points: int
-    quantity: int
-    unit: str | None = None
-    evidence: str | None = None
-    review_status: str
-    created_at: datetime
-
-
-class ClaimLineAdjustmentRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    claim_draft_id: int
-    claim_draft_line_id: int | None = None
-    rule_id: str | None = None
-    adjustment_type: str
-    points_delta: int
-    comment: str | None = None
-    reason: str
-    status: Literal["suggested", "accepted", "ignored"]
-    created_at: datetime
-
-
-class ClaimDraftRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    patient_id: str
-    admission_id: int | None = None
-    status: ClaimDraftStatus
-    source_type: str
-    billing_candidates: list[dict[str, str]]
-    total_points: int
-    created_by: str
-    created_at: datetime
-    updated_at: datetime
-    lines: list[ClaimDraftLineRead] = []
-    adjustments: list[ClaimLineAdjustmentRead] = []
-    issues: list[ClaimReviewIssueRead] = []
-    transmissions: list[ClaimTransmissionRead] = []
-
-
-class ClaimDraftUpdateRequest(BaseModel):
-    status: ClaimDraftStatus
-
-
-class FacilityClaimRuleRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    sort_order: int
-    is_active: bool
-    category: str
-    target_category: str
-    rule_type: str
-    severity: ClaimIssueSeverity
-    message: str
-    evidence_hint: str | None = None
-    conditions: dict[str, object] = {}
-    actions: dict[str, object] = {}
-    updated_at: datetime
-
-
-class FacilityClaimRuleCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    category: str
-    target_category: str
-    rule_type: str
-    severity: ClaimIssueSeverity = "warning"
-    message: str
-    evidence_hint: str | None = None
-    conditions: dict[str, object] = {}
-    actions: dict[str, object] = {}
-
-
-class FacilityClaimRuleUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    category: str
-    target_category: str
-    rule_type: str
-    severity: ClaimIssueSeverity = "warning"
-    message: str
-    evidence_hint: str | None = None
-    conditions: dict[str, object] = {}
-    actions: dict[str, object] = {}
-
-
-class OrcaAdapterSettingRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    is_active: bool
-    base_url: str | None = None
-    auth_type: str
-    username: str | None = None
-    has_password: bool = False
-    client_id: str | None = None
-    claim_endpoint: str
-    health_endpoint: str
-    mode: Literal["mock", "http"]
-    note: str | None = None
-    updated_by: str | None = None
-    updated_at: datetime
-
-
-class OrcaAdapterSettingUpdateRequest(BaseModel):
-    is_active: bool = False
-    base_url: str | None = None
-    auth_type: Literal["none", "basic", "client"] = "none"
-    username: str | None = None
-    password: str | None = None
-    client_id: str | None = None
-    claim_endpoint: str = "/api01rv2/claim"
-    health_endpoint: str = "/api01rv2/systeminfv2"
-    mode: Literal["mock", "http"] = "mock"
-    note: str | None = None
-
-
-class OrcaConnectionTestRead(BaseModel):
-    ok: bool
-    status_code: int | None = None
-    url: str | None = None
-    message: str
-    response_payload: dict[str, object] = {}
-
-
-class AdmissionRead(BaseModel):
-    id: int
-    patient: PatientSummaryRead
-    status: AdmissionStatus
-    requested_at: datetime
-    admitted_at: datetime | None = None
-    discharge_permitted_at: datetime | None = None
-    discharged_at: datetime | None = None
-    ward: WardMasterRead | None = None
-    bed: BedMasterRead | None = None
-    attending_doctor: str
-    team: str | None = None
-    primary_diagnosis: str | None = None
-    care_level: str | None = None
-    note: str | None = None
-    stay_days: int
-    pending_instruction_count: int
-    latest_nursing_note: NursingNoteRead | None = None
-    updated_at: datetime
-
-
-class AdmissionCreateRequest(BaseModel):
-    status: AdmissionStatus = "planned"
-    ward_id: str | None = None
-    bed_id: str | None = None
-    admitted_at: datetime | None = None
-    attending_doctor: str
-    team: str | None = None
-    primary_diagnosis: str | None = None
-    care_level: str | None = None
-    note: str | None = None
-
-
-class AdmissionTransferRequest(BaseModel):
-    ward_id: str
-    bed_id: str
-    note: str | None = None
-
-
-class AdmissionDischargeRequest(BaseModel):
-    note: str | None = None
-
-
-class DiagnosisMasterRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    management_number: str
-    disease_name: str
-    disease_name_kana: str
-    adoption_level: str
-    exchange_code: str | None = None
-    icd10_code: str | None = None
-    icd10_subcode: str | None = None
-    claim_code: str | None = None
-    is_deleted: bool
-    updated_at_master: str | None = None
-    matched_alias: str | None = None
-    migration_source_management_number: str | None = None
-    migration_source_name: str | None = None
-
-
-class ReservationSlotCreateRequest(BaseModel):
-    id: str
-    sort_order: int
-    is_active: bool = True
-    date: str
-    time: str
-    department: str
-    doctor: str
-    state: Literal["available", "few", "full"]
-    capacity: int = 1
-
-
-class ReservationSlotUpdateRequest(BaseModel):
-    sort_order: int
-    is_active: bool = True
-    date: str
-    time: str
-    department: str
-    doctor: str
-    state: Literal["available", "few", "full"]
-    capacity: int = 1
-
-
-class ChartOrderMasterRead(BaseModel):
-    prescription_catalog: list[PrescriptionCatalogItemRead]
-    standard_usage_masters: list[StandardUsageMasterRead]
-    prescription_sets: list[PrescriptionSetMasterRead]
-    lab_set_options: list[LabSetOptionRead]
-    reservation_slots: list[ReservationSlotRead]
-    chart_templates: list[ChartTemplateRead]
-
-
-class UserSessionRead(BaseModel):
-    user_id: str
-    display_name: str
-    department: str
-    role: UserRole
-    logged_in_at: datetime
-    password_expires_at: date
-
-
-class AuthTokenRead(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: UserSessionRead
-
-
-class UserSummaryRead(BaseModel):
-    user_id: str
-    display_name: str
-    department: str
-    role: UserRole
-    password_expires_at: date
-
-
-class UserCreateRequest(BaseModel):
-    user_id: str
-    password: str
-    display_name: str
-    department: str
-    role: UserRole
-    password_expires_at: date
-
-
-class UserUpdateRequest(BaseModel):
-    display_name: str
-    department: str
-    role: UserRole
-    password_expires_at: date
-
-
-class UserPasswordResetRequest(BaseModel):
-    password: str
-
-
-class LoginRequest(BaseModel):
-    user_id: str
-    password: str
-
-
-class PatientSummaryRead(BaseModel):
-    id: str
-    name: str
-    kana: str
-    age: str
-    sex: str
-    department: str
-    doctor: str
-    reception_number: str
-    reservation_time: str
-    reception_time: str
-    status: str
-    elapsed: str
-    lab_progress: str
-    same_name_duplicate_count: int
-    comment: str
-    demographics: list[DetailItem]
-    alerts: list[AlertItem]
-
-
-class PatientContextRead(BaseModel):
-    patient_profile: list[PatientProfileItem]
-    problems: list[ProblemItem]
-
-
-class PatientContextUpdateRequest(BaseModel):
-    patient_profile: list[PatientProfileItem]
-    problems: list[ProblemItem]
-
-
-class ChartNoteRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    version: int
-    subjective: str
-    objective: str
-    assessment: str
-    plan: str
-    saved_by: str
-    saved_at: datetime
-
-
-class ChartSaveRequest(BaseModel):
-    subjective: str
-    objective: str
-    assessment: str
-    plan: str
-    saved_by: str
-
-
-class PrescriptionCreateRequest(BaseModel):
-    type: str
-    days: str
-    drug_name: str
-    dosage: str
-    actor: str
-
-
-class PrescriptionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    type: str
-    days: str
-    drug_name: str
-    dosage: str
-    created_at: datetime
-    warnings: list[str] = []
-    warning_details: list[dict[str, str | None]] = []
-
-
-class PrescriptionHistoryGroupRead(BaseModel):
-    date: str
-    label: str
-    is_latest: bool = False
-    item_count: int
-    items: list[PrescriptionRead]
-
-
-class PrescriptionTimelineItemRead(PrescriptionRead):
-    is_current: bool = False
-    catalog_id: str | None = None
-    pmda_info_url: str | None = None
-    warnings: list[str] = []
-
-
-class PrescriptionTimelineGroupRead(BaseModel):
-    date: str
-    label: str
-    is_latest: bool = False
-    is_today: bool = False
-    copyable: bool = True
-    item_count: int
-    warning_count: int
-    items: list[PrescriptionTimelineItemRead]
-
-
-class PrescriptionCopyLastRequest(BaseModel):
-    actor: str
-    source_date: str | None = None
-
-
-class PrescriptionCopySkippedItem(BaseModel):
-    drug_name: str
-    reason: str
-
-
-class PrescriptionDiffItem(BaseModel):
-    drug_name: str
-    status: Literal["continued", "changed", "to_copy", "skipped", "added"]
-    label: str
-    source_dosage: str | None = None
-    current_dosage: str | None = None
-    reason: str | None = None
-
-
-class PrescriptionCopyPreviewRead(BaseModel):
-    source_date: str
-    planned_count: int
-    skipped_count: int
-    planned_items: list[PrescriptionTimelineItemRead]
-    skipped_items: list[PrescriptionCopySkippedItem]
-    diff_items: list[PrescriptionDiffItem]
-
-
-class PrescriptionCopyLastRead(BaseModel):
-    source_date: str
-    copied_count: int
-    skipped_count: int
-    copied_items: list[PrescriptionRead]
-    skipped_items: list[PrescriptionCopySkippedItem]
-    timeline: list[PrescriptionTimelineGroupRead]
-
-
-class LabOrderCreateRequest(BaseModel):
-    category: str
-    urgency: str | None = None
-    items: list[str]
-    actor: str
-
-
-class LabOrderRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    category: str
-    status: str
-    urgency: str | None = None
-    items: list[str]
-    created_at: datetime
-
-
-class ReservationUpsertRequest(BaseModel):
-    slot_id: str | None = None
-    scheduled_for: str
-    department: str
-    doctor: str
-    note: str
-    actor: str
-
-
-class ReservationRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    slot_id: str | None = None
-    scheduled_for: str
-    department: str
-    doctor: str
-    note: str
-    updated_at: datetime
-
-
-class PatientStatusUpdateRequest(BaseModel):
-    status: str
-    actor: str
-    detail: str
-
-
-class AuditLogRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    actor: str
-    action: str
-    scope: str
-    detail: str
-    patient_id: str | None = None
-    patient_name: str | None = None
-    created_at: datetime
-
-
-class ChartWorkspaceRead(BaseModel):
-    patient: PatientSummaryRead
-    latest_note: ChartNoteRead | None
-    versions: list[ChartNoteRead]
-    prescriptions: list[PrescriptionRead]
-    prescription_history: list[PrescriptionHistoryGroupRead]
-    lab_orders: list[LabOrderRead]
-    reservation: ReservationRead | None
-    audit_logs: list[AuditLogRead]
-    patient_profile: list[PatientProfileItem]
-    problems: list[ProblemItem]
-    visit_history: list[VisitHistoryItem]
-    vitals: list[VitalItem]
-    lab_results: list[LabResultItem]
-    chart_history: list[ChartHistoryItem]
-    imaging_orders: list[ImagingOrderItem]
-    procedure_orders: list[ProcedureOrderItem]
+from .modules.admin.schemas import (
+    UserCreateRequest,
+    UserPasswordResetRequest,
+    UserUpdateRequest,
+)
+from .modules.auth.schemas import (
+    AuthTokenRead,
+    LoginRequest,
+    UserRole,
+    UserSessionRead,
+    UserSummaryRead,
+)
+from .modules.common.schemas import AuditLogRead
+from .modules.gateway.orca.schemas import (
+    OrcaAdapterSettingRead,
+    OrcaAdapterSettingUpdateRequest,
+    OrcaConnectionTestRead,
+)
+from .modules.inpatient.schemas import (
+    AdmissionCreateRequest,
+    AdmissionDischargeRequest,
+    AdmissionRead,
+    AdmissionStatus,
+    AdmissionTransferRequest,
+    AiSummaryReviewStatus,
+    BedBoardItemRead,
+    BedStatus,
+    BedStatusUpdateRequest,
+    DischargePlanStatus,
+    InpatientAiSummaryReviewCreateRequest,
+    InpatientAiSummaryReviewRead,
+    InpatientDischargePlanRead,
+    InpatientDischargePlanUpdateRequest,
+    InpatientDocumentCreateRequest,
+    InpatientDocumentRead,
+    InpatientDocumentStatus,
+    InpatientDocumentType,
+    InpatientDocumentUpdateRequest,
+    InpatientEventRead,
+    InpatientInstructionCreateRequest,
+    InpatientInstructionRead,
+    InpatientInstructionUpdateRequest,
+    InpatientPathwayCreateRequest,
+    InpatientPathwayMasterRead,
+    InpatientPathwayRead,
+    InpatientPathwayTaskMasterRead,
+    InpatientPathwayTaskRead,
+    InpatientPathwayTaskUpdateRequest,
+    InpatientProgressDateRow,
+    InpatientProgressRead,
+    InpatientSummaryDraftRead,
+    InstructionStatus,
+    NursingNoteCreateRequest,
+    NursingNoteRead,
+    PathwayTaskStatus,
+)
+from .modules.karte.schemas import (
+    AlertItem,
+    ChartHistoryItem,
+    ChartNoteRead,
+    ChartSaveRequest,
+    ChartWorkspaceRead,
+    DetailItem,
+    DrugCategory,
+    ImagingOrderCreateRequest,
+    ImagingOrderItem,
+    LabLongTrendItem,
+    LabLongTrendPoint,
+    LabOrderCreateRequest,
+    LabOrderRead,
+    LabResultItem,
+    LabTrendPoint,
+    PatientContextRead,
+    PatientContextUpdateRequest,
+    PatientProfileItem,
+    PatientStatusUpdateRequest,
+    PatientSummaryRead,
+    PrescriptionCopyLastRead,
+    PrescriptionCopyLastRequest,
+    PrescriptionCopyPreviewRead,
+    PrescriptionCopySkippedItem,
+    PrescriptionCreateRequest,
+    PrescriptionDiffItem,
+    PrescriptionHistoryGroupRead,
+    PrescriptionRead,
+    PrescriptionTimelineGroupRead,
+    PrescriptionTimelineItemRead,
+    ProblemItem,
+    ProcedureOrderCreateRequest,
+    ProcedureOrderItem,
+    ReservationRead,
+    ReservationUpsertRequest,
+    VisitHistoryItem,
+    VitalItem,
+)
+from .modules.master_data.schemas import (
+    BedMasterRead,
+    ChartOrderMasterRead,
+    ChartTemplateCreateRequest,
+    ChartTemplateRead,
+    ChartTemplateUpdateRequest,
+    DiagnosisMasterRead,
+    LabSetOptionCreateRequest,
+    LabSetOptionRead,
+    LabSetOptionUpdateRequest,
+    PrescriptionCatalogItemCreateRequest,
+    PrescriptionCatalogItemRead,
+    PrescriptionCatalogItemUpdateRequest,
+    PrescriptionSetMasterCreateRequest,
+    PrescriptionSetMasterItem,
+    PrescriptionSetMasterRead,
+    PrescriptionSetMasterUpdateRequest,
+    ReservationSlotCreateRequest,
+    ReservationSlotRead,
+    ReservationSlotUpdateRequest,
+    StandardUsageMasterCreateRequest,
+    StandardUsageMasterRead,
+    StandardUsageMasterUpdateRequest,
+    WardMasterRead,
+)
+from .modules.rececon.schemas import (
+    ClaimDraftLineRead,
+    ClaimDraftRead,
+    ClaimDraftStatus,
+    ClaimDraftUpdateRequest,
+    ClaimIssueSeverity,
+    ClaimLineAdjustmentRead,
+    ClaimReviewIssueRead,
+    ClaimTransmissionRead,
+    ClaimTransmissionStatus,
+    FacilityClaimRuleCreateRequest,
+    FacilityClaimRuleRead,
+    FacilityClaimRuleUpdateRequest,
+)
+
+__all__ = [
+    "AdmissionCreateRequest",
+    "AdmissionDischargeRequest",
+    "AdmissionRead",
+    "AdmissionStatus",
+    "AdmissionTransferRequest",
+    "AiSummaryReviewStatus",
+    "AlertItem",
+    "AuditLogRead",
+    "AuthTokenRead",
+    "BedBoardItemRead",
+    "BedMasterRead",
+    "BedStatus",
+    "BedStatusUpdateRequest",
+    "ChartHistoryItem",
+    "ChartNoteRead",
+    "ChartOrderMasterRead",
+    "ChartSaveRequest",
+    "ChartTemplateCreateRequest",
+    "ChartTemplateRead",
+    "ChartTemplateUpdateRequest",
+    "ChartWorkspaceRead",
+    "ClaimDraftLineRead",
+    "ClaimDraftRead",
+    "ClaimDraftStatus",
+    "ClaimDraftUpdateRequest",
+    "ClaimIssueSeverity",
+    "ClaimLineAdjustmentRead",
+    "ClaimReviewIssueRead",
+    "ClaimTransmissionRead",
+    "ClaimTransmissionStatus",
+    "DetailItem",
+    "DiagnosisMasterRead",
+    "DischargePlanStatus",
+    "DrugCategory",
+    "FacilityClaimRuleCreateRequest",
+    "FacilityClaimRuleRead",
+    "FacilityClaimRuleUpdateRequest",
+    "ImagingOrderCreateRequest",
+    "ImagingOrderItem",
+    "InpatientAiSummaryReviewCreateRequest",
+    "InpatientAiSummaryReviewRead",
+    "InpatientDischargePlanRead",
+    "InpatientDischargePlanUpdateRequest",
+    "InpatientDocumentCreateRequest",
+    "InpatientDocumentRead",
+    "InpatientDocumentStatus",
+    "InpatientDocumentType",
+    "InpatientDocumentUpdateRequest",
+    "InpatientEventRead",
+    "InpatientInstructionCreateRequest",
+    "InpatientInstructionRead",
+    "InpatientInstructionUpdateRequest",
+    "InpatientPathwayCreateRequest",
+    "InpatientPathwayMasterRead",
+    "InpatientPathwayRead",
+    "InpatientPathwayTaskMasterRead",
+    "InpatientPathwayTaskRead",
+    "InpatientPathwayTaskUpdateRequest",
+    "InpatientProgressDateRow",
+    "InpatientProgressRead",
+    "InpatientSummaryDraftRead",
+    "InstructionStatus",
+    "LabLongTrendItem",
+    "LabLongTrendPoint",
+    "LabOrderCreateRequest",
+    "LabOrderRead",
+    "LabResultItem",
+    "LabSetOptionCreateRequest",
+    "LabSetOptionRead",
+    "LabSetOptionUpdateRequest",
+    "LabTrendPoint",
+    "LoginRequest",
+    "NursingNoteCreateRequest",
+    "NursingNoteRead",
+    "OrcaAdapterSettingRead",
+    "OrcaAdapterSettingUpdateRequest",
+    "OrcaConnectionTestRead",
+    "PathwayTaskStatus",
+    "PatientContextRead",
+    "PatientContextUpdateRequest",
+    "PatientProfileItem",
+    "PatientStatusUpdateRequest",
+    "PatientSummaryRead",
+    "PrescriptionCatalogItemCreateRequest",
+    "PrescriptionCatalogItemRead",
+    "PrescriptionCatalogItemUpdateRequest",
+    "PrescriptionCopyLastRead",
+    "PrescriptionCopyLastRequest",
+    "PrescriptionCopyPreviewRead",
+    "PrescriptionCopySkippedItem",
+    "PrescriptionCreateRequest",
+    "PrescriptionDiffItem",
+    "PrescriptionHistoryGroupRead",
+    "PrescriptionRead",
+    "PrescriptionSetMasterCreateRequest",
+    "PrescriptionSetMasterItem",
+    "PrescriptionSetMasterRead",
+    "PrescriptionSetMasterUpdateRequest",
+    "PrescriptionTimelineGroupRead",
+    "PrescriptionTimelineItemRead",
+    "ProblemItem",
+    "ProcedureOrderCreateRequest",
+    "ProcedureOrderItem",
+    "ReservationRead",
+    "ReservationSlotCreateRequest",
+    "ReservationSlotRead",
+    "ReservationSlotUpdateRequest",
+    "ReservationUpsertRequest",
+    "StandardUsageMasterCreateRequest",
+    "StandardUsageMasterRead",
+    "StandardUsageMasterUpdateRequest",
+    "UserCreateRequest",
+    "UserPasswordResetRequest",
+    "UserRole",
+    "UserSessionRead",
+    "UserSummaryRead",
+    "UserUpdateRequest",
+    "VisitHistoryItem",
+    "VitalItem",
+    "WardMasterRead",
+]

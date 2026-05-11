@@ -6,7 +6,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from app.fhir.mappers.encounter import encounter_id_for_visit, orm_visit_to_fhir
+from app.modules.gateway.fhir.mappers.encounter import encounter_id_for_visit, orm_visit_to_fhir
 from app.main import app
 from app.models import Patient
 

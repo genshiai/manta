@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db import SessionLocal
-from app.fhir.mappers.patient import orm_to_fhir
+from app.modules.gateway.fhir.mappers.patient import orm_to_fhir
 from app.main import app
 from app.models import Patient
 
