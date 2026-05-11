@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from .models import PmdaDrugInteraction, PmdaPackageInsertSection
+from .modules.master_data.models import PmdaDrugInteraction, PmdaPackageInsertSection
 
 PMDA_NS = {"p": "http://info.pmda.go.jp/namespace/prescription_drugs/package_insert/1.0"}
 

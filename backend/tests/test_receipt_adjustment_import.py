@@ -3,7 +3,7 @@ from __future__ import annotations
 from zipfile import ZipFile
 
 from app.db import SessionLocal
-from app.models import ReceiptLongTermListedDrug, ReceiptTransitionalDrug
+from app.modules.master_data.models import ReceiptLongTermListedDrug, ReceiptTransitionalDrug
 from app.receipt_adjustment_import import (
     iter_receipt_long_term_listed_drug_records,
     iter_receipt_transitional_drug_records,

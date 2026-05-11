@@ -16,7 +16,7 @@ from fhir.resources.R4B.coding import Coding
 from fhir.resources.R4B.condition import Condition as FhirCondition
 from fhir.resources.R4B.reference import Reference
 
-from app.models import Condition as ConditionRow
+from app.modules.karte.models import Condition as ConditionRow
 
 
 # FHIR / JP Core 推奨の CodeSystem URI

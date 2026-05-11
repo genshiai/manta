@@ -21,7 +21,8 @@ from fhir.resources.R4B.medicationrequest import (
 )
 from fhir.resources.R4B.reference import Reference
 
-from app.models import PrescriptionCatalogMaster, PrescriptionOrder
+from app.modules.karte.models import PrescriptionOrder
+from app.modules.master_data.models import PrescriptionCatalogMaster
 
 
 HOT13_SYSTEM = "http://jpfhir.jp/fhir/core/CodeSystem/JP_MedicationCodeHOT13_CS"

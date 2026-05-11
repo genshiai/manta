@@ -7,33 +7,32 @@ from sqlalchemy import select
 
 from app.db import SessionLocal
 from app.main import app
-from app.models import (
-    ChartTemplateMaster,
+from app.modules.auth.models import User
+from app.modules.inpatient.models import (
     BedMaster,
-    ClaimDraft,
-    DiagnosisAliasMaster,
-    DiagnosisMaster,
-    FacilityClaimRule,
-    InpatientDocument,
     InpatientAiSummaryReview,
     InpatientDischargePlan,
+    InpatientDocument,
     InpatientInstruction,
     InpatientPathwayAssignment,
+)
+from app.modules.karte.models import Patient, PrescriptionOrder, Reservation
+from app.modules.master_data.models import (
+    ChartTemplateMaster,
+    DiagnosisAliasMaster,
+    DiagnosisMaster,
     LabSetMaster,
-    Patient,
-    PmdaPackageInsertSection,
     PmdaDrugInteraction,
     PmdaDrugInteractionMatch,
+    PmdaPackageInsertSection,
     PrescriptionCatalogMaster,
-    PrescriptionOrder,
     PrescriptionSetMaster,
     ReceiptLongTermListedDrug,
     ReceiptTransitionalDrug,
-    Reservation,
     ReservationSlotMaster,
     StandardUsageMaster,
-    User,
 )
+from app.modules.rececon.models import ClaimDraft, FacilityClaimRule
 from app.seed import PATIENT_WORKSPACE_BY_ID
 
 

@@ -11,7 +11,7 @@ from fhir.resources.R4B.codeableconcept import CodeableConcept
 from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.reference import Reference
 
-from app.models import Reservation
+from app.modules.karte.models import Reservation
 
 
 APPOINTMENT_IDENTIFIER_SYSTEM = "urn:manta:reservation"

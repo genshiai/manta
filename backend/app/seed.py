@@ -7,35 +7,38 @@ import unicodedata
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import (
+from .modules.auth.models import User
+from .modules.common.models import AuditLog, utcnow
+from .modules.gateway.orca.models import OrcaAdapterSetting
+from .modules.inpatient.models import (
     Admission,
-    AuditLog,
     BedMaster,
-    ChartNote,
-    ChartTemplateMaster,
-    Condition,
-    DiagnosisMaster,
-    FacilityClaimRule,
     InpatientInstruction,
     InpatientPathwayMaster,
     InpatientPathwayTaskMaster,
-    LabOrder,
-    LabSetMaster,
     NursingNote,
+    WardMaster,
+)
+from .modules.karte.models import (
+    ChartNote,
+    Condition,
+    LabOrder,
     Observation,
-    OrcaAdapterSetting,
     Patient,
+    PrescriptionOrder,
+    Reservation,
+)
+from .modules.master_data.models import (
+    ChartTemplateMaster,
+    DiagnosisMaster,
+    LabSetMaster,
     PrescriptionCatalogMaster,
     PrescriptionSetMaster,
-    PrescriptionOrder,
     ReceiptMedicalPracticeMaster,
-    Reservation,
     ReservationSlotMaster,
     StandardUsageMaster,
-    User,
-    WardMaster,
-    utcnow,
 )
+from .modules.rececon.models import FacilityClaimRule
 from .security import hash_password, password_needs_upgrade
 
 

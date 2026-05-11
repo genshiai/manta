@@ -9,7 +9,7 @@ from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.reference import Reference
 from fhir.resources.R4B.servicerequest import ServiceRequest
 
-from app.models import LabOrder, Patient
+from app.modules.karte.models import LabOrder, Patient
 
 
 SERVICE_REQUEST_IDENTIFIER_SYSTEM = "https://manta.local/fhir/identifier/service-request"

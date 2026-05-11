@@ -4,7 +4,7 @@ import csv
 from zipfile import ZipFile
 
 from app.db import SessionLocal
-from app.models import ReceiptMedicalPracticeMaster
+from app.modules.master_data.models import ReceiptMedicalPracticeMaster
 from app.receipt_medical_practice_import import (
     iter_receipt_medical_practice_master_records,
     sync_receipt_medical_practice_master_records,

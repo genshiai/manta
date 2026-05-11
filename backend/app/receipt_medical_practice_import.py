@@ -8,7 +8,7 @@ from zipfile import ZipFile
 
 from sqlalchemy.orm import Session
 
-from .models import ReceiptMedicalPracticeMaster
+from .modules.master_data.models import ReceiptMedicalPracticeMaster
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from decimal import Decimal
 from zipfile import ZipFile
 
 from app.db import SessionLocal
-from app.models import ReceiptDrugMaster
+from app.modules.master_data.models import ReceiptDrugMaster
 from app.receipt_drug_import import iter_receipt_drug_master_records, sync_receipt_drug_master_records
 
 

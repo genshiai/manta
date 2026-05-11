@@ -6,7 +6,7 @@ from zipfile import ZipFile
 from app.db import SessionLocal
 from app.drug_import import sync_drug_master_records
 from app.mhlw_drug_price_import import iter_mhlw_drug_price_records
-from app.models import PrescriptionCatalogMaster
+from app.modules.master_data.models import PrescriptionCatalogMaster
 
 
 def write_minimal_xlsx(path, rows: list[list[str]]) -> None:

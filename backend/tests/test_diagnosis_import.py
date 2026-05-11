@@ -15,7 +15,7 @@ from app.diagnosis_import import (
     upsert_diagnosis_main_records,
 )
 from app.main import app
-from app.models import DiagnosisAliasMaster, DiagnosisMaster
+from app.modules.master_data.models import DiagnosisAliasMaster, DiagnosisMaster
 
 
 def write_cp932_csv(path, rows: list[list[str]]) -> None:

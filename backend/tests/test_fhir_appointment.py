@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.db import SessionLocal
 from app.modules.gateway.fhir.mappers.appointment import orm_to_fhir
 from app.main import app
-from app.models import Reservation
+from app.modules.karte.models import Reservation
 
 
 TOKYO_TZ = ZoneInfo("Asia/Tokyo")

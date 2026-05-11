@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.db import SessionLocal
 from app.modules.gateway.fhir.mappers.composition import orm_to_fhir
 from app.main import app
-from app.models import ChartNote
+from app.modules.karte.models import ChartNote
 
 
 def _make_note() -> ChartNote:

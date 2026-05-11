@@ -19,7 +19,7 @@ from fhir.resources.R4B.quantity import Quantity
 from fhir.resources.R4B.reference import Reference
 
 from app.modules.gateway.fhir.loinc import LOINC_SYSTEM, UCUM_SYSTEM
-from app.models import Observation as ObservationRow
+from app.modules.karte.models import Observation as ObservationRow
 
 
 CATEGORY_SYSTEM = "http://terminology.hl7.org/CodeSystem/observation-category"

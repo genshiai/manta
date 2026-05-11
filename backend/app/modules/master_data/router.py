@@ -8,28 +8,14 @@ from ...db import get_db
 from ...security import get_current_user
 from ..auth.models import User
 from .models import DiagnosisAliasMaster, DiagnosisMaster
-from .schemas import ChartOrderMasterRead, DiagnosisMasterRead
+from .schemas import DiagnosisMasterRead
 from .services import (
-    get_chart_order_masters_read,
     normalize_diagnosis_search_query,
     to_katakana,
 )
 
 
 router = APIRouter()
-
-
-@router.get("/api/masters/chart-order-config", response_model=ChartOrderMasterRead)
-def get_chart_order_config(
-    include_inactive: bool = Query(default=False),
-    department: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> ChartOrderMasterRead:
-    if include_inactive and current_user.role != "管理者":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
-    return get_chart_order_masters_read(db, include_inactive=include_inactive, department=department)
 
 
 @router.get("/api/masters/diagnoses/search", response_model=list[DiagnosisMasterRead])

@@ -8,7 +8,12 @@ from sqlalchemy import select
 
 from app.db import SessionLocal
 from app.main import app
-from app.models import PmdaDrugInteraction, PmdaDrugInteractionMatch, PmdaPackageInsertSection, PrescriptionCatalogMaster
+from app.modules.master_data.models import (
+    PmdaDrugInteraction,
+    PmdaDrugInteractionMatch,
+    PmdaPackageInsertSection,
+    PrescriptionCatalogMaster,
+)
 from app.pmda_import import parse_pmda_package_insert_xml_records, upsert_pmda_package_insert_data
 from app.pmda_interaction_match import sync_pmda_interaction_matches
 

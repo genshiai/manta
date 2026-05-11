@@ -18,7 +18,8 @@ from app.modules.gateway.fhir.mappers.medication_request import (
     orm_to_fhir,
 )
 from app.main import app
-from app.models import PrescriptionCatalogMaster, PrescriptionOrder
+from app.modules.karte.models import PrescriptionOrder
+from app.modules.master_data.models import PrescriptionCatalogMaster
 
 
 def _make_order() -> PrescriptionOrder:

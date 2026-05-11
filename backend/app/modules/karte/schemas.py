@@ -8,9 +8,6 @@ from pydantic import BaseModel, ConfigDict
 from ..common.schemas import AuditLogRead
 
 
-DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
-
-
 class DetailItem(BaseModel):
     label: str
     value: str

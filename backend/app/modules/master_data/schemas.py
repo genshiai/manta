@@ -5,7 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from ..karte.schemas import DrugCategory
+
+DrugCategory = Literal["内服", "外用", "頓服", "注射", "歯科"]
 
 
 class PrescriptionCatalogItemRead(BaseModel):

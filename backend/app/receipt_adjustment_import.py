@@ -10,7 +10,7 @@ from zipfile import ZipFile
 
 from sqlalchemy.orm import Session
 
-from .models import ReceiptLongTermListedDrug, ReceiptTransitionalDrug
+from .modules.master_data.models import ReceiptLongTermListedDrug, ReceiptTransitionalDrug
 
 XLSX_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 

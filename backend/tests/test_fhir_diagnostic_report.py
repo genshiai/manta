@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.modules.gateway.fhir.mappers.diagnostic_report import build_diagnostic_report, diagnostic_report_id
 from app.main import app
-from app.models import Patient
+from app.modules.karte.models import Patient
 
 
 def _make_patient() -> Patient:

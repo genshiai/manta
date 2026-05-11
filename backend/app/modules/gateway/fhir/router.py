@@ -104,16 +104,16 @@ from app.modules.gateway.fhir.validators.jp_core import (
     validate_jp_observation,
     validate_jp_patient,
 )
-from app.models import (
+from app.modules.karte.models import (
     ChartNote,
     Condition,
     LabOrder,
     Observation,
     Patient,
-    PrescriptionCatalogMaster,
     PrescriptionOrder,
     Reservation,
 )
+from app.modules.master_data.models import PrescriptionCatalogMaster
 
 
 FHIR_JSON = "application/fhir+json"

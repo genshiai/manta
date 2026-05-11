@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.db import SessionLocal
 from app.modules.gateway.fhir.mappers.service_request import lab_order_to_fhir, patient_json_orders_to_fhir
 from app.main import app
-from app.models import LabOrder, Patient
+from app.modules.karte.models import LabOrder, Patient
 
 
 def _make_lab_order() -> LabOrder:

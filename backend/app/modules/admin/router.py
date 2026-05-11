@@ -29,7 +29,11 @@ from ..gateway.orca.schemas import (
     OrcaAdapterSettingUpdateRequest,
     OrcaConnectionTestRead,
 )
-from ..karte.services import resolve_pmda_info_url
+from ..karte.services import (
+    get_reservation_slot_counts,
+    reservation_slot_to_read,
+    resolve_pmda_info_url,
+)
 from ..master_data.schemas import (
     ChartTemplateCreateRequest,
     ChartTemplateRead,
@@ -55,10 +59,8 @@ from ..master_data.services import (
     get_lab_set_master_or_404,
     get_prescription_catalog_master_or_404,
     get_prescription_set_master_or_404,
-    get_reservation_slot_counts,
     get_reservation_slot_master_or_404,
     get_standard_usage_master_or_404,
-    reservation_slot_to_read,
 )
 from ..rececon.schemas import (
     FacilityClaimRuleCreateRequest,

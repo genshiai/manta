@@ -10,7 +10,7 @@ from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.reference import Reference
 
 from app.modules.gateway.fhir.loinc import LOINC_SYSTEM
-from app.models import Patient
+from app.modules.karte.models import Patient
 
 
 DIAGNOSTIC_REPORT_IDENTIFIER_SYSTEM = "https://manta.local/fhir/identifier/diagnostic-report"

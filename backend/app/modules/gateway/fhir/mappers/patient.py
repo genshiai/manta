@@ -18,7 +18,7 @@ from fhir.resources.R4B.humanname import HumanName
 from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.patient import Patient as FhirPatient
 
-from app.models import Patient as PatientRow
+from app.modules.karte.models import Patient as PatientRow
 
 
 # 実 OID は施設ごとに差し替える想定。Step 2 以降で settings に移設予定。

@@ -25,7 +25,7 @@ from app.modules.gateway.fhir.mappers.condition import (
     orm_to_fhir,
 )
 from app.main import app
-from app.models import Condition
+from app.modules.karte.models import Condition
 
 
 def _make_condition_row(

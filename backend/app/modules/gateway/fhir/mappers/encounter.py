@@ -10,7 +10,7 @@ from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.period import Period
 from fhir.resources.R4B.reference import Reference
 
-from app.models import Patient
+from app.modules.karte.models import Patient
 
 
 ACT_CODE_SYSTEM = "http://terminology.hl7.org/CodeSystem/v3-ActCode"

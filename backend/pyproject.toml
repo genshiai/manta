@@ -38,7 +38,8 @@ layers = [
   "app.modules.gateway",
   "app.modules.rececon",
   "app.modules.inpatient",
-  "app.modules.karte : app.modules.master_data",
+  "app.modules.karte",
+  "app.modules.master_data",
   "app.modules.auth",
   "app.modules.common",
 ]

@@ -9,7 +9,7 @@ from zipfile import ZipFile
 
 from sqlalchemy.orm import Session
 
-from .models import ReceiptDrugMaster
+from .modules.master_data.models import ReceiptDrugMaster
 
 
 @dataclass(frozen=True)

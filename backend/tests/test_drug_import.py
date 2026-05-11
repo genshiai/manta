@@ -14,7 +14,7 @@ from app.drug_import import (
     upsert_drug_master_records,
 )
 from app.main import app
-from app.models import PrescriptionCatalogMaster
+from app.modules.master_data.models import PrescriptionCatalogMaster
 
 
 def write_utf8_csv(path, rows: list[list[str]]) -> None:

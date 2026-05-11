@@ -25,7 +25,7 @@ from app.modules.gateway.fhir.mappers.observation import (
     orm_to_fhir,
 )
 from app.main import app
-from app.models import Observation
+from app.modules.karte.models import Observation
 
 
 def _make_observation_row(

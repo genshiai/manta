@@ -15,6 +15,7 @@ from ..common.time import TOKYO_TZ
 from ..master_data.models import PrescriptionCatalogMaster
 from ..master_data.services import get_reservation_slot_master_or_404
 from .models import ChartNote, LabOrder, Observation, Patient, PrescriptionOrder, Reservation
+from ..master_data.schemas import ChartOrderMasterRead
 from .schemas import (
     ChartSaveRequest,
     ChartWorkspaceRead,
@@ -49,6 +50,7 @@ from .services import (
     build_warning_details,
     catalog_by_drug_name,
     copy_skip_reason,
+    get_chart_order_masters_read,
     get_long_term_listed_drug_for_catalog,
     get_patient_or_404,
     get_pmda_interaction_matches,
@@ -64,6 +66,19 @@ from .services import (
 
 
 router = APIRouter()
+
+
+@router.get("/api/masters/chart-order-config", response_model=ChartOrderMasterRead)
+def get_chart_order_config(
+    include_inactive: bool = Query(default=False),
+    department: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ChartOrderMasterRead:
+    if include_inactive and current_user.role != "管理者":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    return get_chart_order_masters_read(db, include_inactive=include_inactive, department=department)
 
 
 @router.get("/api/patients", response_model=list[PatientSummaryRead])

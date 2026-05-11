@@ -9,7 +9,7 @@ from fhir.resources.R4B.identifier import Identifier
 from fhir.resources.R4B.narrative import Narrative
 from fhir.resources.R4B.reference import Reference
 
-from app.models import ChartNote, Patient
+from app.modules.karte.models import ChartNote, Patient
 
 
 COMPOSITION_IDENTIFIER_SYSTEM = "https://manta.local/fhir/identifier/composition"

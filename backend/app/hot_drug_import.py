@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from .models import HotDrugCodeMapping
+from .modules.master_data.models import HotDrugCodeMapping
 
 
 FIELD_BY_HEADER = {

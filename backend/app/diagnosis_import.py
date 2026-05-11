@@ -9,7 +9,7 @@ from typing import Iterable
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .models import DiagnosisAliasMaster, DiagnosisMaster
+from .modules.master_data.models import DiagnosisAliasMaster, DiagnosisMaster
 
 
 def normalize_header(value: str) -> str:

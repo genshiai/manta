@@ -13,7 +13,16 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.config import get_settings
 from app.db import Base
-from app import models  # noqa: F401
+
+# Import every module that owns SQLAlchemy models so they register on Base.metadata
+# before Alembic builds its diff.
+from app.modules.auth import models  # noqa: F401
+from app.modules.common import models  # noqa: F401
+from app.modules.gateway.orca import models  # noqa: F401
+from app.modules.inpatient import models  # noqa: F401
+from app.modules.karte import models  # noqa: F401
+from app.modules.master_data import models  # noqa: F401
+from app.modules.rececon import models  # noqa: F401
 
 config = context.config
 settings = get_settings()

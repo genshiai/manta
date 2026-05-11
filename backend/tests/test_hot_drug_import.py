@@ -4,7 +4,7 @@ import csv
 
 from app.db import SessionLocal
 from app.hot_drug_import import iter_hot_drug_code_mapping_records, sync_hot_drug_code_mapping_records
-from app.models import HotDrugCodeMapping
+from app.modules.master_data.models import HotDrugCodeMapping
 
 
 HOT_HEADERS = [

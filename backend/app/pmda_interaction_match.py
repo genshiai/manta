@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .models import (
+from .modules.master_data.models import (
     HotDrugCodeMapping,
     PmdaDrugInteraction,
     PmdaDrugInteractionMatch,
