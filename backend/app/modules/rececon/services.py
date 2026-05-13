@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from ..inpatient.models import Admission, InpatientInstruction
@@ -57,6 +57,21 @@ def _candidate_points(candidate: dict[str, str], admission: Admission) -> int:
 
 def claim_total_points(candidates: list[dict[str, str]], admission: Admission) -> int:
     return sum(_candidate_points(candidate, admission) for candidate in candidates)
+
+
+def recalculate_claim_draft_total_points(db: Session, claim_draft_id: int) -> int:
+    line_total = db.scalar(
+        select(func.coalesce(func.sum(ClaimDraftLine.points * ClaimDraftLine.quantity), 0)).where(
+            ClaimDraftLine.claim_draft_id == claim_draft_id
+        )
+    )
+    adjustment_total = db.scalar(
+        select(func.coalesce(func.sum(ClaimLineAdjustment.points_delta), 0)).where(
+            ClaimLineAdjustment.claim_draft_id == claim_draft_id,
+            ClaimLineAdjustment.status == "accepted",
+        )
+    )
+    return int(line_total or 0) + int(adjustment_total or 0)
 
 
 def build_claim_draft_lines(

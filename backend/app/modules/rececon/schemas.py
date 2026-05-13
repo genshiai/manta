@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 ClaimDraftStatus = Literal["draft", "reviewed", "ready", "submitted", "error"]
 ClaimIssueSeverity = Literal["info", "warning", "error"]
+ClaimLineAdjustmentStatus = Literal["suggested", "accepted", "ignored"]
 ClaimTransmissionStatus = Literal["accepted", "rejected", "error"]
 
 
@@ -69,7 +70,7 @@ class ClaimLineAdjustmentRead(BaseModel):
     points_delta: int
     comment: str | None = None
     reason: str
-    status: Literal["suggested", "accepted", "ignored"]
+    status: ClaimLineAdjustmentStatus
     created_at: datetime
 
 
@@ -94,6 +95,10 @@ class ClaimDraftRead(BaseModel):
 
 class ClaimDraftUpdateRequest(BaseModel):
     status: ClaimDraftStatus
+
+
+class ClaimLineAdjustmentUpdateRequest(BaseModel):
+    status: ClaimLineAdjustmentStatus
 
 
 class FacilityClaimRuleRead(BaseModel):

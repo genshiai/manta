@@ -17,14 +17,15 @@ from ..inpatient.services import (
 )
 from ..karte.models import LabOrder, PrescriptionOrder
 from ..karte.services import get_patient_or_404
-from .models import ClaimDraft, FacilityClaimRule
-from .schemas import ClaimDraftRead, ClaimDraftUpdateRequest
+from .models import ClaimDraft, ClaimLineAdjustment, FacilityClaimRule
+from .schemas import ClaimDraftRead, ClaimDraftUpdateRequest, ClaimLineAdjustmentUpdateRequest
 from .services import (
     build_claim_draft_lines,
     build_claim_review_issues,
     build_claim_rule_adjustments,
     claim_draft_to_read,
     claim_total_points,
+    recalculate_claim_draft_total_points,
 )
 
 
@@ -155,6 +156,48 @@ def create_inpatient_claim_draft(
         action="請求ドラフト作成",
         scope="billing",
         detail=f"退院計画から請求ドラフトを作成しました。候補 {len(candidates)}件。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(draft)
+    return claim_draft_to_read(db, draft)
+
+
+@router.patch("/api/claim-line-adjustments/{adjustment_id}", response_model=ClaimDraftRead)
+def update_claim_line_adjustment(
+    adjustment_id: int,
+    payload: ClaimLineAdjustmentUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimDraftRead:
+    adjustment = db.get(ClaimLineAdjustment, adjustment_id)
+    if adjustment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim line adjustment not found")
+    draft = db.get(ClaimDraft, adjustment.claim_draft_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft not found")
+
+    patient = get_patient_or_404(db, draft.patient_id)
+    adjustment.status = payload.status
+    db.flush()
+    draft.total_points = recalculate_claim_draft_total_points(db, draft.id)
+    draft.updated_at = utcnow()
+    if draft.admission_id is not None:
+        status_label = "採用" if payload.status == "accepted" else "無視" if payload.status == "ignored" else "提案へ戻す"
+        add_inpatient_event(
+            db,
+            admission_id=draft.admission_id,
+            event_type="claim_adjustment_updated",
+            title="請求点数調整",
+            detail=f"{status_label}: {adjustment.reason} ({adjustment.points_delta:+}点)",
+            actor=current_user.display_name,
+        )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="請求点数調整",
+        scope="billing",
+        detail=f"{adjustment.reason} を {payload.status} に更新しました。合計 {draft.total_points}点。",
         patient=patient,
     )
     db.commit()

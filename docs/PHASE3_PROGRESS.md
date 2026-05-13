@@ -51,6 +51,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - `GET/PUT /api/inpatient/admissions/{admission_id}/discharge-plan`: 退院時処方メモ・会計候補レビュー
 - `GET/POST /api/inpatient/admissions/{admission_id}/claim-draft`: 入院退院計画から請求ドラフト取得・作成
 - `PATCH /api/claim-drafts/{claim_draft_id}`: 請求ドラフト状態更新
+- `PATCH /api/claim-line-adjustments/{adjustment_id}`: 点数調整提案の採用/無視と請求合計点数への反映
 - `POST /api/claim-drafts/{claim_draft_id}/transmissions/orca`: ORCA adapter 送信試行
 - `GET/POST/PATCH /api/admin/claim-rules`: 施設別算定ルール管理
 - `GET/PUT /api/admin/orca/settings`: ORCA adapter 接続設定
@@ -71,6 +72,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - 設定画面に算定ルール管理と ORCA adapter 設定を追加し、管理者が rule の有効化、重要度、対象カテゴリ、接続 mode/base URL を更新できるようにした
 - ORCA adapter の HTTP mode を追加し、`base_url`、BASIC 認証の operator/password、請求送信 endpoint、接続確認 endpoint を設定できるようにした。HTTP 送信時は ORCA レスポンス本文と HTTP status を `claim_transmissions` に保存する
 - 施設別算定ルールに `conditions` / `actions` JSON を追加し、明細単位の点数調整、摘要候補、病名要件、同月回数確認を `claim_line_adjustments` と `ClaimReviewIssue` に展開できるようにした
+- `claim_line_adjustments` の提案を病棟UIで採用/無視できるようにし、採用済みの `points_delta` だけを `ClaimDraft.total_points` へ再計算反映する承認フローを追加した
 
 ## Phase 3 実装範囲
 
@@ -78,7 +80,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
 | 退院許可・退院実施 | backend API 済み | 退院会計の本番レセコン連携 |
-| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft/Line + 施設別rule DSL/UI + 点検提案 + ORCA HTTP adapter 済み | 実ORCA環境での疎通確認、返戻/査定 workflow、診療報酬ルールの網羅 |
+| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft/Line + 施設別rule DSL/UI + 点検提案承認 + ORCA HTTP adapter 済み | 実ORCA環境での疎通確認、返戻/査定 workflow、診療報酬ルールの網羅 |
 | 転棟・転床 | backend API/UI 済み | D&D 操作、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |

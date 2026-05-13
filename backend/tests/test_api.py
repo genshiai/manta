@@ -32,7 +32,7 @@ from app.modules.master_data.models import (
     ReservationSlotMaster,
     StandardUsageMaster,
 )
-from app.modules.rececon.models import ClaimDraft, FacilityClaimRule
+from app.modules.rececon.models import ClaimDraft, ClaimLineAdjustment, FacilityClaimRule
 from app.seed import PATIENT_WORKSPACE_BY_ID
 
 
@@ -502,6 +502,8 @@ def test_get_and_update_inpatient_discharge_plan() -> None:
 
 def test_create_and_update_inpatient_claim_draft() -> None:
     draft_id: int | None = None
+    adjustment_id: int | None = None
+    base_total = 0
     with TestClient(app) as client:
         token = login(client, "dr.tanaka", "manta-demo")
         admissions_response = client.get(
@@ -516,8 +518,29 @@ def test_create_and_update_inpatient_claim_draft() -> None:
         assert create_response.status_code == 201
         draft = create_response.json()
         draft_id = draft["id"]
+        base_total = draft["total_points"]
+        with SessionLocal() as db:
+            adjustment = ClaimLineAdjustment(
+                claim_draft_id=draft_id,
+                adjustment_type="test_points_delta",
+                points_delta=123,
+                reason="テスト調整",
+            )
+            db.add(adjustment)
+            db.commit()
+            adjustment_id = adjustment.id
         get_response = client.get(
             f"/api/inpatient/admissions/{admission_id}/claim-draft",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        accept_adjustment_response = client.patch(
+            f"/api/claim-line-adjustments/{adjustment_id}",
+            json={"status": "accepted"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        ignore_adjustment_response = client.patch(
+            f"/api/claim-line-adjustments/{adjustment_id}",
+            json={"status": "ignored"},
             headers={"Authorization": f"Bearer {token}"},
         )
         update_response = client.patch(
@@ -541,6 +564,18 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert "issues" in draft
     assert get_response.status_code == 200
     assert get_response.json()["id"] == draft_id
+    assert accept_adjustment_response.status_code == 200
+    assert accept_adjustment_response.json()["total_points"] == base_total + 123
+    assert any(
+        item["id"] == adjustment_id and item["status"] == "accepted"
+        for item in accept_adjustment_response.json()["adjustments"]
+    )
+    assert ignore_adjustment_response.status_code == 200
+    assert ignore_adjustment_response.json()["total_points"] == base_total
+    assert any(
+        item["id"] == adjustment_id and item["status"] == "ignored"
+        for item in ignore_adjustment_response.json()["adjustments"]
+    )
     assert update_response.status_code == 200
     assert update_response.json()["status"] == "ready"
     assert transmit_response.status_code == 201

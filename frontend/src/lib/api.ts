@@ -11,6 +11,7 @@ import type {
   AdminUserSummary,
   AuditLogEntry,
   ClaimDraft,
+  ClaimLineAdjustment,
   FacilityClaimRule,
   OrcaAdapterSetting,
   OrcaConnectionTestResult,
@@ -1886,6 +1887,17 @@ export const updateClaimDraftStatus = async (
   status: ClaimDraft['status'],
 ): Promise<ClaimDraft> => {
   const draft = await request<ApiClaimDraft>(`/api/claim-drafts/${claimDraftId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return mapClaimDraft(draft);
+};
+
+export const updateClaimLineAdjustmentStatus = async (
+  adjustmentId: number,
+  status: ClaimLineAdjustment['status'],
+): Promise<ClaimDraft> => {
+  const draft = await request<ApiClaimDraft>(`/api/claim-line-adjustments/${adjustmentId}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });

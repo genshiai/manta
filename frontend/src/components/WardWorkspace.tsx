@@ -24,6 +24,7 @@ import {
   transferInpatientAdmission,
   updateInpatientBedStatus,
   updateClaimDraftStatus,
+  updateClaimLineAdjustmentStatus,
   updateInpatientDocument,
   updateInpatientDischargePlan,
   updateInpatientInstructionStatus,
@@ -35,6 +36,7 @@ import type {
   InpatientAiSummaryReview,
   InpatientBed,
   ClaimDraft,
+  ClaimLineAdjustment,
   InpatientDocument,
   InpatientDocumentType,
   InpatientDischargePlan,
@@ -87,6 +89,18 @@ const documentTypeLabels: Record<InpatientDocumentType, string> = {
   admission_care_plan: '入院診療計画書',
   discharge_summary: '退院サマリ',
   discharge_instruction: '退院時指導文書',
+};
+
+const claimAdjustmentStatusLabels: Record<ClaimLineAdjustment['status'], string> = {
+  suggested: '提案',
+  accepted: '採用済',
+  ignored: '無視',
+};
+
+const claimAdjustmentStatusClasses: Record<ClaimLineAdjustment['status'], string> = {
+  suggested: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+  accepted: 'border-green-200 bg-green-50 text-green-900',
+  ignored: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-700',
 };
 
 const documentStatusLabels: Record<InpatientDocument['status'], string> = {
@@ -541,6 +555,31 @@ export const WardWorkspace = ({
         return;
       }
       setErrorMessage(error instanceof Error ? error.message : '請求ドラフトの更新に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
+    }
+  };
+
+  const handleUpdateClaimLineAdjustmentStatus = async (
+    adjustment: ClaimLineAdjustment,
+    status: ClaimLineAdjustment['status'],
+  ) => {
+    if (isSavingClaimDraft || adjustment.status === status) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const draft = await updateClaimLineAdjustmentStatus(adjustment.id, status);
+      setClaimDraft(draft);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '請求点数調整の更新に失敗しました。');
     } finally {
       setIsSavingClaimDraft(false);
     }
@@ -1074,13 +1113,38 @@ export const WardWorkspace = ({
                             {claimDraft.adjustments.slice(0, 4).map((adjustment) => (
                               <div className='rounded border border-purple-100 bg-white px-2 py-1.5' key={adjustment.id}>
                                 <div className='flex flex-wrap items-center justify-between gap-2'>
-                                  <p className='text-[11px] font-bold text-purple-950'>{adjustment.adjustmentType}</p>
-                                  <span className='text-[10px] font-bold text-purple-900'>
+                                  <div className='flex flex-wrap items-center gap-2'>
+                                    <p className='text-[11px] font-bold text-purple-950'>{adjustment.adjustmentType}</p>
+                                    <span className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold', claimAdjustmentStatusClasses[adjustment.status])}>
+                                      {claimAdjustmentStatusLabels[adjustment.status]}
+                                    </span>
+                                  </div>
+                                  <span className={cn('text-[10px] font-bold', adjustment.status === 'accepted' ? 'text-green-900' : 'text-purple-900')}>
                                     {adjustment.pointsDelta > 0 ? '+' : ''}{adjustment.pointsDelta}点
                                   </span>
                                 </div>
                                 <p className='mt-1 text-[11px] leading-normal text-text-secondary'>{adjustment.reason}</p>
                                 {adjustment.comment ? <p className='mt-1 text-[10px] text-text-tertiary'>摘要候補: {adjustment.comment}</p> : null}
+                                <div className='mt-2 flex flex-wrap gap-2'>
+                                  <Button
+                                    disabled={isSavingClaimDraft || adjustment.status === 'accepted'}
+                                    onClick={() => handleUpdateClaimLineAdjustmentStatus(adjustment, 'accepted')}
+                                    size='xs'
+                                    type='button'
+                                    variant='outline'
+                                  >
+                                    採用
+                                  </Button>
+                                  <Button
+                                    disabled={isSavingClaimDraft || adjustment.status === 'ignored'}
+                                    onClick={() => handleUpdateClaimLineAdjustmentStatus(adjustment, 'ignored')}
+                                    size='xs'
+                                    type='button'
+                                    variant='ghost'
+                                  >
+                                    無視
+                                  </Button>
+                                </div>
                               </div>
                             ))}
                             {claimDraft.issues.slice(0, 4).map((issue) => (
