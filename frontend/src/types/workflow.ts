@@ -382,6 +382,8 @@ export type ClaimLineAdjustment = {
   adjustmentType: string;
   pointsDelta: number;
   comment?: string;
+  commentCode?: string;
+  commentPattern?: string;
   reason: string;
   status: 'suggested' | 'accepted' | 'ignored';
   createdAt: string;

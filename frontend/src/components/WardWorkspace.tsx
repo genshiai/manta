@@ -1124,7 +1124,12 @@ export const WardWorkspace = ({
                                   </span>
                                 </div>
                                 <p className='mt-1 text-[11px] leading-normal text-text-secondary'>{adjustment.reason}</p>
-                                {adjustment.comment ? <p className='mt-1 text-[10px] text-text-tertiary'>摘要候補: {adjustment.comment}</p> : null}
+                                {adjustment.comment ? (
+                                  <p className='mt-1 text-[10px] text-text-tertiary'>
+                                    摘要候補: {adjustment.commentCode ? `${adjustment.commentCode} ` : ''}{adjustment.comment}
+                                    {adjustment.commentPattern ? ` / pattern ${adjustment.commentPattern}` : ''}
+                                  </p>
+                                ) : null}
                                 <div className='mt-2 flex flex-wrap gap-2'>
                                   <Button
                                     disabled={isSavingClaimDraft || adjustment.status === 'accepted'}

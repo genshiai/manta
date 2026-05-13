@@ -548,9 +548,33 @@ def test_get_and_update_inpatient_discharge_plan() -> None:
 def test_create_and_update_inpatient_claim_draft() -> None:
     draft_id: int | None = None
     adjustment_id: int | None = None
+    comment_code = "820999994"
     base_total = 0
     with TestClient(app) as client:
         token = login(client, "dr.tanaka", "manta-demo")
+        with SessionLocal() as db:
+            existing_comment = db.get(ReceiptCommentMaster, comment_code)
+            if existing_comment is not None:
+                db.delete(existing_comment)
+                db.commit()
+            db.add(
+                ReceiptCommentMaster(
+                    comment_code=comment_code,
+                    change_type="0",
+                    master_type="C",
+                    comment_class="8",
+                    pattern="20",
+                    sequence_number="999994",
+                    check_digit="4",
+                    text="同月内検査の包括・回数制限を確認",
+                    text_kana="ドウゲツナイケンサノホウカツカイスウセイゲンヲカクニン",
+                    effective_from="20260401",
+                    effective_to="99999999",
+                    raw_columns=[],
+                    source_file="test",
+                )
+            )
+            db.commit()
         admissions_response = client.get(
             "/api/inpatient/admissions",
             headers={"Authorization": f"Bearer {token}"},
@@ -605,6 +629,7 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert {"line_type", "source_type", "label", "points", "quantity"} <= set(draft["lines"][0])
     assert "adjustments" in draft
     assert any(item["adjustment_type"] == "review_comment" for item in draft["adjustments"])
+    assert any(item["comment_code"] == comment_code for item in draft["adjustments"])
     assert isinstance(draft["total_points"], int)
     assert "issues" in draft
     assert get_response.status_code == 200
@@ -632,7 +657,10 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             persisted = db.get(ClaimDraft, draft_id)
             if persisted is not None:
                 db.delete(persisted)
-                db.commit()
+            comment_master = db.get(ReceiptCommentMaster, comment_code)
+            if comment_master is not None:
+                db.delete(comment_master)
+            db.commit()
 
 
 def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:

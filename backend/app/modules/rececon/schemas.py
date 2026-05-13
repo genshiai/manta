@@ -69,6 +69,8 @@ class ClaimLineAdjustmentRead(BaseModel):
     adjustment_type: str
     points_delta: int
     comment: str | None = None
+    comment_code: str | None = None
+    comment_pattern: str | None = None
     reason: str
     status: ClaimLineAdjustmentStatus
     created_at: datetime

@@ -625,6 +625,8 @@ type ApiClaimLineAdjustment = {
   adjustment_type: string;
   points_delta: number;
   comment: string | null;
+  comment_code: string | null;
+  comment_pattern: string | null;
   reason: string;
   status: 'suggested' | 'accepted' | 'ignored';
   created_at: string;
@@ -1375,6 +1377,8 @@ const mapClaimLineAdjustment = (item: ApiClaimLineAdjustment) => ({
   adjustmentType: item.adjustment_type,
   pointsDelta: item.points_delta,
   comment: item.comment ?? undefined,
+  commentCode: item.comment_code ?? undefined,
+  commentPattern: item.comment_pattern ?? undefined,
   reason: item.reason,
   status: item.status,
   createdAt: formatTimestamp(item.created_at),

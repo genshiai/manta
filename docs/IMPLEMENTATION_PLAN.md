@@ -158,7 +158,7 @@ Mantaカルテ本体は **外来 1 ループの demo MVP はかなり進んで�
 | カルテ API / 永続化 | 主要 API は動作。モジュール境界は未整理 | 55% |
 | オーダ / マスター | 処方・検査・予約 master はあり。公式診療報酬 master 連携は未着手 | 40% |
 | FHIR / 外部公開 | 主要 resource の preview adapter あり | 35% |
-| Mantaレセコン | ClaimDraft/Line、ReviewIssue、施設別rule DSL/UI、点検提案承認、診療行為/コメント master importer、Mock/HTTP ORCA送信履歴まで実装 | 42% |
+| Mantaレセコン | ClaimDraft/Line、ReviewIssue、施設別rule DSL/UI、点検提案承認、診療行為/コメント master importer、コメントコード付き摘要候補、Mock/HTTP ORCA送信履歴まで実装 | 44% |
 | レセコン連携 | ORCA adapter 境界、接続設定、HTTP mode、mock/http送信履歴まで実装。実環境疎通は未確認 | 24% |
 | AI算定補助 | UI concept と方針のみ。実API未接続 | 5% |
 
@@ -240,6 +240,7 @@ Mantaカルテ本体は **外来 1 ループの demo MVP はかなり進んで�
 - 施設別算定ルールへ `conditions` / `actions` JSON を追加し、ClaimDraftLine から点数調整・摘要候補・病名要件・同月回数確認を生成できるようにした
 - 点数調整提案を `accepted` / `ignored` に更新する API/UI を追加し、採用済み調整のみを請求ドラフト合計点数へ反映できるようにした
 - 支払基金 コメントマスター importer と検索 API を追加し、摘要欄コメントコードを請求点検へ使う土台を作った
+- 点検提案の摘要候補をコメントマスターへ照合し、`ClaimLineAdjustment` にコメントコードとパターンを保持・表示できるようにした
 - クリティカルパス master を追加し、疾患/診療科別パスと日別タスクテンプレートを選択して入院エピソードへ展開できるようにした
 - クリティカルパス割当時に予定日、予定時間、担当職種をタスクへ展開し、病棟ワークスペースで確認できるようにした
 - 次の主課題は外部 preview への公開と、マスタの更新者 / 更新日時表示、レビュー運用の整備

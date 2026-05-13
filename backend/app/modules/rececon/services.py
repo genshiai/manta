@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..inpatient.models import Admission, InpatientInstruction
 from ..karte.models import LabOrder, Patient, PrescriptionOrder
+from ..master_data.models import ReceiptCommentMaster
 from .models import (
     ClaimDraft,
     ClaimDraftLine,
@@ -295,8 +296,40 @@ def _claim_rule_matches_context(
     return bool(conditions)
 
 
+def _resolve_receipt_comment_candidate(
+    db: Session,
+    *,
+    comment: str | None,
+    comment_code: str | None,
+) -> ReceiptCommentMaster | None:
+    normalized_code = comment_code.strip() if isinstance(comment_code, str) else ""
+    if normalized_code:
+        return db.get(ReceiptCommentMaster, normalized_code)
+
+    normalized_comment = comment.strip() if isinstance(comment, str) else ""
+    if not normalized_comment:
+        return None
+
+    exact = db.scalar(
+        select(ReceiptCommentMaster)
+        .where(ReceiptCommentMaster.text == normalized_comment)
+        .order_by(ReceiptCommentMaster.comment_code)
+        .limit(1)
+    )
+    if exact is not None:
+        return exact
+
+    return db.scalar(
+        select(ReceiptCommentMaster)
+        .where(ReceiptCommentMaster.text.ilike(f"%{normalized_comment}%"))
+        .order_by(ReceiptCommentMaster.comment_code)
+        .limit(1)
+    )
+
+
 def build_claim_rule_adjustments(
     *,
+    db: Session,
     claim_draft_id: int,
     patient: Patient,
     lines: list[ClaimDraftLine],
@@ -319,7 +352,13 @@ def build_claim_rule_adjustments(
             actions = rule.actions or {}
             points_delta = actions.get("points_delta")
             comment = actions.get("comment")
-            if isinstance(points_delta, int) or isinstance(comment, str):
+            comment_code = actions.get("comment_code")
+            if isinstance(points_delta, int) or isinstance(comment, str) or isinstance(comment_code, str):
+                comment_candidate = _resolve_receipt_comment_candidate(
+                    db,
+                    comment=comment if isinstance(comment, str) else None,
+                    comment_code=comment_code if isinstance(comment_code, str) else None,
+                )
                 adjustments.append(
                     ClaimLineAdjustment(
                         claim_draft_id=claim_draft_id,
@@ -327,7 +366,9 @@ def build_claim_rule_adjustments(
                         rule_id=rule.id,
                         adjustment_type=str(actions.get("type") or "rule_suggestion"),
                         points_delta=points_delta if isinstance(points_delta, int) else 0,
-                        comment=comment if isinstance(comment, str) else None,
+                        comment=comment_candidate.text if comment_candidate is not None else comment if isinstance(comment, str) else None,
+                        comment_code=comment_candidate.comment_code if comment_candidate is not None else None,
+                        comment_pattern=comment_candidate.pattern if comment_candidate is not None else None,
                         reason=rule.message,
                     )
                 )

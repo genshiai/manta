@@ -75,6 +75,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - ORCA adapter の HTTP mode を追加し、`base_url`、BASIC 認証の operator/password、請求送信 endpoint、接続確認 endpoint を設定できるようにした。HTTP 送信時は ORCA レスポンス本文と HTTP status を `claim_transmissions` に保存する
 - 施設別算定ルールに `conditions` / `actions` JSON を追加し、明細単位の点数調整、摘要候補、病名要件、同月回数確認を `claim_line_adjustments` と `ClaimReviewIssue` に展開できるようにした
 - `claim_line_adjustments` の提案を病棟UIで採用/無視できるようにし、採用済みの `points_delta` だけを `ClaimDraft.total_points` へ再計算反映する承認フローを追加した
+- 施設別算定ルールの `actions.comment` / `actions.comment_code` から `receipt_comment_masters` を照合し、`ClaimLineAdjustment` にコメントコード・パターン付きの摘要候補を保持できるようにした
 
 ## Phase 3 実装範囲
 

@@ -71,6 +71,8 @@ class ClaimLineAdjustment(Base):
     adjustment_type: Mapped[str] = mapped_column(String(64), index=True)
     points_delta: Mapped[int] = mapped_column(Integer, default=0)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment_code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    comment_pattern: Mapped[str | None] = mapped_column(String(8), nullable=True)
     reason: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(32), default="suggested", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

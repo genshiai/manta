@@ -133,6 +133,7 @@ def create_inpatient_claim_draft(
         .order_by(FacilityClaimRule.sort_order, FacilityClaimRule.id)
     ).all()
     adjustments, rule_issues = build_claim_rule_adjustments(
+        db=db,
         claim_draft_id=draft.id,
         patient=patient,
         lines=lines,
