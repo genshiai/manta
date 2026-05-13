@@ -27,6 +27,7 @@ from app.modules.master_data.models import (
     PmdaPackageInsertSection,
     PrescriptionCatalogMaster,
     PrescriptionSetMaster,
+    ReceiptCommentMaster,
     ReceiptLongTermListedDrug,
     ReceiptTransitionalDrug,
     ReservationSlotMaster,
@@ -195,6 +196,50 @@ def test_login_and_list_patients() -> None:
     )
     assert all(item["department"] == "内科" for item in internal_master_response.json()["reservation_slots"])
     assert all(item["department"] in {"内科", "共通"} for item in internal_master_response.json()["chart_templates"])
+
+
+def test_search_receipt_comment_masters() -> None:
+    comment_code = "820999993"
+    with SessionLocal() as db:
+        existing = db.get(ReceiptCommentMaster, comment_code)
+        if existing is not None:
+            db.delete(existing)
+            db.commit()
+        db.add(
+            ReceiptCommentMaster(
+                comment_code=comment_code,
+                change_type="0",
+                master_type="C",
+                comment_class="8",
+                pattern="20",
+                sequence_number="999993",
+                check_digit="3",
+                text="コメント検索テスト",
+                text_kana="コメントケンサクテスト",
+                effective_from="20260401",
+                effective_to="99999999",
+                raw_columns=[],
+                source_file="test",
+            )
+        )
+        db.commit()
+
+    try:
+        with TestClient(app) as client:
+            token = login(client, "dr.tanaka", "manta-demo")
+            response = client.get(
+                "/api/masters/receipt-comments/search?q=コメント検索",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert response.status_code == 200
+        assert any(item["comment_code"] == comment_code for item in response.json())
+    finally:
+        with SessionLocal() as db:
+            item = db.get(ReceiptCommentMaster, comment_code)
+            if item is not None:
+                db.delete(item)
+                db.commit()
 
 
 def test_list_inpatient_admissions() -> None:

@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from ...db import get_db
 from ...security import get_current_user
 from ..auth.models import User
-from .models import DiagnosisAliasMaster, DiagnosisMaster
-from .schemas import DiagnosisMasterRead
+from .models import DiagnosisAliasMaster, DiagnosisMaster, ReceiptCommentMaster
+from .schemas import DiagnosisMasterRead, ReceiptCommentMasterRead
 from .services import (
     normalize_diagnosis_search_query,
     to_katakana,
@@ -134,3 +134,41 @@ def search_diagnosis_masters(
         )
         for item in items
     ]
+
+
+@router.get("/api/masters/receipt-comments/search", response_model=list[ReceiptCommentMasterRead])
+def search_receipt_comment_masters(
+    q: str = Query(min_length=1),
+    limit: int = Query(default=20, ge=1, le=50),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[ReceiptCommentMasterRead]:
+    normalized_query = q.strip()
+    if not normalized_query:
+        return []
+
+    code_query = normalized_query.replace("-", "").replace(" ", "")
+    contains = f"%{normalized_query}%"
+    code_prefix = f"{code_query}%"
+    statement = (
+        select(ReceiptCommentMaster)
+        .where(
+            or_(
+                ReceiptCommentMaster.comment_code.ilike(code_prefix),
+                ReceiptCommentMaster.text.ilike(contains),
+                ReceiptCommentMaster.text_kana.ilike(contains),
+            )
+        )
+        .order_by(
+            case(
+                (ReceiptCommentMaster.comment_code == code_query, 0),
+                (ReceiptCommentMaster.comment_code.ilike(code_prefix), 1),
+                (ReceiptCommentMaster.text.ilike(f"{normalized_query}%"), 2),
+                (ReceiptCommentMaster.text.ilike(contains), 3),
+                else_=4,
+            ),
+            ReceiptCommentMaster.comment_code,
+        )
+        .limit(limit)
+    )
+    return [ReceiptCommentMasterRead.model_validate(item) for item in db.scalars(statement).all()]

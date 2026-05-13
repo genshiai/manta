@@ -121,6 +121,26 @@ class ReceiptMedicalPracticeMaster(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class ReceiptCommentMaster(Base):
+    __tablename__ = "receipt_comment_masters"
+
+    comment_code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    change_type: Mapped[str] = mapped_column(String(8))
+    master_type: Mapped[str] = mapped_column(String(1), default="C")
+    comment_class: Mapped[str | None] = mapped_column(String(8), nullable=True, index=True)
+    pattern: Mapped[str | None] = mapped_column(String(8), nullable=True, index=True)
+    sequence_number: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    check_digit: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text_kana: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    effective_from: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    effective_to: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    raw_columns: Mapped[list[str]] = mapped_column(JSON, default=list)
+    source_file: Mapped[str] = mapped_column(String(255), default="demo")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class HotDrugCodeMapping(Base):
     __tablename__ = "hot_drug_code_mappings"
 

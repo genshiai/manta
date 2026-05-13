@@ -239,6 +239,20 @@ class ReservationSlotUpdateRequest(BaseModel):
     capacity: int = 1
 
 
+class ReceiptCommentMasterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    comment_code: str
+    comment_class: str | None = None
+    pattern: str | None = None
+    sequence_number: str | None = None
+    text: str | None = None
+    text_kana: str | None = None
+    effective_from: str | None = None
+    effective_to: str | None = None
+    source_file: str
+
+
 class ChartTemplateRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

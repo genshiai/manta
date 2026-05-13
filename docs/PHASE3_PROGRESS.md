@@ -63,8 +63,10 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - 病棟ワークスペースで退院時処方メモ、退院後方針、会計候補を確認し、レビュー済/退院準備完了に更新できるようにした
 - 退院会計候補に候補ID、根拠、確認状態、信頼度を持たせ、入院日数、退院支援、処方、実施済み指示、検査オーダから構造化して生成するようにした
 - `receipt_medical_practice_masters`: 診療行為レセ電 master の受け皿
+- `receipt_comment_masters`: 摘要欄コメント master の受け皿
 - 退院会計候補へ診療行為レセ電コード候補、名称、点数、単位を付与し、UIで確認できるようにした
 - 支払基金 医科診療行為マスター importer を追加し、`s_ALL*.zip` / 展開済み CSV から `receipt_medical_practice_masters` に同期できるようにした
+- 支払基金 コメントマスター importer を追加し、`c_ALL*.zip` / 展開済み CSV から `receipt_comment_masters` に同期、API検索できるようにした
 - 退院計画の会計候補から請求ドラフトを作成し、レセ電コード不足、要確認候補、傷病名コード確認を `ClaimReviewIssue` として保存・表示できるようにした
 - 施設別算定ルールを `facility_claim_rules` として seed 同期し、入院基本料、退院支援、投薬、検査の必要記録を請求ドラフト作成時に照合するようにした
 - Mock ORCA adapter を追加し、送信 payload、戻り status、エラー内容を `claim_transmissions` に保存し、病棟ワークスペースから送信試行と結果確認ができるようにした

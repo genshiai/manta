@@ -1,6 +1,6 @@
 # Master Data Downloads
 
-更新日: 2026-05-08
+更新日: 2026-05-13
 
 Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 
@@ -16,8 +16,9 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 2. PMDA 医療用医薬品添付文書 XML
 3. 支払基金 レセプト電算 医薬品マスター
 4. 支払基金 レセプト電算 医科診療行為マスター
-4. MEDIS 医薬品 HOT コードマスター
-5. 厚労省 一般名処方マスター
+5. 支払基金 レセプト電算 コメントマスター
+6. MEDIS 医薬品 HOT コードマスター
+7. 厚労省 一般名処方マスター
 
 `/Users/daichi/Downloads/tp20260415-01_01.xlsx` は 1 の「内用薬」。Manta の薬剤 master の YJ 実コード化に使える。
 
@@ -45,6 +46,7 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
   20260331-medis-hot/
   20260312-ssk-long-term-listed/
   20260305-ssk-transitional-drugs/
+  20260507-ssk-receipt-comment/
 ```
 
 DB 件数:
@@ -56,6 +58,7 @@ DB 件数:
 | `hot_drug_code_mappings` | 98,724 | MEDIS HOT 全件 CSV 2 ファイル |
 | `receipt_transitional_drugs` | 458 | 支払基金 経過措置医薬品一覧 |
 | `receipt_long_term_listed_drugs` | 776 | 支払基金 長期収載品の選定療養対象一覧 |
+| `receipt_comment_masters` | 4,826 | 支払基金 レセプト電算 コメントマスター |
 
 取得済みだが importer 未実装:
 
@@ -72,6 +75,7 @@ DB 件数:
 | A | PMDA 医療用医薬品添付文書 XML | ロキソニン XML で検証済み。全件/採用薬分は未取得 | importer 実装済み | PMDA メディナビから XML 全件または採用薬分を取得する |
 | A | 支払基金 レセプト電算 医薬品マスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260414-ssk-receipt-drug/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
 | A | MEDIS 医薬品 HOT コードマスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260331-medis-hot/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| A | 支払基金 レセプト電算 コメントマスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260507-ssk-receipt-comment/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
 | B | 支払基金 経過措置医薬品一覧 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260305-ssk-transitional-drugs/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
 | B | 支払基金 長期収載品の選定療養対象一覧 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260312-ssk-long-term-listed/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
 | B | 厚労省 一般名処方マスター | 未取得 | importer 未実装 | 一般名処方 Excel を取得する |
@@ -101,6 +105,8 @@ DB 件数:
     sentei_20260312.xlsx
   20260305-ssk-transitional-drugs/
     keikasoti_R08_20260305.xlsx
+  20260507-ssk-receipt-comment/
+    c_ALL20260507.zip
   pmda-package-inserts/
     xml/
 ```
@@ -265,7 +271,37 @@ uv run python scripts/import_receipt_medical_practice_master.py \
   --dry-run
 ```
 
-## 5. MEDIS 医薬品 HOT コードマスター
+## 5. 支払基金 レセプト電算 コメントマスター
+
+目的: レセプト摘要欄コメントのコード選択、コメント不足点検、将来のレセプトCSV出力。
+
+公式ページ:
+
+- [社会保険診療報酬支払基金 コメントマスター](https://www.ssk.or.jp/smph/seikyushiharai/tensuhyo/kihonmasta/kihonmasta_06.html)
+
+確認時点:
+
+- 最終更新日: 2026-05-07
+- 全件: `c_ALL20260507.zip`
+- 件数: 4,826件
+
+Manta 実装メモ:
+
+- `receipt_comment_masters` にコメントコード、区分、パターン、番号、漢字名称、カナ、有効期間、原本列を保持する。
+- `backend/scripts/import_receipt_comment_master.py` で `c_ALL*.zip` または展開済み CSV を import する。
+- API は `/api/masters/receipt-comments/search?q=...`。コメントコード、漢字名称、カナで検索できる。
+- パターン 20 は固定文、30/40 系は文字・数字差し込みが必要。現時点ではマスター保持と検索まで。
+
+取り込み例:
+
+```bash
+cd backend
+uv run python scripts/import_receipt_comment_master.py \
+  /path/to/c_ALL20260507.zip \
+  --dry-run
+```
+
+## 6. MEDIS 医薬品 HOT コードマスター
 
 目的: YJ、レセ電、包装単位、販売名、一般名処方の対応を安定させる。
 
@@ -465,7 +501,12 @@ uv run python scripts/import_receipt_adjustment_drugs.py \
    - 出力: `receipt_long_term_listed_drugs`
    - 目的: 選定療養対象表示と請求コード選択
 
-6. `import_generic_prescription_master.py` 未実装
+6. `import_receipt_comment_master.py` 実装済み
+   - 入力: 支払基金 `c_ALL*.zip` / `c_*.csv`
+   - 出力: `receipt_comment_masters`
+   - 目的: 摘要欄コメントコードの検索・コメント不足点検の基盤
+
+7. `import_generic_prescription_master.py` 未実装
    - 入力: 厚労省 一般名処方 master Excel
    - 出力: 一般名処方 master
    - 目的: 一般名処方、後発品提案、薬剤検索補助
