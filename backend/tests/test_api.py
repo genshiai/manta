@@ -16,7 +16,7 @@ from app.modules.inpatient.models import (
     InpatientInstruction,
     InpatientPathwayAssignment,
 )
-from app.modules.karte.models import LabOrder, Patient, PrescriptionOrder, Reservation
+from app.modules.karte.models import ImagingOrder, LabOrder, Patient, PrescriptionOrder, ProcedureOrder, Reservation
 from app.modules.master_data.models import (
     ChartTemplateMaster,
     DiagnosisAliasMaster,
@@ -1944,6 +1944,8 @@ def test_reservation_slot_state_uses_live_booking_count() -> None:
 
 
 def test_doctor_can_add_imaging_and_procedure_orders() -> None:
+    imaging_id: int | None = None
+    procedure_id: int | None = None
     try:
         with TestClient(app) as client:
             doctor_token = login(client, "dr.tanaka", "manta-demo")
@@ -1968,22 +1970,24 @@ def test_doctor_can_add_imaging_and_procedure_orders() -> None:
                     "actor": "田中 太郎",
                 },
             )
+            imaging_id = imaging_response.json()["id"]
+            procedure_id = procedure_response.json()["id"]
             imaging_update_response = client.patch(
-                "/api/patients/0009900041/imaging-orders/0",
+                f"/api/patients/0009900041/imaging-orders/{imaging_id}",
                 headers={"Authorization": f"Bearer {doctor_token}"},
                 json={"category": "皮膚エコー再検", "scheduled_at": "2026/05/18 10:00", "note": "再検予定"},
             )
             procedure_update_response = client.patch(
-                "/api/patients/0009900041/procedure-orders/0",
+                f"/api/patients/0009900041/procedure-orders/{procedure_id}",
                 headers={"Authorization": f"Bearer {doctor_token}"},
                 json={"title": "保湿指導再説明", "note": "家族へも説明"},
             )
             imaging_cancel_response = client.delete(
-                "/api/patients/0009900041/imaging-orders/0",
+                f"/api/patients/0009900041/imaging-orders/{imaging_id}",
                 headers={"Authorization": f"Bearer {doctor_token}"},
             )
             procedure_cancel_response = client.delete(
-                "/api/patients/0009900041/procedure-orders/0",
+                f"/api/patients/0009900041/procedure-orders/{procedure_id}",
                 headers={"Authorization": f"Bearer {doctor_token}"},
             )
             chart_response = client.get(
@@ -1992,6 +1996,16 @@ def test_doctor_can_add_imaging_and_procedure_orders() -> None:
             )
     finally:
         restore_patient_workspace("0009900041")
+        with SessionLocal() as db:
+            if imaging_id is not None:
+                imaging = db.get(ImagingOrder, imaging_id)
+                if imaging is not None:
+                    db.delete(imaging)
+            if procedure_id is not None:
+                procedure = db.get(ProcedureOrder, procedure_id)
+                if procedure is not None:
+                    db.delete(procedure)
+            db.commit()
 
     assert imaging_response.status_code == 200
     assert imaging_response.json()["category"] == "皮膚エコー"

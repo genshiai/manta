@@ -259,12 +259,16 @@ type ApiChartWorkspace = {
   }>;
   chart_history: Array<{ date: string; department: string; title: string; summary: string }>;
   imaging_orders: Array<{
+    id?: number | null;
+    patient_id?: string | null;
     category: string;
     status: 'scheduled' | 'draft' | 'cancelled';
     scheduled_at: string;
     note: string;
   }>;
   procedure_orders: Array<{
+    id?: number | null;
+    patient_id?: string | null;
     title: string;
     status: 'planned' | 'done' | 'cancelled';
     note: string;
@@ -993,9 +997,11 @@ const mapChartHistory = (
   }));
 
 const mapImagingOrders = (
-  items: Array<{ category: string; status: 'scheduled' | 'draft' | 'cancelled'; scheduled_at: string; note: string }>,
+  items: Array<{ id?: number | null; patient_id?: string | null; category: string; status: 'scheduled' | 'draft' | 'cancelled'; scheduled_at: string; note: string }>,
 ): ImagingOrderEntry[] =>
   items.map((item) => ({
+    id: item.id ?? undefined,
+    patientId: item.patient_id ?? undefined,
     category: item.category,
     status: item.status,
     scheduledAt: item.scheduled_at,
@@ -1003,9 +1009,11 @@ const mapImagingOrders = (
   }));
 
 const mapProcedureOrders = (
-  items: Array<{ title: string; status: 'planned' | 'done' | 'cancelled'; note: string }>,
+  items: Array<{ id?: number | null; patient_id?: string | null; title: string; status: 'planned' | 'done' | 'cancelled'; note: string }>,
 ): ProcedureOrderEntry[] =>
   items.map((item) => ({
+    id: item.id ?? undefined,
+    patientId: item.patient_id ?? undefined,
     title: item.title,
     status: item.status,
     note: item.note,
@@ -2759,8 +2767,10 @@ export const addImagingOrder = async (
   },
 ) =>
   request<{
+    id?: number | null;
+    patient_id?: string | null;
     category: string;
-    status: 'scheduled' | 'draft';
+    status: 'scheduled' | 'draft' | 'cancelled';
     scheduled_at: string;
     note: string;
   }>(`/api/patients/${patientId}/imaging-orders`, {
@@ -2780,6 +2790,8 @@ export const updateImagingOrder = async (
   payload: Partial<ImagingOrderEntry>,
 ) =>
   request<{
+    id?: number | null;
+    patient_id?: string | null;
     category: string;
     status: 'scheduled' | 'draft' | 'cancelled';
     scheduled_at: string;
@@ -2796,6 +2808,8 @@ export const updateImagingOrder = async (
 
 export const cancelImagingOrder = async (patientId: string, orderIndex: number) =>
   request<{
+    id?: number | null;
+    patient_id?: string | null;
     category: string;
     status: 'scheduled' | 'draft' | 'cancelled';
     scheduled_at: string;
@@ -2814,8 +2828,10 @@ export const addProcedureOrder = async (
   },
 ) =>
   request<{
+    id?: number | null;
+    patient_id?: string | null;
     title: string;
-    status: 'planned' | 'done';
+    status: 'planned' | 'done' | 'cancelled';
     note: string;
   }>(`/api/patients/${patientId}/procedure-orders`, {
     method: 'POST',
@@ -2833,6 +2849,8 @@ export const updateProcedureOrder = async (
   payload: Partial<ProcedureOrderEntry>,
 ) =>
   request<{
+    id?: number | null;
+    patient_id?: string | null;
     title: string;
     status: 'planned' | 'done' | 'cancelled';
     note: string;
@@ -2847,6 +2865,8 @@ export const updateProcedureOrder = async (
 
 export const cancelProcedureOrder = async (patientId: string, orderIndex: number) =>
   request<{
+    id?: number | null;
+    patient_id?: string | null;
     title: string;
     status: 'planned' | 'done' | 'cancelled';
     note: string;

@@ -93,10 +93,16 @@ class ChartHistoryItem(BaseModel):
 
 
 class ImagingOrderItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int | None = None
+    patient_id: str | None = None
     category: str
     status: Literal["scheduled", "draft", "cancelled"]
     scheduled_at: str
     note: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ImagingOrderCreateRequest(BaseModel):
@@ -115,9 +121,15 @@ class ImagingOrderUpdateRequest(BaseModel):
 
 
 class ProcedureOrderItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int | None = None
+    patient_id: str | None = None
     title: str
     status: Literal["planned", "done", "cancelled"]
     note: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ProcedureOrderCreateRequest(BaseModel):

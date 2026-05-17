@@ -104,6 +104,8 @@ export type ChartHistoryEntry = {
 };
 
 export type ImagingOrderEntry = {
+  id?: number;
+  patientId?: string;
   category: string;
   status: 'scheduled' | 'draft' | 'cancelled';
   scheduledAt: string;
@@ -111,6 +113,8 @@ export type ImagingOrderEntry = {
 };
 
 export type ProcedureOrderEntry = {
+  id?: number;
+  patientId?: string;
   title: string;
   status: 'planned' | 'done' | 'cancelled';
   note: string;

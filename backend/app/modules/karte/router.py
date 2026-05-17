@@ -14,7 +14,7 @@ from ..common.models import AuditLog
 from ..common.time import TOKYO_TZ
 from ..master_data.models import PrescriptionCatalogMaster
 from ..master_data.services import get_reservation_slot_master_or_404
-from .models import ChartNote, LabOrder, Observation, Patient, PrescriptionOrder, Reservation
+from .models import ChartNote, ImagingOrder, LabOrder, Observation, Patient, PrescriptionOrder, ProcedureOrder, Reservation
 from ..master_data.schemas import ChartOrderMasterRead
 from .schemas import (
     ChartSaveRequest,
@@ -143,6 +143,12 @@ def get_chart_workspace(
     patient_lab_orders = db.scalars(
         select(LabOrder).where(LabOrder.patient_id == patient_id).order_by(desc(LabOrder.created_at))
     ).all()
+    imaging_orders = db.scalars(
+        select(ImagingOrder).where(ImagingOrder.patient_id == patient_id).order_by(desc(ImagingOrder.created_at), desc(ImagingOrder.id))
+    ).all()
+    procedure_orders = db.scalars(
+        select(ProcedureOrder).where(ProcedureOrder.patient_id == patient_id).order_by(desc(ProcedureOrder.created_at), desc(ProcedureOrder.id))
+    ).all()
     reservation = db.scalar(select(Reservation).where(Reservation.patient_id == patient_id))
     audit_logs = db.scalars(
         select(AuditLog).where(AuditLog.patient_id == patient_id).order_by(desc(AuditLog.created_at)).limit(20)
@@ -163,8 +169,8 @@ def get_chart_workspace(
         vitals=patient.vitals,
         lab_results=patient.lab_results,
         chart_history=patient.chart_history,
-        imaging_orders=patient.imaging_orders,
-        procedure_orders=patient.procedure_orders,
+        imaging_orders=imaging_orders or [ImagingOrderItem(**item) for item in patient.imaging_orders or []],
+        procedure_orders=procedure_orders or [ProcedureOrderItem(**item) for item in patient.procedure_orders or []],
     )
 
 
@@ -618,17 +624,14 @@ def create_imaging_order(
     db: Session = Depends(get_db),
 ) -> ImagingOrderItem:
     patient = get_patient_or_404(db, patient_id)
-    imaging_orders = list(patient.imaging_orders or [])
-    imaging_orders.insert(
-        0,
-        {
-            "category": payload.category,
-            "status": payload.status,
-            "scheduled_at": payload.scheduled_at,
-            "note": payload.note,
-        },
+    order = ImagingOrder(
+        patient_id=patient_id,
+        category=payload.category,
+        status=payload.status,
+        scheduled_at=payload.scheduled_at,
+        note=payload.note,
     )
-    patient.imaging_orders = imaging_orders
+    db.add(order)
     log_audit(
         db,
         actor=current_user.display_name,
@@ -638,8 +641,8 @@ def create_imaging_order(
         patient=patient,
     )
     db.commit()
-    db.refresh(patient)
-    return ImagingOrderItem(**patient.imaging_orders[0])
+    db.refresh(order)
+    return ImagingOrderItem.model_validate(order)
 
 
 @router.patch("/api/patients/{patient_id}/imaging-orders/{order_index}", response_model=ImagingOrderItem)
@@ -651,6 +654,28 @@ def update_imaging_order(
     db: Session = Depends(get_db),
 ) -> ImagingOrderItem:
     patient = get_patient_or_404(db, patient_id)
+    table_order = db.get(ImagingOrder, order_index)
+    if table_order is not None and table_order.patient_id == patient_id:
+        if payload.category is not None:
+            table_order.category = payload.category
+        if payload.status is not None:
+            table_order.status = payload.status
+        if payload.scheduled_at is not None:
+            table_order.scheduled_at = payload.scheduled_at
+        if payload.note is not None:
+            table_order.note = payload.note
+        log_audit(
+            db,
+            actor=current_user.display_name,
+            action="画像更新",
+            scope="order",
+            detail=f"{table_order.category} を更新しました。",
+            patient=patient,
+        )
+        db.commit()
+        db.refresh(table_order)
+        return ImagingOrderItem.model_validate(table_order)
+
     imaging_orders = list(patient.imaging_orders or [])
     if order_index < 0 or order_index >= len(imaging_orders):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imaging order not found")
@@ -686,6 +711,21 @@ def cancel_imaging_order(
     db: Session = Depends(get_db),
 ) -> ImagingOrderItem:
     patient = get_patient_or_404(db, patient_id)
+    table_order = db.get(ImagingOrder, order_index)
+    if table_order is not None and table_order.patient_id == patient_id:
+        table_order.status = "cancelled"
+        log_audit(
+            db,
+            actor=current_user.display_name,
+            action="画像取消",
+            scope="order",
+            detail=f"{table_order.category} を取消しました。",
+            patient=patient,
+        )
+        db.commit()
+        db.refresh(table_order)
+        return ImagingOrderItem.model_validate(table_order)
+
     imaging_orders = list(patient.imaging_orders or [])
     if order_index < 0 or order_index >= len(imaging_orders):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imaging order not found")
@@ -714,16 +754,13 @@ def create_procedure_order(
     db: Session = Depends(get_db),
 ) -> ProcedureOrderItem:
     patient = get_patient_or_404(db, patient_id)
-    procedure_orders = list(patient.procedure_orders or [])
-    procedure_orders.insert(
-        0,
-        {
-            "title": payload.title,
-            "status": payload.status,
-            "note": payload.note,
-        },
+    order = ProcedureOrder(
+        patient_id=patient_id,
+        title=payload.title,
+        status=payload.status,
+        note=payload.note,
     )
-    patient.procedure_orders = procedure_orders
+    db.add(order)
     log_audit(
         db,
         actor=current_user.display_name,
@@ -733,8 +770,8 @@ def create_procedure_order(
         patient=patient,
     )
     db.commit()
-    db.refresh(patient)
-    return ProcedureOrderItem(**patient.procedure_orders[0])
+    db.refresh(order)
+    return ProcedureOrderItem.model_validate(order)
 
 
 @router.patch("/api/patients/{patient_id}/procedure-orders/{order_index}", response_model=ProcedureOrderItem)
@@ -746,6 +783,26 @@ def update_procedure_order(
     db: Session = Depends(get_db),
 ) -> ProcedureOrderItem:
     patient = get_patient_or_404(db, patient_id)
+    table_order = db.get(ProcedureOrder, order_index)
+    if table_order is not None and table_order.patient_id == patient_id:
+        if payload.title is not None:
+            table_order.title = payload.title
+        if payload.status is not None:
+            table_order.status = payload.status
+        if payload.note is not None:
+            table_order.note = payload.note
+        log_audit(
+            db,
+            actor=current_user.display_name,
+            action="処置更新",
+            scope="order",
+            detail=f"{table_order.title} を更新しました。",
+            patient=patient,
+        )
+        db.commit()
+        db.refresh(table_order)
+        return ProcedureOrderItem.model_validate(table_order)
+
     procedure_orders = list(patient.procedure_orders or [])
     if order_index < 0 or order_index >= len(procedure_orders):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedure order not found")
@@ -779,6 +836,21 @@ def cancel_procedure_order(
     db: Session = Depends(get_db),
 ) -> ProcedureOrderItem:
     patient = get_patient_or_404(db, patient_id)
+    table_order = db.get(ProcedureOrder, order_index)
+    if table_order is not None and table_order.patient_id == patient_id:
+        table_order.status = "cancelled"
+        log_audit(
+            db,
+            actor=current_user.display_name,
+            action="処置取消",
+            scope="order",
+            detail=f"{table_order.title} を取消しました。",
+            patient=patient,
+        )
+        db.commit()
+        db.refresh(table_order)
+        return ProcedureOrderItem.model_validate(table_order)
+
     procedure_orders = list(patient.procedure_orders or [])
     if order_index < 0 or order_index >= len(procedure_orders):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedure order not found")

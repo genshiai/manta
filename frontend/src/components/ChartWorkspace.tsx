@@ -541,9 +541,10 @@ export function ChartWorkspace({
   };
 
   const handleUpdateImaging = async (index: number, entry: ImagingOrderEntry) => {
+    const orderRef = entry.id ?? index;
     setIsMutating(true);
     try {
-      await updateImagingOrder(patient.id, index, entry);
+      await updateImagingOrder(patient.id, orderRef, entry);
       const refreshed = await getChartWorkspace(patient.id);
       setImagingOrders(refreshed.imagingOrders);
       setOrderMessage(`画像オーダを更新しました: ${entry.category}`);
@@ -560,9 +561,10 @@ export function ChartWorkspace({
   };
 
   const handleCancelImaging = async (index: number, entry: ImagingOrderEntry) => {
+    const orderRef = entry.id ?? index;
     setIsMutating(true);
     try {
-      await cancelImagingOrder(patient.id, index);
+      await cancelImagingOrder(patient.id, orderRef);
       const refreshed = await getChartWorkspace(patient.id);
       setImagingOrders(refreshed.imagingOrders);
       setOrderMessage(`画像オーダを取消しました: ${entry.category}`);
@@ -579,9 +581,10 @@ export function ChartWorkspace({
   };
 
   const handleUpdateProcedure = async (index: number, entry: ProcedureOrderEntry) => {
+    const orderRef = entry.id ?? index;
     setIsMutating(true);
     try {
-      await updateProcedureOrder(patient.id, index, entry);
+      await updateProcedureOrder(patient.id, orderRef, entry);
       const refreshed = await getChartWorkspace(patient.id);
       setProcedureOrders(refreshed.procedureOrders);
       setOrderMessage(`処置を更新しました: ${entry.title}`);
@@ -598,9 +601,10 @@ export function ChartWorkspace({
   };
 
   const handleCancelProcedure = async (index: number, entry: ProcedureOrderEntry) => {
+    const orderRef = entry.id ?? index;
     setIsMutating(true);
     try {
-      await cancelProcedureOrder(patient.id, index);
+      await cancelProcedureOrder(patient.id, orderRef);
       const refreshed = await getChartWorkspace(patient.id);
       setProcedureOrders(refreshed.procedureOrders);
       setOrderMessage(`処置を取消しました: ${entry.title}`);
