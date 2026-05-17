@@ -34,7 +34,7 @@ from app.modules.master_data.models import (
     StandardUsageMaster,
 )
 from app.modules.rececon.models import ClaimDraft, ClaimLineAdjustment, FacilityClaimRule
-from app.seed import PATIENT_WORKSPACE_BY_ID
+from app.seed import PATIENT_WORKSPACE_BY_ID, sync_patient_order_tables
 
 
 def login(client: TestClient, user_id: str, password: str) -> str:
@@ -1344,6 +1344,34 @@ def test_chart_workspace_includes_db_backed_snapshot_data() -> None:
     assert payload["prescription_history"][0]["item_count"] >= 1
     assert any(order["category"] == "胸部X線" for order in payload["imaging_orders"])
     assert any(order["title"] == "生活指導" for order in payload["procedure_orders"])
+
+
+def test_seed_syncs_snapshot_orders_into_order_tables() -> None:
+    with SessionLocal() as db:
+        for order in db.scalars(select(ImagingOrder).where(ImagingOrder.patient_id == "0009900040")).all():
+            db.delete(order)
+        for order in db.scalars(select(ProcedureOrder).where(ProcedureOrder.patient_id == "0009900040")).all():
+            db.delete(order)
+        db.commit()
+
+        assert sync_patient_order_tables(db) is True
+        db.commit()
+
+    with TestClient(app) as client:
+        doctor_token = login(client, "dr.tanaka", "manta-demo")
+        chart_response = client.get(
+            "/api/patients/0009900040/chart",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    assert chart_response.status_code == 200
+    payload = chart_response.json()
+    imaging_order = next(order for order in payload["imaging_orders"] if order["category"] == "胸部X線")
+    procedure_order = next(order for order in payload["procedure_orders"] if order["title"] == "生活指導")
+    assert imaging_order["id"] is not None
+    assert imaging_order["status"] == "scheduled"
+    assert procedure_order["id"] is not None
+    assert procedure_order["status"] == "done"
 
 
 def test_lab_trends_endpoint_returns_observation_backed_long_trends() -> None:

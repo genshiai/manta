@@ -22,10 +22,12 @@ from .modules.inpatient.models import (
 from .modules.karte.models import (
     ChartNote,
     Condition,
+    ImagingOrder,
     LabOrder,
     Observation,
     Patient,
     PrescriptionOrder,
+    ProcedureOrder,
     Reservation,
 )
 from .modules.master_data.models import (
@@ -1452,6 +1454,42 @@ def backfill_patient_workspace(db: Session) -> bool:
     return updated
 
 
+def sync_patient_order_tables(db: Session) -> bool:
+    updated = False
+
+    for patient_id, workspace in PATIENT_WORKSPACE_BY_ID.items():
+        has_imaging_orders = db.scalar(select(ImagingOrder.id).where(ImagingOrder.patient_id == patient_id).limit(1))
+        if has_imaging_orders is None:
+            for item in reversed(workspace["imaging_orders"]):
+                db.add(
+                    ImagingOrder(
+                        patient_id=patient_id,
+                        category=item["category"],
+                        status=item.get("status", "scheduled"),
+                        scheduled_at=item.get("scheduled_at", ""),
+                        note=item.get("note", ""),
+                    )
+                )
+                updated = True
+
+        has_procedure_orders = db.scalar(
+            select(ProcedureOrder.id).where(ProcedureOrder.patient_id == patient_id).limit(1)
+        )
+        if has_procedure_orders is None:
+            for item in reversed(workspace["procedure_orders"]):
+                db.add(
+                    ProcedureOrder(
+                        patient_id=patient_id,
+                        title=item["title"],
+                        status=item.get("status", "planned"),
+                        note=item.get("note", ""),
+                    )
+                )
+                updated = True
+
+    return updated
+
+
 def sync_chart_order_masters(db: Session) -> bool:
     updated = False
 
@@ -2127,6 +2165,9 @@ def seed_demo_data(db: Session) -> None:
         if backfill_patient_workspace(db):
             updated = True
 
+        if sync_patient_order_tables(db):
+            updated = True
+
         if backfill_patient_fhir_columns(db):
             updated = True
 
@@ -2387,6 +2428,7 @@ def seed_demo_data(db: Session) -> None:
     backfill_patient_fhir_columns(db)
     backfill_conditions_from_patient_problems(db)
     backfill_observations_from_patient_json(db)
+    sync_patient_order_tables(db)
     sync_inpatient_demo_data(db)
     sync_inpatient_pathway_masters(db)
     sync_receipt_medical_practice_masters(db)
