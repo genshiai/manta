@@ -265,20 +265,28 @@ def test_update_inpatient_instruction_status() -> None:
             instruction = db.scalar(select(InpatientInstruction).where(InpatientInstruction.status == "pending"))
             assert instruction is not None
             instruction_id = instruction.id
+            original_category = instruction.category
+            original_title = instruction.title
+            original_due_at = instruction.due_at
 
         response = client.patch(
             f"/api/inpatient/instructions/{instruction_id}",
-            json={"status": "done"},
+            json={"status": "done", "category": "検査", "title": "採血再検", "due_at": "2026-05-17T09:30:00+09:00"},
             headers={"Authorization": f"Bearer {token}"},
         )
 
     assert response.status_code == 200
     assert response.json()["status"] == "done"
+    assert response.json()["category"] == "検査"
+    assert response.json()["title"] == "採血再検"
 
     with SessionLocal() as db:
         instruction = db.get(InpatientInstruction, instruction_id)
         assert instruction is not None
         instruction.status = "pending"
+        instruction.category = original_category
+        instruction.title = original_title
+        instruction.due_at = original_due_at
         db.commit()
 
 
@@ -358,6 +366,11 @@ def test_create_and_sign_inpatient_document() -> None:
             f"/api/inpatient/admissions/{admission_id}/documents",
             headers={"Authorization": f"Bearer {token}"},
         )
+        update_response = client.patch(
+            f"/api/inpatient/documents/{document_id}",
+            json={"title": "入院診療計画書 改訂", "body": "本文を更新"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
         sign_response = client.patch(
             f"/api/inpatient/documents/{document_id}",
             json={"status": "signed"},
@@ -369,6 +382,9 @@ def test_create_and_sign_inpatient_document() -> None:
     assert "【患者情報】" in document["body"]
     assert list_response.status_code == 200
     assert any(item["id"] == document_id for item in list_response.json())
+    assert update_response.status_code == 200
+    assert update_response.json()["title"] == "入院診療計画書 改訂"
+    assert update_response.json()["body"] == "本文を更新"
     assert sign_response.status_code == 200
     assert sign_response.json()["status"] == "signed"
 
@@ -1808,6 +1824,10 @@ def test_doctor_can_save_unscheduled_reservation() -> None:
                     "actor": "田中 太郎",
                 },
             )
+            delete_response = client.delete(
+                f"/api/patients/{patient_id}/reservation",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
     finally:
         with SessionLocal() as db:
             reservation = db.scalar(select(Reservation).where(Reservation.patient_id == patient_id))
@@ -1825,6 +1845,7 @@ def test_doctor_can_save_unscheduled_reservation() -> None:
     assert response.status_code == 200
     assert response.json()["slot_id"] is None
     assert response.json()["scheduled_for"] == "日未定"
+    assert delete_response.status_code == 204
 
 
 def test_reservation_slot_state_uses_live_booking_count() -> None:

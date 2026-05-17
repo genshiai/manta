@@ -4,6 +4,7 @@ import {
   addLabOrder,
   addPrescription,
   addProcedureOrder,
+  cancelReservation,
   copyLastPrescriptions,
   getChartOrderConfig,
   getChartWorkspace,
@@ -603,6 +604,29 @@ export function ChartWorkspace({
     await finalizeFinishVisit();
   };
 
+  const handleCancelReservation = async () => {
+    if (!scheduledVisit) {
+      return;
+    }
+
+    setIsMutating(true);
+    try {
+      await cancelReservation(patient.id);
+      setScheduledVisit(null);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setSaveMessage(
+        `予約取消に失敗しました: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`,
+      );
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   const abnormalLabCount = labResults.filter((r) => r.flag === 'high').length;
 
   return (
@@ -693,6 +717,7 @@ export function ChartWorkspace({
           onCopyPrevious={handleCopyPrevious}
           onAddOrder={setOrderDialogTab}
           onOpenReservation={isInpatientChart ? undefined : () => setReservationDialogOpen(true)}
+          onCancelReservation={isInpatientChart ? undefined : handleCancelReservation}
         />
       }
       right={

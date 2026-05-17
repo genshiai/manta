@@ -665,6 +665,31 @@ def upsert_reservation(
     return reservation
 
 
+@router.delete("/api/patients/{patient_id}/reservation", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_reservation(
+    patient_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    patient = get_patient_or_404(db, patient_id)
+    reservation = db.scalar(select(Reservation).where(Reservation.patient_id == patient_id))
+    if reservation is None:
+        return None
+
+    detail = f"{reservation.scheduled_for} の再診予約を取消しました。"
+    db.delete(reservation)
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="再診予約取消",
+        scope="reservation",
+        detail=detail,
+        patient=patient,
+    )
+    db.commit()
+    return None
+
+
 @router.post("/api/patients/{patient_id}/status", response_model=PatientSummaryRead)
 def update_patient_status(
     patient_id: str,

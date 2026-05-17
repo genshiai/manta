@@ -52,7 +52,10 @@ class InpatientInstructionCreateRequest(BaseModel):
 
 
 class InpatientInstructionUpdateRequest(BaseModel):
-    status: InstructionStatus
+    category: str | None = None
+    title: str | None = None
+    due_at: datetime | None = None
+    status: InstructionStatus | None = None
 
 
 class NursingNoteRead(BaseModel):

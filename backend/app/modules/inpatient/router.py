@@ -742,13 +742,20 @@ def update_inpatient_instruction(
     instruction = get_inpatient_instruction_or_404(db, instruction_id)
     admission = get_admission_or_404(db, instruction.admission_id)
     patient = get_patient_or_404(db, admission.patient_id)
-    instruction.status = payload.status
+    if payload.category is not None:
+        instruction.category = payload.category
+    if payload.title is not None:
+        instruction.title = payload.title
+    if "due_at" in payload.model_fields_set:
+        instruction.due_at = payload.due_at
+    if payload.status is not None:
+        instruction.status = payload.status
     log_audit(
         db,
         actor=current_user.display_name,
         action="入院指示更新",
         scope="order",
-        detail=f"{instruction.title} を {payload.status} に更新しました。",
+        detail=f"{instruction.category}: {instruction.title} を更新しました。",
         patient=patient,
     )
     db.commit()
@@ -897,6 +904,15 @@ def update_inpatient_document(
             admission_id=document.admission_id,
             event_type="document_signed",
             title=f"文書署名: {document.title}",
+            detail=document.document_type,
+            actor=current_user.display_name,
+        )
+    elif payload.status == "archived":
+        add_inpatient_event(
+            db,
+            admission_id=document.admission_id,
+            event_type="document_archived",
+            title=f"文書取消: {document.title}",
             detail=document.document_type,
             actor=current_user.display_name,
         )

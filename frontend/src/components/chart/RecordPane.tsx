@@ -107,6 +107,7 @@ type RecordPaneProps = {
   onCopyPrevious: () => void;
   onAddOrder?: (tab: OrderTab) => void;
   onOpenReservation?: () => void;
+  onCancelReservation?: () => void;
 };
 
 const DEPT_ALL = 'all';
@@ -241,6 +242,7 @@ export const RecordPane = ({
   onCopyPrevious,
   onAddOrder,
   onOpenReservation,
+  onCancelReservation,
 }: RecordPaneProps) => {
   const [departmentFilter, setDepartmentFilter] = useState<string>(DEPT_ALL);
   const [todayRecordOpen, setTodayRecordOpen] = useState(false);
@@ -722,6 +724,8 @@ export const RecordPane = ({
               empty="予約枠はありません"
               actionLabel="予約を変更"
               onAction={onOpenReservation}
+              secondaryActionLabel={scheduledVisit ? '予約取消' : undefined}
+              onSecondaryAction={scheduledVisit ? onCancelReservation : undefined}
               items={[
                 ...(scheduledVisit
                   ? [
@@ -1243,26 +1247,37 @@ const LabsView = ({
 
 const OrderListView = ({
   actionLabel,
+  secondaryActionLabel,
   title,
   empty,
   items,
   onAction,
+  onSecondaryAction,
 }: {
   actionLabel?: string;
+  secondaryActionLabel?: string;
   title: string;
   empty: string;
   items: Array<{ key: string; title: string; meta: string; body: string }>;
   onAction?: () => void;
+  onSecondaryAction?: () => void;
 }) => (
   <section className="py-5">
     <div className="mb-3 flex items-center justify-between gap-3">
       <h3 className="text-[18px] font-bold text-text-primary">{title}</h3>
-      {actionLabel && onAction ? (
-        <Button onClick={onAction} size="xs" type="button" variant="outline">
-          <Plus size={13} />
-          {actionLabel}
-        </Button>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {secondaryActionLabel && onSecondaryAction ? (
+          <Button onClick={onSecondaryAction} size="xs" type="button" variant="ghost">
+            {secondaryActionLabel}
+          </Button>
+        ) : null}
+        {actionLabel && onAction ? (
+          <Button onClick={onAction} size="xs" type="button" variant="outline">
+            <Plus size={13} />
+            {actionLabel}
+          </Button>
+        ) : null}
+      </div>
     </div>
     {items.length === 0 ? (
       <p className="rounded-lg border border-dashed border-border bg-card py-12 text-center text-[13px] text-text-tertiary">

@@ -1722,19 +1722,34 @@ export const updateInpatientPathwayTask = async (
   return mapInpatientPathwayTask(task);
 };
 
-export const updateInpatientInstructionStatus = async (
+export const updateInpatientInstruction = async (
   instructionId: number,
-  status: 'pending' | 'done' | 'cancelled',
+  payload: {
+    category?: string;
+    title?: string;
+    dueAt?: string | null;
+    status?: 'pending' | 'done' | 'cancelled';
+  },
 ): Promise<InpatientInstruction> => {
+  const body: Record<string, string | null> = {};
+  if (payload.category !== undefined) body.category = payload.category;
+  if (payload.title !== undefined) body.title = payload.title;
+  if (payload.dueAt !== undefined) body.due_at = payload.dueAt;
+  if (payload.status !== undefined) body.status = payload.status;
   const instruction = await request<ApiInpatientInstruction>(
     `/api/inpatient/instructions/${instructionId}`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(body),
     },
   );
   return mapInpatientInstruction(instruction);
 };
+
+export const updateInpatientInstructionStatus = async (
+  instructionId: number,
+  status: 'pending' | 'done' | 'cancelled',
+): Promise<InpatientInstruction> => updateInpatientInstruction(instructionId, { status });
 
 export const listNursingNotes = async (admissionId: number): Promise<NursingNote[]> => {
   const notes = await request<ApiNursingNote[]>(
@@ -2775,6 +2790,12 @@ export const saveReservation = async (
       actor: payload.actor,
     }),
   });
+
+export const cancelReservation = async (patientId: string): Promise<void> => {
+  await request<void>(`/api/patients/${patientId}/reservation`, {
+    method: 'DELETE',
+  });
+};
 
 export const updatePatientStatus = async (
   patientId: string,

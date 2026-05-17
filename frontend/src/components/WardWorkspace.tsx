@@ -53,6 +53,7 @@ import {
   updateClaimLineAdjustmentStatus,
   updateInpatientDocument,
   updateInpatientDischargePlan,
+  updateInpatientInstruction,
   updateInpatientInstructionStatus,
   updateInpatientPathwayTask,
 } from '../lib/api';
@@ -134,7 +135,7 @@ const claimAdjustmentStatusClasses: Record<ClaimLineAdjustment['status'], string
 const documentStatusLabels: Record<InpatientDocument['status'], string> = {
   draft: '下書き',
   signed: '署名済',
-  archived: '保管',
+  archived: '取消済',
 };
 
 const documentStatusClasses: Record<InpatientDocument['status'], string> = {
@@ -237,6 +238,10 @@ export const WardWorkspace = ({
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [instructionForm, setInstructionForm] = useState(emptyInstructionForm);
   const [isInstructionFormOpen, setIsInstructionFormOpen] = useState(false);
+  const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
+  const [instructionEditForm, setInstructionEditForm] = useState(emptyInstructionForm);
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
+  const [documentForm, setDocumentForm] = useState({ title: '', body: '' });
   const [activeTab, setActiveTab] = useState('overview');
   const [isPatientListOpen, setIsPatientListOpen] = useState(false);
   const [selectedLabRowKeys, setSelectedLabRowKeys] = useState<Set<string>>(() => new Set());
@@ -248,6 +253,7 @@ export const WardWorkspace = ({
   const [isSavingInstruction, setIsSavingInstruction] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
+  const [isSavingDocument, setIsSavingDocument] = useState(false);
   const [isStartingPathway, setIsStartingPathway] = useState(false);
   const [isReviewingSummary, setIsReviewingSummary] = useState(false);
   const [isSavingDischargePlan, setIsSavingDischargePlan] = useState(false);
@@ -285,6 +291,10 @@ export const WardWorkspace = ({
       setSummaryReviews([]);
       setDischargePlan(null);
       setClaimDraft(null);
+      setEditingInstructionId(null);
+      setInstructionEditForm(emptyInstructionForm);
+      setEditingDocumentId(null);
+      setDocumentForm({ title: '', body: '' });
       return;
     }
 
@@ -451,6 +461,43 @@ export const WardWorkspace = ({
     }
   };
 
+  const startEditingInstruction = (instruction: InpatientInstruction) => {
+    setEditingInstructionId(instruction.id);
+    setInstructionEditForm({
+      category: instruction.category,
+      title: instruction.title,
+      dueAt: instruction.dueAt ? instruction.dueAt.slice(0, 16) : '',
+    });
+  };
+
+  const handleSaveInstruction = async (instruction: InpatientInstruction) => {
+    if (instruction.status !== 'pending' || isSavingInstruction) {
+      return;
+    }
+
+    setIsSavingInstruction(true);
+    setErrorMessage(null);
+    try {
+      const updated = await updateInpatientInstruction(instruction.id, {
+        category: instructionEditForm.category,
+        title: instructionEditForm.title,
+        dueAt: instructionEditForm.dueAt || null,
+      });
+      setInstructions((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setEditingInstructionId(null);
+      setInstructionEditForm(emptyInstructionForm);
+      setProgress(selectedAdmission ? await getInpatientProgress(selectedAdmission.id) : progress);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '指示の保存に失敗しました。');
+    } finally {
+      setIsSavingInstruction(false);
+    }
+  };
+
   const handleSaveNote = async () => {
     if (!selectedAdmission || isSavingNote) {
       return;
@@ -485,6 +532,8 @@ export const WardWorkspace = ({
     try {
       const document = await createInpatientDocument(selectedAdmission.id, { documentType });
       setDocuments((current) => [document, ...current]);
+      setEditingDocumentId(document.id);
+      setDocumentForm({ title: document.title, body: document.body });
     } catch (error) {
       if (isUnauthorizedError(error)) {
         onAuthExpired();
@@ -497,19 +546,79 @@ export const WardWorkspace = ({
   };
 
   const handleSignDocument = async (document: InpatientDocument) => {
-    if (document.status === 'signed') {
+    if (document.status === 'signed' || isSavingDocument) {
       return;
     }
 
+    setIsSavingDocument(true);
+    setErrorMessage(null);
     try {
       const updated = await updateInpatientDocument(document.id, { status: 'signed' });
       setDocuments((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setEditingDocumentId(null);
+      await refreshEvents();
     } catch (error) {
       if (isUnauthorizedError(error)) {
         onAuthExpired();
         return;
       }
       setErrorMessage(error instanceof Error ? error.message : '入退院文書の署名に失敗しました。');
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const startEditingDocument = (document: InpatientDocument) => {
+    setEditingDocumentId(document.id);
+    setDocumentForm({ title: document.title, body: document.body });
+  };
+
+  const handleSaveDocument = async (document: InpatientDocument) => {
+    if (document.status !== 'draft' || isSavingDocument) {
+      return;
+    }
+
+    setIsSavingDocument(true);
+    setErrorMessage(null);
+    try {
+      const updated = await updateInpatientDocument(document.id, {
+        title: documentForm.title,
+        body: documentForm.body,
+      });
+      setDocuments((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setEditingDocumentId(null);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '入退院文書の保存に失敗しました。');
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleArchiveDocument = async (document: InpatientDocument) => {
+    if (document.status === 'archived' || isSavingDocument) {
+      return;
+    }
+
+    setIsSavingDocument(true);
+    setErrorMessage(null);
+    try {
+      const updated = await updateInpatientDocument(document.id, { status: 'archived' });
+      setDocuments((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setEditingDocumentId(null);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '入退院文書の取消に失敗しました。');
+    } finally {
+      setIsSavingDocument(false);
     }
   };
 
@@ -1219,12 +1328,32 @@ export const WardWorkspace = ({
                   ) : null}
                   {pendingInstructions.slice(0, 5).map((instruction) => (
                     <div className='grid gap-3 px-4 py-3 md:grid-cols-[7rem_minmax(0,1fr)_10rem]' key={instruction.id}>
-                      <span className='text-[13px] font-bold text-text-secondary'>{instruction.category}</span>
-                      <div>
-                        <p className='text-[14px] font-bold text-text-primary'>{instruction.title}</p>
-                        <p className='mt-1 text-[12px] text-text-tertiary'>{instruction.dueAt ?? instruction.createdAt}</p>
-                      </div>
+                      {editingInstructionId === instruction.id ? (
+                        <>
+                          <Input aria-label='指示カテゴリ' onChange={(event) => setInstructionEditForm((current) => ({ ...current, category: event.target.value }))} value={instructionEditForm.category} />
+                          <div className='grid gap-2 md:grid-cols-[minmax(0,1fr)_12rem]'>
+                            <Input aria-label='指示内容' onChange={(event) => setInstructionEditForm((current) => ({ ...current, title: event.target.value }))} value={instructionEditForm.title} />
+                            <Input aria-label='期限' onChange={(event) => setInstructionEditForm((current) => ({ ...current, dueAt: event.target.value }))} type='datetime-local' value={instructionEditForm.dueAt} />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span className='text-[13px] font-bold text-text-secondary'>{instruction.category}</span>
+                          <div>
+                            <p className='text-[14px] font-bold text-text-primary'>{instruction.title}</p>
+                            <p className='mt-1 text-[12px] text-text-tertiary'>{instruction.dueAt ?? instruction.createdAt}</p>
+                          </div>
+                        </>
+                      )}
                       <div className='flex flex-wrap gap-2'>
+                        {editingInstructionId === instruction.id ? (
+                          <>
+                            <Button disabled={isSavingInstruction || !instructionEditForm.title.trim()} onClick={() => handleSaveInstruction(instruction)} size='xs' type='button' variant='outline'>保存</Button>
+                            <Button onClick={() => setEditingInstructionId(null)} size='xs' type='button' variant='ghost'>閉じる</Button>
+                          </>
+                        ) : (
+                          <Button disabled={instruction.status !== 'pending'} onClick={() => startEditingInstruction(instruction)} size='xs' type='button' variant='ghost'>編集</Button>
+                        )}
                         <Button disabled={instruction.status === 'done'} onClick={() => handleInstructionStatus(instruction, 'done')} size='xs' type='button' variant='outline'>実施</Button>
                         <Button disabled={instruction.status === 'cancelled'} onClick={() => handleInstructionStatus(instruction, 'cancelled')} size='xs' type='button' variant='ghost'>中止</Button>
                       </div>
@@ -1299,15 +1428,35 @@ export const WardWorkspace = ({
                   ) : null}
                   {instructions.map((instruction) => (
                   <div className='grid gap-3 px-4 py-3 lg:grid-cols-[7rem_minmax(0,1fr)_7rem_11rem]' key={instruction.id}>
-                    <span className='text-[13px] font-bold text-text-secondary'>{instruction.category}</span>
-                    <div>
-                      <p className='text-[14px] font-bold text-text-primary'>{instruction.title}</p>
-                      <p className='mt-1 text-[12px] text-text-tertiary'>{instruction.dueAt ?? instruction.createdAt}</p>
-                    </div>
+                    {editingInstructionId === instruction.id ? (
+                      <>
+                        <Input aria-label='指示カテゴリ' onChange={(event) => setInstructionEditForm((current) => ({ ...current, category: event.target.value }))} value={instructionEditForm.category} />
+                        <div className='grid gap-2 md:grid-cols-[minmax(0,1fr)_12rem]'>
+                          <Input aria-label='指示内容' onChange={(event) => setInstructionEditForm((current) => ({ ...current, title: event.target.value }))} value={instructionEditForm.title} />
+                          <Input aria-label='期限' onChange={(event) => setInstructionEditForm((current) => ({ ...current, dueAt: event.target.value }))} type='datetime-local' value={instructionEditForm.dueAt} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className='text-[13px] font-bold text-text-secondary'>{instruction.category}</span>
+                        <div>
+                          <p className='text-[14px] font-bold text-text-primary'>{instruction.title}</p>
+                          <p className='mt-1 text-[12px] text-text-tertiary'>{instruction.dueAt ?? instruction.createdAt}</p>
+                        </div>
+                      </>
+                    )}
                     <span className={cn('inline-flex h-7 w-fit items-center rounded-md border px-2 text-[12px] font-bold', statusClasses[instruction.status])}>
                       {statusLabels[instruction.status]}
                     </span>
                     <div className='flex flex-wrap gap-2'>
+                      {editingInstructionId === instruction.id ? (
+                        <>
+                          <Button disabled={isSavingInstruction || !instructionEditForm.title.trim()} onClick={() => handleSaveInstruction(instruction)} size='xs' type='button' variant='outline'>保存</Button>
+                          <Button onClick={() => setEditingInstructionId(null)} size='xs' type='button' variant='ghost'>閉じる</Button>
+                        </>
+                      ) : (
+                        <Button disabled={instruction.status !== 'pending'} onClick={() => startEditingInstruction(instruction)} size='xs' type='button' variant='ghost'>編集</Button>
+                      )}
                       <Button disabled={instruction.status === 'done'} onClick={() => handleInstructionStatus(instruction, 'done')} size='xs' type='button' variant='outline'>実施</Button>
                       <Button disabled={instruction.status === 'cancelled'} onClick={() => handleInstructionStatus(instruction, 'cancelled')} size='xs' type='button' variant='ghost'>中止</Button>
                     </div>
@@ -1392,19 +1541,78 @@ export const WardWorkspace = ({
                             {document.createdBy} · 更新 {document.updatedAt}
                           </p>
                         </div>
-                        <Button
-                          disabled={document.status === 'signed'}
-                          onClick={() => handleSignDocument(document)}
-                          size='xs'
-                          type='button'
-                          variant='ghost'
-                        >
-                          署名
-                        </Button>
+                        <div className='flex flex-wrap gap-2'>
+                          <Button
+                            disabled={document.status !== 'draft'}
+                            onClick={() => startEditingDocument(document)}
+                            size='xs'
+                            type='button'
+                            variant='outline'
+                          >
+                            編集
+                          </Button>
+                          <Button
+                            disabled={document.status !== 'draft' || isSavingDocument}
+                            onClick={() => handleSignDocument(document)}
+                            size='xs'
+                            type='button'
+                            variant='ghost'
+                          >
+                            署名
+                          </Button>
+                          <Button
+                            disabled={document.status === 'archived' || isSavingDocument}
+                            onClick={() => handleArchiveDocument(document)}
+                            size='xs'
+                            type='button'
+                            variant='ghost'
+                          >
+                            取消
+                          </Button>
+                        </div>
                       </div>
-                      <pre className='mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-subtle p-3 text-[12px] leading-relaxed text-text-secondary'>
-                        {document.body}
-                      </pre>
+                      {editingDocumentId === document.id && document.status === 'draft' ? (
+                        <div className='mt-3 space-y-2'>
+                          <Input
+                            aria-label='文書タイトル'
+                            onChange={(event) => setDocumentForm((current) => ({ ...current, title: event.target.value }))}
+                            value={documentForm.title}
+                          />
+                          <textarea
+                            aria-label='文書本文'
+                            className='min-h-64 w-full rounded-md border border-border bg-white px-3 py-2 text-[13px] leading-relaxed text-text-primary outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
+                            onChange={(event) => setDocumentForm((current) => ({ ...current, body: event.target.value }))}
+                            value={documentForm.body}
+                          />
+                          <div className='flex flex-wrap gap-2'>
+                            <Button
+                              disabled={isSavingDocument || !documentForm.title.trim()}
+                              onClick={() => handleSaveDocument(document)}
+                              size='xs'
+                              type='button'
+                              variant='outline'
+                            >
+                              下書き保存
+                            </Button>
+                            <Button
+                              disabled={isSavingDocument}
+                              onClick={() => {
+                                setEditingDocumentId(null);
+                                setDocumentForm({ title: '', body: '' });
+                              }}
+                              size='xs'
+                              type='button'
+                              variant='ghost'
+                            >
+                              閉じる
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <pre className='mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-subtle p-3 text-[12px] leading-relaxed text-text-secondary'>
+                          {document.body}
+                        </pre>
+                      )}
                     </article>
                   ))}
                   {documents.length === 0 && !isLoadingDetail ? (
