@@ -53,16 +53,20 @@ export const PastChartItem = ({
 }: PastChartItemProps) => (
   <article className="border-b border-border py-10 last:border-b-0">
     {/* 日付ヘッダー */}
-    <header className="mb-6 flex items-baseline gap-3">
+    <header className="mb-6 flex flex-wrap items-baseline gap-3">
       <h3 className="text-[20px] font-bold leading-snug text-text-primary">
         {formatDateHeader(version.savedAt)}
       </h3>
-      {visit?.department ? (
-        <span className="text-[13px] text-text-tertiary">{visit.department}</span>
-      ) : null}
-      <span className="ml-auto text-[12px] text-text-tertiary">
-        v{version.version} ・ {version.savedBy}
-      </span>
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-text-tertiary">
+        {visit?.department ? (
+          <span className="rounded-full border border-border bg-surface-subtle px-2 py-0.5 font-bold text-text-secondary">
+            {visit.department}
+          </span>
+        ) : null}
+        <span>記載者 {version.savedBy}</span>
+        <span>保存 {version.savedAt}</span>
+        <span>v{version.version}</span>
+      </div>
     </header>
 
     {/* SOAP 本文 */}

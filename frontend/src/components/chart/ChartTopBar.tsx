@@ -18,6 +18,8 @@ type ChartTopBarProps = {
   lastSavedAt: string | null;
   version: number;
   abnormalLabCount: number;
+  finishLabel?: string;
+  modeLabel?: string;
   onOpenPatient: (patient: PatientRecord) => void;
   onSave: () => void;
   onReturnReception: () => void;
@@ -93,6 +95,8 @@ export const ChartTopBar = ({
   lastSavedAt,
   version,
   abnormalLabCount,
+  finishLabel = '診察終了',
+  modeLabel = '外来',
   onOpenPatient,
   onSave,
   onReturnReception,
@@ -173,7 +177,7 @@ export const ChartTopBar = ({
             </span>
           </div>
           <p className="truncate text-[12px] text-text-tertiary">
-            {patient.department} ・ 担当: {patient.doctor} ・ v{version}
+            {modeLabel} ・ {patient.department} ・ 担当: {patient.doctor} ・ v{version}
             {lastSavedAt ? ` ・ 最終保存 ${lastSavedAt}` : ''}
           </p>
         </div>
@@ -254,7 +258,7 @@ export const ChartTopBar = ({
         保存
       </Button>
       <Button variant="default" size="sm" onClick={onFinishVisit} disabled={isMutating}>
-        診察終了
+        {finishLabel}
       </Button>
       <span className="text-[12px] text-text-tertiary">{currentUser.displayName}</span>
     </div>

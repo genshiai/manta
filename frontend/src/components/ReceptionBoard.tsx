@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   BadgeAlert,
+  Baby,
   Building2,
   CheckCircle2,
   CircleDashed,
@@ -10,10 +11,13 @@ import {
   FileText,
   FlaskConical,
   HeartPulse,
+  Mars,
   ShieldAlert,
   Siren,
   Stethoscope,
   UserCheck,
+  UserRound,
+  Venus,
   type LucideIcon,
 } from 'lucide-react';
 import { Button, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
@@ -105,6 +109,41 @@ const WorkBadge = ({
     <span>{label}</span>
   </span>
 );
+
+const parseAgeValue = (age: string) => {
+  const matched = age.match(/\d+/);
+  return matched ? Number(matched[0]) : null;
+};
+
+const patientAgeIcon = (age: string): LucideIcon => {
+  const ageValue = parseAgeValue(age);
+  if (ageValue !== null && ageValue < 15) return Baby;
+  if (ageValue !== null && ageValue >= 65) return UserCheck;
+  return UserRound;
+};
+
+const PatientDemographicIcon = ({ patient }: { patient: PatientRecord }) => {
+  const AgeIcon = patientAgeIcon(patient.age);
+  const SexIcon = patient.sex === '男性' ? Mars : Venus;
+  const sexClassName = patient.sex === '男性'
+    ? 'border-blue-200 bg-blue-50 text-blue-900'
+    : 'border-magenta-200 bg-magenta-50 text-magenta-900';
+
+  return (
+    <span
+      className={cn(
+        'relative inline-grid size-9 shrink-0 place-items-center rounded-full border',
+        sexClassName,
+      )}
+      title={`${patient.age} ${patient.sex}`}
+    >
+      <AgeIcon size={19} strokeWidth={2.2} />
+      <span className='absolute -bottom-1 -right-1 inline-grid size-4 place-items-center rounded-full border border-white bg-white shadow-sm'>
+        <SexIcon size={11} strokeWidth={2.4} />
+      </span>
+    </span>
+  );
+};
 
 const classifyAlert = (alert: AlertItem): { icon: LucideIcon; tone: BadgeTone } => {
   if (
@@ -327,30 +366,36 @@ export const ReceptionBoard = ({
   };
 
   const renderPatientIdentity = (patient: PatientRecord) => (
-    <div className='min-w-0'>
-      <div className='flex flex-wrap items-center gap-2'>
-        <span className='text-[16px] font-bold leading-snug text-solid-gray-900'>{patient.name}</span>
-        <span className='text-mono-14N-150 text-solid-gray-536'>{patient.id}</span>
-        {patient.sameNameDuplicateCount > 1 ? (
-          <WorkBadge icon={BadgeAlert} label='同姓同名' tone='identity' />
+    <div className='flex min-w-0 items-start gap-2.5'>
+      <PatientDemographicIcon patient={patient} />
+      <div className='min-w-0'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='text-[16px] font-bold leading-snug text-solid-gray-900'>{patient.name}</span>
+          <span className='text-mono-14N-150 text-solid-gray-536'>{patient.id}</span>
+          <span className='rounded-full border border-solid-gray-200 bg-solid-gray-50 px-2 py-0.5 text-[11px] font-bold text-solid-gray-700'>
+            {patient.age} {patient.sex}
+          </span>
+          {patient.sameNameDuplicateCount > 1 ? (
+            <WorkBadge icon={BadgeAlert} label='同姓同名' tone='identity' />
+          ) : null}
+        </div>
+        {patient.alerts.length > 0 ? (
+          <div className='mt-1 flex flex-wrap gap-2'>
+            {patient.alerts.slice(0, 2).map((alert) => {
+              const alertBadge = classifyAlert(alert);
+
+              return (
+                <WorkBadge
+                  icon={alertBadge.icon}
+                  key={alert.label}
+                  label={alert.label}
+                  tone={alertBadge.tone}
+                />
+              );
+            })}
+          </div>
         ) : null}
       </div>
-      {patient.alerts.length > 0 ? (
-        <div className='mt-1 flex flex-wrap gap-2'>
-          {patient.alerts.slice(0, 2).map((alert) => {
-            const alertBadge = classifyAlert(alert);
-
-            return (
-              <WorkBadge
-                icon={alertBadge.icon}
-                key={alert.label}
-                label={alert.label}
-                tone={alertBadge.tone}
-              />
-            );
-          })}
-        </div>
-      ) : null}
     </div>
   );
 

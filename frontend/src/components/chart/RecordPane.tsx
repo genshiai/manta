@@ -1,7 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import type { PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CalendarClock,
+  CalendarPlus,
+  ClipboardCheck,
+  FileText,
+  FlaskConical,
+  Pill,
+  Plus,
+  ScanLine,
+  Search,
+} from 'lucide-react';
 import { PastChartItem } from './PastChartItem';
 import { TodayChartBlock } from './TodayChartBlock';
+import type { OrderTab } from './OrderPane';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import type { SoapDraft } from './SoapEditor';
@@ -38,10 +50,40 @@ type LabOrderRow = {
   createdAt?: string;
 };
 
+const parseLabBaselineRange = (baseline?: string) => {
+  if (!baseline) return null;
+  const numbers = baseline.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  if (numbers.length >= 2) return { min: numbers[0], max: numbers[1] };
+  if (baseline.endsWith('-') && numbers.length === 1) return { min: numbers[0], max: null };
+  return null;
+};
+
+const labValueTone = (
+  value: string,
+  baseline?: string,
+  flag?: 'high' | 'normal',
+): 'high' | 'low' | 'normal' => {
+  const numericValue = Number(value.match(/-?\d+(?:\.\d+)?/)?.[0]);
+  const range = parseLabBaselineRange(baseline);
+  if (Number.isFinite(numericValue) && range) {
+    if (range.min !== null && numericValue < range.min) return 'low';
+    if (range.max !== null && numericValue > range.max) return 'high';
+  }
+  return flag === 'high' ? 'high' : 'normal';
+};
+
+const labToneClassName = (tone: 'high' | 'low' | 'normal') => {
+  if (tone === 'high') return 'font-bold text-destructive';
+  if (tone === 'low') return 'font-bold text-blue-700';
+  return 'text-text-primary';
+};
+
 type RecordPaneProps = {
   patientId: string;
   view: ChartView;
   draft: SoapDraft;
+  authorName: string;
+  department: string;
   isDirty: boolean;
   vitals: VitalEntry[];
   templates: ChartTemplate[];
@@ -63,6 +105,8 @@ type RecordPaneProps = {
   onSelectTemplate: (id: string) => void;
   onApplyTemplate: () => void;
   onCopyPrevious: () => void;
+  onAddOrder?: (tab: OrderTab) => void;
+  onOpenReservation?: () => void;
 };
 
 const DEPT_ALL = 'all';
@@ -107,6 +151,14 @@ const formatDateKey = (date: Date): string => {
 
 type TimelineKind = 'chart' | 'lab' | 'rx' | 'image' | 'procedure';
 
+type TimelineItem = {
+  id: string;
+  date: string;
+  kind: TimelineKind;
+  title: string;
+  body: string;
+};
+
 const timelineKindLabel: Record<TimelineKind, string> = {
   chart: '診療録',
   lab: '検査',
@@ -121,6 +173,22 @@ const timelineKindClass: Record<TimelineKind, string> = {
   rx: 'bg-warning',
   image: 'bg-chart-3',
   procedure: 'bg-text-tertiary',
+};
+
+const timelineKindIcon: Record<TimelineKind, typeof FileText> = {
+  chart: FileText,
+  lab: FlaskConical,
+  rx: Pill,
+  image: ScanLine,
+  procedure: ClipboardCheck,
+};
+
+const timelineKindChipClass: Record<TimelineKind, string> = {
+  chart: 'border-blue-100 bg-blue-50 text-brand',
+  lab: 'border-green-100 bg-green-50 text-success',
+  rx: 'border-yellow-100 bg-yellow-50 text-warning',
+  image: 'border-purple-100 bg-purple-50 text-chart-3',
+  procedure: 'border-solid-gray-200 bg-solid-gray-50 text-text-secondary',
 };
 
 const demoLabTimeline = [
@@ -148,6 +216,8 @@ export const RecordPane = ({
   patientId,
   view,
   draft,
+  authorName,
+  department,
   isDirty,
   vitals,
   templates,
@@ -169,6 +239,8 @@ export const RecordPane = ({
   onSelectTemplate,
   onApplyTemplate,
   onCopyPrevious,
+  onAddOrder,
+  onOpenReservation,
 }: RecordPaneProps) => {
   const [departmentFilter, setDepartmentFilter] = useState<string>(DEPT_ALL);
   const [todayRecordOpen, setTodayRecordOpen] = useState(false);
@@ -176,13 +248,34 @@ export const RecordPane = ({
   const [timelineKinds, setTimelineKinds] = useState<Set<TimelineKind>>(
     () => new Set(['chart', 'lab', 'rx', 'image', 'procedure']),
   );
+  const [timelineYear, setTimelineYear] = useState('all');
+  const [timelineMonth, setTimelineMonth] = useState('all');
+  const todayRecordRef = useRef<HTMLDivElement | null>(null);
+  const [pendingTodayScroll, setPendingTodayScroll] = useState(false);
 
   useEffect(() => {
     if (!patientId) return;
     setTodayRecordOpen(false);
     setSearchQuery('');
     setDepartmentFilter(DEPT_ALL);
+    setTimelineYear('all');
+    setTimelineMonth('all');
+    setPendingTodayScroll(false);
   }, [patientId]);
+
+  useEffect(() => {
+    if (!pendingTodayScroll || view !== 'chart' || !todayRecordOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      todayRecordRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setPendingTodayScroll(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingTodayScroll, todayRecordOpen, view]);
+
+  const openTodayRecord = () => {
+    setTodayRecordOpen(true);
+    setPendingTodayScroll(true);
+  };
 
   // 科一覧 (受診履歴から)
   const departments = useMemo(() => {
@@ -220,21 +313,66 @@ export const RecordPane = ({
   }, [versions, visitByDate, departmentFilter]);
 
   const calendarEventsByDate = useMemo(() => {
-    const map = new Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking'>>();
-    const add = (date: string | undefined, kind: 'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking') => {
+    const map = new Map<string, CalendarEventDetail[]>();
+    const add = (date: string | undefined, detail: CalendarEventDetail) => {
       if (!date) return;
       if (date === '日未定') return;
       const key = calendarDateKey(date);
-      const existing = map.get(key) ?? new Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking'>();
-      existing.add(kind);
-      map.set(key, existing);
+      map.set(key, [...(map.get(key) ?? []), detail]);
     };
-    for (const v of versions) add(versionDate(v.savedAt), 'chart');
-    for (const order of labOrders) add(order.createdAt ?? formatDateKey(new Date()), 'lab');
-    for (const group of prescriptionTimeline) add(group.date, 'rx');
-    for (const order of imagingOrders) add(order.scheduledAt || formatDateKey(new Date()), 'image');
-    for (const slot of reservationSlots) add(slot.date, 'reservation');
-    add(scheduledVisit?.date, 'booking');
+    for (const v of versions) {
+      add(versionDate(v.savedAt), {
+        id: `chart-${v.version}-${v.savedAt}`,
+        kind: 'chart',
+        title: `診療録 v${v.version}`,
+        meta: v.savedAt,
+        body: [v.assessment, v.plan].filter(Boolean).join(' / '),
+      });
+    }
+    for (const order of labOrders) {
+      add(order.createdAt ?? formatDateKey(new Date()), {
+        id: `lab-${order.category}-${order.createdAt ?? 'today'}`,
+        kind: 'lab',
+        title: order.category,
+        meta: `${order.urgency ?? '通常'} ・ ${order.status === 'done' ? '完了' : '依頼中'}`,
+        body: order.items.join('・') || '検査項目未設定',
+      });
+    }
+    for (const group of prescriptionTimeline) {
+      add(group.date, {
+        id: `rx-${group.date}`,
+        kind: 'rx',
+        title: `処方 ${group.itemCount}件`,
+        meta: group.date,
+        body: group.items.map((item) => item.drugName).join('、'),
+      });
+    }
+    for (const order of imagingOrders) {
+      add(order.scheduledAt || formatDateKey(new Date()), {
+        id: `image-${order.category}-${order.scheduledAt || 'today'}`,
+        kind: 'image',
+        title: order.category,
+        meta: order.scheduledAt || '日時未定',
+        body: order.note || '画像オーダ',
+      });
+    }
+    for (const slot of reservationSlots) {
+      add(slot.date, {
+        id: `slot-${slot.id}`,
+        kind: 'reservation',
+        title: `${slot.time} ${slot.department}`,
+        meta: `${slot.doctor} ・ ${slot.state} ・ ${slot.bookedCount}/${slot.capacity}件`,
+      });
+    }
+    if (scheduledVisit) {
+      add(scheduledVisit.date, {
+        id: `booking-${scheduledVisit.slotId ?? scheduledVisit.date}`,
+        kind: 'booking',
+        title: `次回予約: ${scheduledVisit.date}`,
+        meta: scheduledVisit.department,
+        body: scheduledVisit.note,
+      });
+    }
     return map;
   }, [versions, labOrders, prescriptionTimeline, imagingOrders, reservationSlots, scheduledVisit]);
 
@@ -256,14 +394,8 @@ export const RecordPane = ({
     });
   }, [filteredVersions, searchQuery]);
 
-  const timelineItems = useMemo(() => {
-    const items: Array<{
-      id: string;
-      date: string;
-      kind: TimelineKind;
-      title: string;
-      body: string;
-    }> = [];
+  const allTimelineItems = useMemo(() => {
+    const items: TimelineItem[] = [];
     for (const version of versions) {
       items.push({
         id: `chart-${version.version}-${version.savedAt}`,
@@ -310,9 +442,33 @@ export const RecordPane = ({
       });
     }
     return items
-      .filter((item) => timelineKinds.has(item.kind))
       .sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [versions, labOrders, prescriptionTimeline, imagingOrders, procedureOrders, timelineKinds]);
+  }, [versions, labOrders, prescriptionTimeline, imagingOrders, procedureOrders]);
+
+  const timelineYearOptions = useMemo(() => {
+    return Array.from(new Set(allTimelineItems.map((item) => item.date.slice(0, 4)))).sort((a, b) => (a < b ? 1 : -1));
+  }, [allTimelineItems]);
+
+  const timelineMonthOptions = useMemo(() => {
+    const scoped = timelineYear === 'all'
+      ? allTimelineItems
+      : allTimelineItems.filter((item) => item.date.slice(0, 4) === timelineYear);
+    return Array.from(new Set(scoped.map((item) => item.date.slice(5, 7)))).sort((a, b) => (a < b ? 1 : -1));
+  }, [allTimelineItems, timelineYear]);
+
+  const timelineItems = useMemo(() => allTimelineItems.filter((item) => (
+    timelineKinds.has(item.kind) &&
+    (timelineYear === 'all' || item.date.slice(0, 4) === timelineYear) &&
+    (timelineMonth === 'all' || item.date.slice(5, 7) === timelineMonth)
+  )), [allTimelineItems, timelineKinds, timelineYear, timelineMonth]);
+
+  const timelineGroups = useMemo(() => {
+    const groups = new Map<string, TimelineItem[]>();
+    for (const item of timelineItems) {
+      groups.set(item.date, [...(groups.get(item.date) ?? []), item]);
+    }
+    return Array.from(groups.entries()).map(([date, items]) => ({ date, items }));
+  }, [timelineItems]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-page">
@@ -354,31 +510,32 @@ export const RecordPane = ({
           {view === 'chart' ? (
             <>
               <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-surface-page/95 py-4 backdrop-blur">
-                <Button variant="default" size="sm" onClick={() => setTodayRecordOpen(true)}>
+                <Button variant="default" size="sm" onClick={openTodayRecord}>
                   <Plus size={14} />
-                  本日の記載
-                </Button>
-                <Button variant="secondary" size="sm" onClick={onApplyTemplate}>
-                  テンプレート挿入
-                </Button>
-                <Button variant="ghost" size="sm" onClick={onCopyPrevious}>
-                  前回複写
+                  本日の記載へ
                 </Button>
               </div>
 
               {todayRecordOpen ? (
-                <TodayChartBlock
-                  draft={draft}
-                  vitals={vitals}
-                  templates={templates}
-                  selectedTemplateId={selectedTemplateId}
-                  isMutating={isMutating}
-                  isDirty={isDirty}
-                  onChange={onDraftChange}
-                  onSelectTemplate={onSelectTemplate}
-                  onApplyTemplate={onApplyTemplate}
-                  onCopyPrevious={onCopyPrevious}
-                />
+                <div ref={todayRecordRef}>
+                  <TodayChartBlock
+                    draft={draft}
+                    patientId={patientId}
+                    authorName={authorName}
+                    department={department}
+                    vitals={vitals}
+                    labResults={labResults}
+                    recentVersions={versions}
+                    templates={templates}
+                    selectedTemplateId={selectedTemplateId}
+                    isMutating={isMutating}
+                    isDirty={isDirty}
+                    onChange={onDraftChange}
+                    onSelectTemplate={onSelectTemplate}
+                    onApplyTemplate={onApplyTemplate}
+                    onCopyPrevious={onCopyPrevious}
+                  />
+                </div>
               ) : null}
 
               {isLoading && filteredVersions.length === 0 ? (
@@ -409,32 +566,71 @@ export const RecordPane = ({
 
           {view === 'history' ? (
             <section className="py-5">
-              <div className="mb-4 flex flex-wrap gap-2">
-                {(Object.keys(timelineKindLabel) as TimelineKind[]).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => {
-                      setTimelineKinds((current) => {
-                        const next = new Set(current);
-                        if (next.has(kind)) {
-                          next.delete(kind);
-                        } else {
-                          next.add(kind);
-                        }
-                        return next.size === 0 ? current : next;
-                      });
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium ${
-                      timelineKinds.has(kind)
-                        ? 'border-brand bg-brand-tint text-brand'
-                        : 'border-border bg-card text-text-secondary'
-                    }`}
-                  >
-                    <span className={`size-2 rounded-full ${timelineKindClass[kind]}`} />
-                    {timelineKindLabel[kind]}
-                  </button>
-                ))}
+              <div className="sticky top-0 z-10 mb-4 space-y-3 border-b border-border bg-surface-page/95 py-3 backdrop-blur">
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(timelineKindLabel) as TimelineKind[]).map((kind) => {
+                    const Icon = timelineKindIcon[kind];
+                    const isActive = timelineKinds.has(kind);
+
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() => {
+                          setTimelineKinds((current) => {
+                            const next = new Set(current);
+                            if (next.has(kind)) {
+                              next.delete(kind);
+                            } else {
+                              next.add(kind);
+                            }
+                            return next.size === 0 ? current : next;
+                          });
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-bold transition-colors ${
+                          isActive
+                            ? timelineKindChipClass[kind]
+                            : 'border-border bg-card text-text-secondary opacity-60'
+                        }`}
+                      >
+                        <span className={`inline-grid size-5 place-items-center rounded-full border ${isActive ? timelineKindChipClass[kind] : 'border-border bg-surface-subtle text-text-tertiary'}`}>
+                          <Icon size={12} strokeWidth={2.2} />
+                        </span>
+                        {timelineKindLabel[kind]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      aria-label="履歴の年を絞り込む"
+                      className="h-8 rounded-md border border-border bg-card px-2 text-[12px] font-bold text-text-primary outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                      onChange={(event) => {
+                        setTimelineYear(event.target.value);
+                        setTimelineMonth('all');
+                      }}
+                      value={timelineYear}
+                    >
+                      <option value="all">全期間</option>
+                      {timelineYearOptions.map((year) => (
+                        <option key={year} value={year}>{year}年</option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="履歴の月を絞り込む"
+                      className="h-8 rounded-md border border-border bg-card px-2 text-[12px] font-bold text-text-primary outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                      onChange={(event) => setTimelineMonth(event.target.value)}
+                      value={timelineMonth}
+                    >
+                      <option value="all">全月</option>
+                      {timelineMonthOptions.map((month) => (
+                        <option key={month} value={month}>{Number(month)}月</option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-[12px] text-text-tertiary">{timelineItems.length}件</span>
+                </div>
               </div>
 
               {timelineItems.length === 0 ? (
@@ -442,43 +638,60 @@ export const RecordPane = ({
                   表示できる時系列イベントはありません
                 </p>
               ) : (
-                <ol className="relative border-l border-border pl-5">
-                  {timelineItems.map((item) => (
-                    <li key={item.id} className="relative mb-4 rounded-lg border border-border bg-card p-4 last:mb-0">
-                      <span
-                        className={`absolute -left-[27px] top-5 size-3 rounded-full border-2 border-card ${timelineKindClass[item.kind]}`}
-                      />
-                      <div className="mb-1 flex items-baseline justify-between gap-3">
-                        <p className="text-[14px] font-bold text-text-primary">{item.title}</p>
-                        <span className="text-[12px] text-text-tertiary">{item.date}</span>
+                <div className="space-y-5">
+                  {timelineGroups.map((group) => (
+                    <section className="relative pl-9" key={group.date}>
+                      <div className="absolute bottom-0 left-3 top-8 w-px bg-border" />
+                      <div className="sticky top-[5.5rem] z-[1] mb-2 inline-flex rounded-full border border-border bg-card px-3 py-1 text-[12px] font-bold text-text-primary shadow-sm">
+                        {group.date}
                       </div>
-                      <p className="text-[12px] font-medium text-text-tertiary">
-                        {timelineKindLabel[item.kind]}
-                      </p>
-                      {item.body ? (
-                        <p className="mt-2 line-clamp-2 text-[13px] leading-normal text-text-secondary">
-                          {item.body}
-                        </p>
-                      ) : null}
-                    </li>
+                      <ol className="space-y-3">
+                        {group.items.map((item) => {
+                          const Icon = timelineKindIcon[item.kind];
+
+                          return (
+                            <li key={item.id} className="relative rounded-lg border border-border bg-card p-4">
+                              <span
+                                className={`absolute -left-[31px] top-5 inline-grid size-6 place-items-center rounded-full border-2 border-card ${timelineKindChipClass[item.kind]}`}
+                              >
+                                <Icon size={13} strokeWidth={2.2} />
+                              </span>
+                              <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-[14px] font-bold text-text-primary">{item.title}</p>
+                                <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${timelineKindChipClass[item.kind]}`}>
+                                  {timelineKindLabel[item.kind]}
+                                </span>
+                              </div>
+                              {item.body ? (
+                                <p className="mt-2 line-clamp-2 text-[13px] leading-normal text-text-secondary">
+                                  {item.body}
+                                </p>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </section>
                   ))}
-                </ol>
+                </div>
               )}
             </section>
           ) : null}
 
           {view === 'calendar' ? (
-            <CalendarView eventsByDate={calendarEventsByDate} reservationSlots={reservationSlots} />
+            <CalendarView eventsByDate={calendarEventsByDate} />
           ) : null}
 
           {view === 'labs' ? (
-            <LabsView results={labResults} trends={labLongTrends} />
+            <LabsView onAddLab={() => onAddOrder?.('lab')} results={labResults} trends={labLongTrends} />
           ) : null}
 
           {view === 'imaging' ? (
             <OrderListView
               title="画像オーダ"
               empty="画像オーダはありません"
+              actionLabel="画像を追加"
+              onAction={() => onAddOrder?.('imaging')}
               items={imagingOrders.map((order) => ({
                 key: `${order.category}-${order.scheduledAt}-${order.note}`,
                 title: order.category,
@@ -492,6 +705,8 @@ export const RecordPane = ({
             <OrderListView
               title="文書"
               empty="文書はまだありません"
+              actionLabel="本日の記載へ"
+              onAction={openTodayRecord}
               items={versions.map((version) => ({
                 key: `${version.version}-${version.savedAt}`,
                 title: `カルテ v${version.version}`,
@@ -505,6 +720,8 @@ export const RecordPane = ({
             <OrderListView
               title="予約"
               empty="予約枠はありません"
+              actionLabel="予約を変更"
+              onAction={onOpenReservation}
               items={[
                 ...(scheduledVisit
                   ? [
@@ -563,7 +780,17 @@ export const RecordPane = ({
   );
 };
 
-const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking', string> = {
+type CalendarEventKind = 'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking';
+
+type CalendarEventDetail = {
+  id: string;
+  kind: CalendarEventKind;
+  title: string;
+  meta: string;
+  body?: string;
+};
+
+const eventDotClass: Record<CalendarEventKind, string> = {
   chart: 'bg-brand',
   lab: 'bg-success',
   rx: 'bg-warning',
@@ -572,32 +799,52 @@ const eventDotClass: Record<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | '
   booking: 'bg-destructive',
 };
 
+const calendarLegendItems: Array<{
+  kind: CalendarEventKind;
+  label: string;
+  icon: typeof FileText;
+  className: string;
+}> = [
+  { kind: 'chart', label: '診療録', icon: FileText, className: 'border-blue-100 bg-blue-50 text-brand' },
+  { kind: 'lab', label: '検査', icon: FlaskConical, className: 'border-green-100 bg-green-50 text-success' },
+  { kind: 'rx', label: '処方', icon: Pill, className: 'border-yellow-100 bg-yellow-50 text-warning' },
+  { kind: 'image', label: '画像', icon: ScanLine, className: 'border-purple-100 bg-purple-50 text-chart-3' },
+  { kind: 'reservation', label: '予約枠', icon: CalendarClock, className: 'border-cyan-100 bg-cyan-50 text-cyan-700' },
+  { kind: 'booking', label: '次回予約', icon: CalendarPlus, className: 'border-red-100 bg-red-50 text-destructive' },
+];
+
 const CalendarView = ({
   eventsByDate,
-  reservationSlots,
 }: {
-  eventsByDate: Map<string, Set<'chart' | 'lab' | 'rx' | 'image' | 'reservation' | 'booking'>>;
-  reservationSlots: ReservationSlot[];
+  eventsByDate: Map<string, CalendarEventDetail[]>;
 }) => {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const [visibleKinds, setVisibleKinds] = useState<Set<CalendarEventKind>>(
+    () => new Set(calendarLegendItems.map((item) => item.kind)),
+  );
+  const [selectedDateKey, setSelectedDateKey] = useState(() => formatDateKey(new Date()));
   const days = currentMonthDays(visibleMonth);
   const todayKey = formatDateKey(new Date());
   const monthLabel = `${visibleMonth.getFullYear()}年 ${visibleMonth.getMonth() + 1}月`;
-  const reservationSlotsByDate = useMemo(() => {
-    const map = new Map<string, ReservationSlot[]>();
-    for (const slot of reservationSlots) {
-      const key = calendarDateKey(slot.date);
-      map.set(key, [...(map.get(key) ?? []), slot]);
-    }
-    return map;
-  }, [reservationSlots]);
+  const selectedDateEvents = (eventsByDate.get(selectedDateKey) ?? []).filter((event) => visibleKinds.has(event.kind));
   const moveMonth = (delta: number) => {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  };
+  const toggleKind = (kind: CalendarEventKind) => {
+    setVisibleKinds((current) => {
+      const next = new Set(current);
+      if (next.has(kind)) {
+        next.delete(kind);
+      } else {
+        next.add(kind);
+      }
+      return next.size === 0 ? current : next;
+    });
   };
 
   return (
     <section className="py-5">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="xs" onClick={() => moveMonth(-1)}>
             前月
@@ -610,12 +857,20 @@ const CalendarView = ({
           </Button>
         </div>
         <div className="flex flex-wrap gap-2 text-[11px] text-text-secondary">
-          <CalendarLegend className="bg-brand" label="診療録" />
-          <CalendarLegend className="bg-success" label="検査" />
-          <CalendarLegend className="bg-warning" label="処方" />
-          <CalendarLegend className="bg-chart-3" label="画像" />
-          <CalendarLegend className="bg-cyan-600" label="予約枠" />
-          <CalendarLegend className="bg-destructive" label="次回予約" />
+          {calendarLegendItems.map((item) => {
+            const isActive = visibleKinds.has(item.kind);
+
+            return (
+              <CalendarLegend
+                className={item.className}
+                icon={item.icon}
+                isActive={isActive}
+                key={item.kind}
+                label={item.label}
+                onClick={() => toggleKind(item.kind)}
+              />
+            );
+          })}
         </div>
       </div>
       <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-border bg-card">
@@ -629,16 +884,24 @@ const CalendarView = ({
         ))}
         {days.map((day) => {
           const key = formatDateKey(day);
-          const events = eventsByDate.get(key);
-          const slots = reservationSlotsByDate.get(key) ?? [];
+          const events = (eventsByDate.get(key) ?? []).filter((event) => visibleKinds.has(event.kind));
+          const eventKinds = Array.from(new Set(events.map((event) => event.kind)));
+          const previewEvents = events.filter((event) => event.kind === 'reservation' || event.kind === 'booking').slice(0, 3);
           const isToday = key === todayKey;
           const muted = day.getMonth() !== visibleMonth.getMonth();
+          const isSelected = key === selectedDateKey;
           return (
-            <div
+            <button
               key={key}
-              className={`min-h-24 border-b border-r border-border p-2 last:border-r-0 ${
-                muted ? 'bg-surface-subtle/60 text-text-tertiary' : 'bg-card text-text-primary'
+              className={`min-h-24 border-b border-r border-border p-2 text-left last:border-r-0 ${
+                isSelected
+                  ? 'bg-blue-50 ring-2 ring-inset ring-brand'
+                  : muted
+                    ? 'bg-surface-subtle/60 text-text-tertiary'
+                    : 'bg-card text-text-primary'
               }`}
+              onClick={() => setSelectedDateKey(key)}
+              type="button"
             >
               <div
                 className={`mb-2 inline-grid size-7 place-items-center rounded-full text-[12px] ${
@@ -647,47 +910,104 @@ const CalendarView = ({
               >
                 {day.getDate()}
               </div>
-              {events ? (
+              {eventKinds.length > 0 ? (
                 <div className="flex gap-1">
-                  {Array.from(events).map((event) => (
+                  {eventKinds.map((event) => (
                     <span key={event} className={`size-2 rounded-full ${eventDotClass[event]}`} />
                   ))}
                 </div>
               ) : null}
-              {slots.length > 0 ? (
+              {previewEvents.length > 0 ? (
                 <ul className="mt-2 space-y-1">
-                  {slots.slice(0, 3).map((slot) => (
+                  {previewEvents.map((event) => (
                     <li
-                      key={slot.id}
+                      key={event.id}
                       className="truncate rounded-sm bg-surface-subtle px-1.5 py-1 text-[10px] text-text-secondary"
                     >
-                      {slot.time} {slot.department} {slot.bookedCount}/{slot.capacity}
+                      {event.title}
                     </li>
                   ))}
-                  {slots.length > 3 ? (
-                    <li className="text-[10px] text-text-tertiary">他 {slots.length - 3} 件</li>
+                  {events.length > previewEvents.length ? (
+                    <li className="text-[10px] text-text-tertiary">他 {events.length - previewEvents.length} 件</li>
                   ) : null}
                 </ul>
               ) : null}
-            </div>
+            </button>
           );
         })}
       </div>
+      <section className="mt-4 rounded-lg border border-border bg-card">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+          <h3 className="text-[15px] font-bold text-text-primary">{selectedDateKey} の内容</h3>
+          <span className="text-[12px] text-text-tertiary">{selectedDateEvents.length}件</span>
+        </div>
+        {selectedDateEvents.length > 0 ? (
+          <div className="divide-y divide-border">
+            {selectedDateEvents.map((event) => {
+              const legend = calendarLegendItems.find((item) => item.kind === event.kind);
+              const Icon = legend?.icon ?? FileText;
+
+              return (
+                <article className="px-4 py-3" key={event.id}>
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 inline-grid size-7 shrink-0 place-items-center rounded-full border ${legend?.className ?? 'border-border bg-surface-subtle text-text-secondary'}`}>
+                      <Icon size={14} strokeWidth={2.2} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[14px] font-bold text-text-primary">{event.title}</p>
+                        <span className="text-[11px] font-bold text-text-tertiary">{legend?.label}</span>
+                      </div>
+                      <p className="mt-1 text-[12px] text-text-tertiary">{event.meta}</p>
+                      {event.body ? <p className="mt-2 text-[13px] leading-normal text-text-secondary">{event.body}</p> : null}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="px-4 py-8 text-center text-[13px] text-text-tertiary">表示対象の予定・記録はありません。</p>
+        )}
+      </section>
     </section>
   );
 };
 
-const CalendarLegend = ({ className, label }: { className: string; label: string }) => (
-  <span className="inline-flex items-center gap-1">
-    <span className={`size-2 rounded-full ${className}`} />
+const CalendarLegend = ({
+  className,
+  icon: Icon,
+  isActive,
+  label,
+  onClick,
+}: {
+  className: string;
+  icon: typeof FileText;
+  isActive: boolean;
+  label: string;
+  onClick: () => void;
+}) => (
+  <button
+    aria-pressed={isActive}
+    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[12px] font-bold transition-colors ${
+      isActive ? 'border-brand bg-white text-text-secondary' : 'border-border bg-surface-subtle text-text-tertiary opacity-60'
+    }`}
+    onClick={onClick}
+    type="button"
+  >
+    <span className={`inline-grid size-5 place-items-center rounded-full border ${isActive ? className : 'border-border bg-white text-text-tertiary'}`}>
+      <Icon size={12} strokeWidth={2.2} />
+    </span>
     {label}
-  </span>
+  </button>
 );
 
 const LabsView = ({
+  onAddLab,
   results,
   trends,
 }: {
+  onAddLab?: () => void;
   results: LabResultEntry[];
   trends: LabLongTrendItem[];
 }) => {
@@ -706,12 +1026,59 @@ const LabsView = ({
     : demoLabTimeline;
   const items = Array.from(new Set(timeline.map((row) => row.item))).sort();
   const [selectedItem, setSelectedItem] = useState<string>('all');
+  const [selectedLabItems, setSelectedLabItems] = useState<Set<string>>(() => new Set());
+  const [trendItems, setTrendItems] = useState<string[]>([]);
+  const [isDraggingLabItems, setIsDraggingLabItems] = useState(false);
+  const [labDragMode, setLabDragMode] = useState<'select' | 'deselect'>('select');
   const [abnormalOnly, setAbnormalOnly] = useState(false);
   const filtered = timeline.filter((row) => {
     if (selectedItem !== 'all' && row.item !== selectedItem) return false;
-    if (abnormalOnly && row.flag !== 'high') return false;
+    if (abnormalOnly && labValueTone(row.result, row.baseline, row.flag) === 'normal') return false;
     return true;
   });
+  const trendRowsToShow = trendItems
+    .flatMap((item) => timeline.filter((row) => row.item === item))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  useEffect(() => {
+    if (!isDraggingLabItems) {
+      return undefined;
+    }
+
+    const stopDragging = () => setIsDraggingLabItems(false);
+    window.addEventListener('pointerup', stopDragging);
+    return () => window.removeEventListener('pointerup', stopDragging);
+  }, [isDraggingLabItems]);
+
+  const applyLabItemSelection = (item: string, mode: 'select' | 'deselect') => {
+    setSelectedLabItems((current) => {
+      const next = new Set(current);
+      if (mode === 'select') {
+        next.add(item);
+      } else {
+        next.delete(item);
+      }
+      return next;
+    });
+  };
+
+  const handleLabPointerDown = (event: PointerEvent<HTMLTableRowElement>, item: string) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const nextMode = selectedLabItems.has(item) ? 'deselect' : 'select';
+    setLabDragMode(nextMode);
+    setIsDraggingLabItems(true);
+    applyLabItemSelection(item, nextMode);
+  };
+
+  const handleLabPointerEnter = (item: string) => {
+    if (!isDraggingLabItems) {
+      return;
+    }
+    applyLabItemSelection(item, labDragMode);
+  };
 
   return (
     <section className="py-5">
@@ -740,8 +1107,32 @@ const LabsView = ({
           異常のみ
         </button>
         <span className="ml-auto text-[12px] text-text-tertiary">
-          ダミー時系列を含む {filtered.length} 件
+          選択 {selectedLabItems.size}項目 ・ 表示 {filtered.length} 件
         </span>
+        <Button onClick={onAddLab} size="xs" type="button" variant="outline">
+          検査を追加
+        </Button>
+        <Button
+          disabled={selectedLabItems.size === 0}
+          onClick={() => setTrendItems(Array.from(selectedLabItems))}
+          size="xs"
+          type="button"
+          variant="outline"
+        >
+          選択項目の推移
+        </Button>
+        <Button
+          disabled={selectedLabItems.size === 0}
+          onClick={() => {
+            setSelectedLabItems(new Set());
+            setTrendItems([]);
+          }}
+          size="xs"
+          type="button"
+          variant="ghost"
+        >
+          選択解除
+        </Button>
         <Button variant="ghost" size="xs" onClick={() => window.print()}>
           印刷
         </Button>
@@ -750,6 +1141,7 @@ const LabsView = ({
       <table className="w-full overflow-hidden rounded-lg border border-border bg-card text-[13px]">
         <thead>
           <tr className="border-b border-border bg-surface-subtle text-[11px] uppercase tracking-wide text-text-tertiary">
+            <th className="w-10 px-3 py-2 text-left font-bold">選択</th>
             <th className="px-3 py-2 text-left font-bold">日付</th>
             <th className="px-3 py-2 text-left font-bold">項目</th>
             <th className="px-3 py-2 text-right font-bold">値</th>
@@ -758,63 +1150,120 @@ const LabsView = ({
           </tr>
         </thead>
         <tbody>
-          {filtered.map((result, index) => (
-            <tr
-              // biome-ignore lint/suspicious/noArrayIndexKey: static demo timeline fallback
-              key={`${result.date}-${result.item}-${index}`}
-              className="border-b border-border/60 last:border-b-0"
-            >
-              <td className="px-3 py-2.5 text-text-tertiary tabular-nums">{result.date}</td>
-              <td className="px-3 py-2.5 text-text-primary">{result.item}</td>
-              <td
-                className={`px-3 py-2.5 text-right tabular-nums ${
-                  result.flag === 'high' ? 'font-bold text-destructive' : 'text-text-primary'
-                }`}
+          {filtered.map((result, index) => {
+            const isSelected = selectedLabItems.has(result.item);
+            const tone = labValueTone(result.result, result.baseline, result.flag);
+
+            return (
+              <tr
+                // biome-ignore lint/suspicious/noArrayIndexKey: static demo timeline fallback
+                key={`${result.date}-${result.item}-${index}`}
+                className={`cursor-pointer select-none border-b border-border/60 last:border-b-0 hover:bg-blue-50 ${isSelected ? 'bg-blue-50' : ''}`}
+                onPointerDown={(event) => handleLabPointerDown(event, result.item)}
+                onPointerEnter={() => handleLabPointerEnter(result.item)}
               >
-                {result.result}
-              </td>
-              <td className="px-3 py-2.5 text-right text-text-tertiary tabular-nums">
-                {result.baseline}
-              </td>
-              <td className="px-3 py-2.5 text-right text-text-tertiary tabular-nums">
-                {result.previous}
-              </td>
-            </tr>
-          ))}
+                <td className="px-3 py-2.5">
+                  <span className={`inline-grid size-5 place-items-center rounded border text-[11px] font-bold ${
+                    isSelected ? 'border-brand bg-brand text-white' : 'border-border bg-white text-transparent'
+                  }`}>
+                    ✓
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 text-text-tertiary tabular-nums">{result.date}</td>
+                <td className="px-3 py-2.5 font-bold text-text-primary">{result.item}</td>
+                <td
+                  className={`px-3 py-2.5 text-right tabular-nums ${labToneClassName(tone)}`}
+                >
+                  {result.result}
+                </td>
+                <td className="px-3 py-2.5 text-right text-text-tertiary tabular-nums">
+                  {result.baseline}
+                </td>
+                <td className="px-3 py-2.5 text-right text-text-tertiary tabular-nums">
+                  {result.previous}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {(trends.length > 0 ? trends : [
-          { item: 'HbA1c', latestValue: '7.0%', deltaLabel: '-0.2%', abnormalCount: 4 },
-          { item: 'eGFR', latestValue: '68', deltaLabel: '-3', abnormalCount: 0 },
-          { item: 'LDL-C', latestValue: '118', deltaLabel: '-8', abnormalCount: 0 },
-          { item: 'AST', latestValue: '42 H', deltaLabel: '+7', abnormalCount: 1 },
-        ]).map((trend) => (
-          <div key={trend.item} className="rounded-lg border border-border bg-card p-4">
-            <p className="truncate text-[13px] font-bold text-text-primary">{trend.item}</p>
-            <p className="mt-1 text-[12px] text-text-tertiary">
-              最新 {trend.latestValue ?? '-'} ・ {trend.deltaLabel}
-              {trend.abnormalCount > 0 ? ` ・ 異常${trend.abnormalCount}回` : ''}
-            </p>
+      {trendItems.length > 0 ? (
+        <section className="mt-6 rounded-lg border border-border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <h3 className="text-[16px] font-bold text-text-primary">選択項目の推移</h3>
+              <p className="mt-1 text-[12px] text-text-tertiary">
+                行をドラッグまたはクリックして項目を選び、右上の共通アクションから表示します。
+              </p>
+            </div>
+            <span className="text-[12px] font-bold text-text-secondary">{trendItems.length}項目</span>
           </div>
-        ))}
-      </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-[13px]">
+              <thead>
+                <tr className="border-b border-border bg-surface-subtle text-[11px] uppercase tracking-wide text-text-tertiary">
+                  <th className="px-3 py-2 text-left font-bold">日付</th>
+                  <th className="px-3 py-2 text-left font-bold">項目</th>
+                  <th className="px-3 py-2 text-right font-bold">値</th>
+                  <th className="px-3 py-2 text-right font-bold">基準</th>
+                  <th className="px-3 py-2 text-right font-bold">前回</th>
+                  <th className="px-3 py-2 text-right font-bold">判定</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trendRowsToShow.map((row, index) => {
+                  const tone = labValueTone(row.result, row.baseline, row.flag);
+
+                  return (
+                    <tr
+                      // biome-ignore lint/suspicious/noArrayIndexKey: static demo timeline fallback
+                      className="border-b border-border/60 last:border-b-0"
+                      key={`${row.date}-${row.item}-trend-${index}`}
+                    >
+                      <td className="px-3 py-2.5 font-bold text-text-primary">{row.date}</td>
+                      <td className="px-3 py-2.5 text-text-primary">{row.item}</td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums ${labToneClassName(tone)}`}>{row.result}</td>
+                      <td className="px-3 py-2.5 text-right text-text-tertiary tabular-nums">{row.baseline}</td>
+                      <td className="px-3 py-2.5 text-right text-text-tertiary tabular-nums">{row.previous}</td>
+                      <td className="px-3 py-2.5 text-right text-text-tertiary">
+                        {tone === 'high' ? '高値' : tone === 'low' ? '低値' : '基準内'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </section>
   );
 };
 
 const OrderListView = ({
+  actionLabel,
   title,
   empty,
   items,
+  onAction,
 }: {
+  actionLabel?: string;
   title: string;
   empty: string;
   items: Array<{ key: string; title: string; meta: string; body: string }>;
+  onAction?: () => void;
 }) => (
   <section className="py-5">
-    <h3 className="mb-3 text-[18px] font-bold text-text-primary">{title}</h3>
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h3 className="text-[18px] font-bold text-text-primary">{title}</h3>
+      {actionLabel && onAction ? (
+        <Button onClick={onAction} size="xs" type="button" variant="outline">
+          <Plus size={13} />
+          {actionLabel}
+        </Button>
+      ) : null}
+    </div>
     {items.length === 0 ? (
       <p className="rounded-lg border border-dashed border-border bg-card py-12 text-center text-[13px] text-text-tertiary">
         {empty}

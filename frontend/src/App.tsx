@@ -14,6 +14,7 @@ import { removeStorage, readStorage, writeStorage } from './lib/storage';
 import type { ChartMeta, InpatientAdmission, UserSession } from './types/workflow';
 
 type Screen = 'login' | 'reception' | 'chart' | 'settings' | 'ward';
+type ChartReturnScreen = 'reception' | 'ward';
 type StatusFilter = ReceptionStatus | 'all';
 type DepartmentFilter = string | 'all';
 type SortKey = 'receptionNumber' | 'reservationTime' | 'elapsed';
@@ -74,6 +75,7 @@ function App() {
   const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [inpatientAdmissions, setInpatientAdmissions] = useState<InpatientAdmission[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
+  const [chartReturnScreen, setChartReturnScreen] = useState<ChartReturnScreen>('reception');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('all');
@@ -300,17 +302,18 @@ function App() {
     ].slice(0, 8));
   };
 
-  const handleOpenPatient = (patient: PatientRecord) => {
+  const handleOpenPatient = (patient: PatientRecord, returnTo: ChartReturnScreen = 'reception') => {
     if (!patient) {
       return;
     }
 
     setSelectedPatient(patient);
+    setChartReturnScreen(returnTo);
     rememberChartPatient(patient);
     setScreen('chart');
   };
 
-  const handleOpenChart = (patientId: string) => {
+  const handleOpenChart = (patientId: string, returnTo: ChartReturnScreen = 'reception') => {
     const patient =
       patients.find((item) => item.id === patientId) ??
       recentChartPatients.find((item) => item.id === patientId);
@@ -319,7 +322,7 @@ function App() {
       return;
     }
 
-    handleOpenPatient(patient);
+    handleOpenPatient(patient, returnTo);
   };
 
   const handlePatientStatusChange = async (
@@ -426,7 +429,7 @@ function App() {
           <WardWorkspace
             admissions={inpatientAdmissions}
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
-            onOpenChart={handleOpenChart}
+            onOpenChart={(patientId) => handleOpenChart(patientId, 'ward')}
             onRefreshAdmissions={setInpatientAdmissions}
           />
         ) : screen === 'reception' ? (
@@ -439,7 +442,7 @@ function App() {
             isLoading={patientsLoading}
             lastRefreshedAt={lastRefreshedAt}
             onDepartmentFilterChange={handleDepartmentFilterChange}
-            onOpenChart={handleOpenChart}
+            onOpenChart={(patientId) => handleOpenChart(patientId, 'reception')}
             onSearchChange={handleSearchChange}
             onSortChange={handleSortChange}
             onStatusFilterChange={handleStatusFilterChange}
@@ -457,8 +460,9 @@ function App() {
             onMetaChange={setChartMeta}
             onOpenPatient={handleOpenPatient}
             onPatientStatusChange={handlePatientStatusChange}
-            onReturnReception={() => setScreen('reception')}
+            onReturnReception={() => setScreen(chartReturnScreen)}
             patient={selectedPatient}
+            currentAdmission={inpatientAdmissions.find((admission) => admission.patientId === selectedPatient.id && admission.status === 'active')}
             recentPatients={recentChartPatients}
           />
         ) : (

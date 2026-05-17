@@ -1631,6 +1631,24 @@ export const listInpatientInstructions = async (admissionId: number): Promise<In
   return instructions.map(mapInpatientInstruction);
 };
 
+export const createInpatientInstruction = async (
+  admissionId: number,
+  payload: { category: string; title: string; dueAt?: string },
+): Promise<InpatientInstruction> => {
+  const instruction = await request<ApiInpatientInstruction>(
+    `/api/inpatient/admissions/${admissionId}/instructions`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        category: payload.category,
+        title: payload.title,
+        due_at: payload.dueAt || null,
+      }),
+    },
+  );
+  return mapInpatientInstruction(instruction);
+};
+
 export const getInpatientProgress = async (admissionId: number): Promise<InpatientProgress> => {
   const progress = await request<ApiInpatientProgress>(
     `/api/inpatient/admissions/${admissionId}/progress`,
@@ -2519,6 +2537,41 @@ export const saveChart = async (
       assessment: payload.assessment,
       plan: payload.plan,
       saved_by: payload.savedBy,
+    }),
+  });
+
+export const generateChartAiDraft = async (
+  patientId: string,
+  payload: {
+    prompt: string;
+    context: string;
+    mode: 'soap' | 'labs' | 'plan';
+    currentDraft: {
+      subjective: string;
+      objective: string;
+      assessment: string;
+      plan: string;
+    };
+  },
+) =>
+  request<{
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+    used_context: string;
+  }>(`/api/patients/${patientId}/chart/ai-draft`, {
+    method: 'POST',
+    body: JSON.stringify({
+      prompt: payload.prompt,
+      context: payload.context,
+      mode: payload.mode,
+      current_draft: {
+        subjective: payload.currentDraft.subjective,
+        objective: payload.currentDraft.objective,
+        assessment: payload.currentDraft.assessment,
+        plan: payload.currentDraft.plan,
+      },
     }),
   });
 

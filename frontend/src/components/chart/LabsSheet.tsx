@@ -1,4 +1,6 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
+import { Button } from '../ui/button';
+import { useEffect, useMemo, useState } from 'react';
 import type { LabLongTrendItem, LabResultEntry } from '../../types/workflow';
 
 type LabsSheetProps = {
@@ -12,8 +14,28 @@ const parseBaselineRange = (baseline?: string) => {
   if (!baseline) return null;
   const numbers = baseline.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
   if (numbers.length >= 2) return { min: numbers[0], max: numbers[1] };
-  if (baseline.endsWith('-') && numbers.length === 1) return { min: numbers[0], max: numbers[0] * 1.4 };
+  if (baseline.endsWith('-') && numbers.length === 1) return { min: numbers[0], max: null };
   return null;
+};
+
+const labValueTone = (
+  value: string,
+  baseline?: string,
+  flag?: 'high' | 'normal',
+): 'high' | 'low' | 'normal' => {
+  const numericValue = Number(value.match(/-?\d+(?:\.\d+)?/)?.[0]);
+  const range = parseBaselineRange(baseline);
+  if (Number.isFinite(numericValue) && range) {
+    if (range.min !== null && numericValue < range.min) return 'low';
+    if (range.max !== null && numericValue > range.max) return 'high';
+  }
+  return flag === 'high' ? 'high' : 'normal';
+};
+
+const labToneClassName = (tone: 'high' | 'low' | 'normal') => {
+  if (tone === 'high') return 'font-bold text-warning';
+  if (tone === 'low') return 'font-bold text-blue-700';
+  return 'text-text-primary';
 };
 
 const Sparkline = ({ trend }: { trend: LabLongTrendItem }) => {
@@ -43,7 +65,7 @@ const Sparkline = ({ trend }: { trend: LabLongTrendItem }) => {
         stroke={lastIsAbnormal ? 'var(--warning)' : 'var(--brand)'}
         strokeWidth="1.5"
       />
-      {baseline ? (
+      {baseline && baseline.max !== null ? (
         <rect
           x="0"
           y={h - ((baseline.max - min) / range) * h}
@@ -78,8 +100,17 @@ const Sparkline = ({ trend }: { trend: LabLongTrendItem }) => {
  * - 長期トレンドのスパークライン (numericValue があるものだけ)
  */
 export const LabsSheet = ({ open, onClose, results, trends }: LabsSheetProps) => {
-  const trendByItem = new Map<string, LabLongTrendItem>();
-  for (const t of trends) trendByItem.set(t.item, t);
+  const trendByItem = useMemo(() => {
+    const map = new Map<string, LabLongTrendItem>();
+    for (const trend of trends) map.set(trend.item, trend);
+    return map;
+  }, [trends]);
+  const [selectedTrendItem, setSelectedTrendItem] = useState<string | null>(() => results[0]?.item ?? trends[0]?.item ?? null);
+  const selectedTrend = selectedTrendItem ? trendByItem.get(selectedTrendItem) : null;
+
+  useEffect(() => {
+    setSelectedTrendItem(results[0]?.item ?? trends[0]?.item ?? null);
+  }, [results, trends]);
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -116,13 +147,15 @@ export const LabsSheet = ({ open, onClose, results, trends }: LabsSheetProps) =>
               <tbody>
                 {results.map((r) => {
                   const trend = trendByItem.get(r.item);
+                  const tone = labValueTone(r.result, r.baseline, r.flag);
                   return (
-                    <tr key={r.item} className="border-b border-border/60">
+                    <tr
+                      key={r.item}
+                      className={`border-b border-border/60 ${selectedTrendItem === r.item ? 'bg-blue-50' : ''}`}
+                    >
                       <td className="py-2.5 text-text-primary">{r.item}</td>
                       <td
-                        className={`py-2.5 text-right tabular-nums ${
-                          r.flag === 'high' ? 'font-bold text-warning' : 'text-text-primary'
-                        }`}
+                        className={`py-2.5 text-right tabular-nums ${labToneClassName(tone)}`}
                       >
                         {r.result}
                       </td>
@@ -132,7 +165,20 @@ export const LabsSheet = ({ open, onClose, results, trends }: LabsSheetProps) =>
                       <td className="py-2.5 text-right text-text-tertiary tabular-nums">
                         {r.previous}
                       </td>
-                      <td className="py-2.5 text-right">{trend ? <Sparkline trend={trend} /> : null}</td>
+                      <td className="py-2.5 text-right">
+                        {trend ? (
+                          <Button
+                            onClick={() => setSelectedTrendItem(r.item)}
+                            size="xs"
+                            type="button"
+                            variant={selectedTrendItem === r.item ? 'default' : 'outline'}
+                          >
+                            推移を見る
+                          </Button>
+                        ) : (
+                          <span className="text-[12px] text-text-tertiary">なし</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -140,30 +186,52 @@ export const LabsSheet = ({ open, onClose, results, trends }: LabsSheetProps) =>
             </table>
           )}
 
-          {trends.length > 0 ? (
-            <section className="mt-8">
-              <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary">
-                長期トレンド
-              </h3>
-              <ul className="space-y-3">
-                {trends.map((t) => (
-                  <li
-                    key={t.item}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2.5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium text-text-primary">{t.item}</p>
-                      <p className="text-[11px] text-text-tertiary">
-                        {t.latestValue ?? '—'}
-                        {t.deltaLabel ? ` (${t.deltaLabel})` : ''}
-                        {t.abnormalCount > 0 ? ` ・ 異常${t.abnormalCount}回` : ''}
-                      </p>
-                    </div>
-                    <Sparkline trend={t} />
-                  </li>
-                ))}
-              </ul>
+          {selectedTrend ? (
+            <section className="mt-6 rounded-md border border-border bg-surface-subtle p-3">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-[14px] font-bold text-text-primary">{selectedTrend.item} の時系列</h3>
+                  <p className="mt-1 text-[12px] text-text-tertiary">
+                    最新 {selectedTrend.latestValue ?? '-'}
+                    {selectedTrend.deltaLabel ? ` ・ ${selectedTrend.deltaLabel}` : ''}
+                    {selectedTrend.abnormalCount > 0 ? ` ・ 異常${selectedTrend.abnormalCount}回` : ''}
+                  </p>
+                </div>
+                <Sparkline trend={selectedTrend} />
+              </div>
+              <div className="overflow-hidden rounded-md border border-border bg-card">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-subtle text-text-tertiary">
+                      <th className="px-2 py-1.5 text-left font-bold">日付</th>
+                      <th className="px-2 py-1.5 text-right font-bold">値</th>
+                      <th className="px-2 py-1.5 text-right font-bold">判定</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedTrend.points.map((point) => {
+                      const tone = labValueTone(point.value, selectedTrend.baseline, point.flag);
+
+                      return (
+                        <tr className="border-b border-border/60 last:border-b-0" key={point.observationId}>
+                          <td className="px-2 py-1.5 text-text-secondary">{point.date}</td>
+                          <td className={`px-2 py-1.5 text-right ${labToneClassName(tone)}`}>
+                            {point.value}{point.unit ? ` ${point.unit}` : ''}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-text-tertiary">
+                            {tone === 'high' ? '高値' : tone === 'low' ? '低値' : '基準内'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </section>
+          ) : trends.length > 0 ? (
+            <p className="mt-6 rounded-md border border-dashed border-border bg-surface-subtle px-3 py-4 text-center text-[13px] text-text-tertiary">
+              検査行の「推移を見る」から時系列を表示できます。
+            </p>
           ) : null}
         </div>
       </SheetContent>

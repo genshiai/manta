@@ -22,6 +22,7 @@ import type {
   ChartTemplate,
   ChartVersion,
   ImagingOrderEntry,
+  InpatientAdmission,
   LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
@@ -40,7 +41,7 @@ import { ChartShell } from './chart/ChartShell';
 import { ChartTopBar } from './chart/ChartTopBar';
 import { LabsSheet } from './chart/LabsSheet';
 import { NextVisitDialog } from './chart/NextVisitDialog';
-import { OrderPane } from './chart/OrderPane';
+import { OrderPane, type OrderTab } from './chart/OrderPane';
 import { PatientPane } from './chart/PatientPane';
 import { RecordPane } from './chart/RecordPane';
 import type { SoapDraft } from './chart/SoapEditor';
@@ -68,6 +69,7 @@ const chartTabs: Array<{ value: ChartView; label: string }> = [
 
 type ChartWorkspaceProps = {
   patient: PatientRecord;
+  currentAdmission?: InpatientAdmission;
   availablePatients: PatientRecord[];
   recentPatients: PatientRecord[];
   currentUser: UserSession;
@@ -125,6 +127,7 @@ const draftFromTemplate = (template: ChartTemplate): SoapDraft => ({
  */
 export function ChartWorkspace({
   patient,
+  currentAdmission,
   availablePatients,
   recentPatients,
   currentUser,
@@ -171,6 +174,7 @@ export function ChartWorkspace({
   // モーダル
   const [labsSheetOpen, setLabsSheetOpen] = useState(false);
   const [reservationDialogOpen, setReservationDialogOpen] = useState(false);
+  const [orderDialogTab, setOrderDialogTab] = useState<OrderTab | null>(null);
   const [reservationSlots, setReservationSlots] = useState<ReservationSlot[]>([]);
   const [scheduledVisit, setScheduledVisit] = useState<ScheduledVisit | null>(null);
 
@@ -186,6 +190,7 @@ export function ChartWorkspace({
     () => labOrders.filter((order) => order.status === 'pending'),
     [labOrders],
   );
+  const isInpatientChart = Boolean(currentAdmission);
   const activeProblemNames = useMemo(
     () => problems.filter((problem) => problem.status !== 'resolved').map((problem) => problem.name),
     [problems],
@@ -517,17 +522,23 @@ export function ChartWorkspace({
       setSaveMessage('保存してから診察終了してください');
       return;
     }
+    if (isInpatientChart) {
+      void finalizeFinishVisit();
+      return;
+    }
     setReservationDialogOpen(true);
   };
 
   const finalizeFinishVisit = async () => {
     setIsMutating(true);
     try {
-      await onPatientStatusChange(
-        patient.id,
-        '診察終了',
-        'カルテ保存後に診察終了へ更新しました。',
-      );
+      if (!isInpatientChart) {
+        await onPatientStatusChange(
+          patient.id,
+          '診察終了',
+          'カルテ保存後に診察終了へ更新しました。',
+        );
+      }
       onDataChanged();
       setReservationDialogOpen(false);
       onReturnReception();
@@ -609,6 +620,8 @@ export function ChartWorkspace({
           lastSavedAt={lastSavedAt}
           version={version}
           abnormalLabCount={abnormalLabCount}
+          finishLabel={isInpatientChart ? '病棟へ戻る' : '診察終了'}
+          modeLabel={isInpatientChart ? `${currentAdmission?.wardName ?? '病棟'} ${currentAdmission?.bedLabel ?? ''}`.trim() : '外来'}
           onOpenPatient={onOpenPatient}
           onSave={handleSave}
           onReturnReception={onReturnReception}
@@ -655,6 +668,8 @@ export function ChartWorkspace({
           patientId={patient.id}
           view={activeView}
           draft={draft}
+          authorName={currentUser.displayName}
+          department={patient.department}
           isDirty={isDirty}
           vitals={vitals}
           templates={prioritizedChartTemplates}
@@ -676,6 +691,8 @@ export function ChartWorkspace({
           onSelectTemplate={setSelectedTemplateId}
           onApplyTemplate={handleApplyTemplate}
           onCopyPrevious={handleCopyPrevious}
+          onAddOrder={setOrderDialogTab}
+          onOpenReservation={isInpatientChart ? undefined : () => setReservationDialogOpen(true)}
         />
       }
       right={
@@ -689,6 +706,8 @@ export function ChartWorkspace({
           procedureOrders={procedureOrders}
           isMutating={isMutating}
           orderMessage={orderMessage}
+          openAddTab={orderDialogTab}
+          onOpenAddTabHandled={() => setOrderDialogTab(null)}
           onAddPrescription={handleAddPrescription}
           onAddLab={handleAddLab}
           onAddImaging={handleAddImaging}

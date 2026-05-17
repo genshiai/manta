@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, FileText, FlaskConical, Pencil, Pill, Plus, ScanLine, Search, Trash2, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -307,18 +307,28 @@ const MiniCalendar = ({
         </div>
       </button>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <CalendarChip className="bg-brand" label="診療録" />
-        <CalendarChip className="bg-success" label="検査" />
-        <CalendarChip className="bg-warning" label="処方" />
-        <CalendarChip className="bg-chart-3" label="画像" />
+        <CalendarChip className="border-blue-100 bg-blue-50 text-brand" icon={FileText} label="診療録" />
+        <CalendarChip className="border-green-100 bg-green-50 text-success" icon={FlaskConical} label="検査" />
+        <CalendarChip className="border-yellow-100 bg-yellow-50 text-warning" icon={Pill} label="処方" />
+        <CalendarChip className="border-purple-100 bg-purple-50 text-chart-3" icon={ScanLine} label="画像" />
       </div>
     </section>
   );
 };
 
-const CalendarChip = ({ className, label }: { className: string; label: string }) => (
-  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-subtle px-2 py-0.5 text-[11px] text-text-secondary">
-    <span className={`size-1.5 rounded-full ${className}`} />
+const CalendarChip = ({
+  className,
+  icon: Icon,
+  label,
+}: {
+  className: string;
+  icon: typeof FileText;
+  label: string;
+}) => (
+  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-subtle px-2 py-0.5 text-[11px] font-bold text-text-secondary">
+    <span className={`inline-grid size-5 place-items-center rounded-full border ${className}`}>
+      <Icon size={12} strokeWidth={2.2} />
+    </span>
     {label}
   </span>
 );

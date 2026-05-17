@@ -18,6 +18,8 @@ from .models import ChartNote, LabOrder, Observation, Patient, PrescriptionOrder
 from ..master_data.schemas import ChartOrderMasterRead
 from .schemas import (
     ChartSaveRequest,
+    ChartAiDraftRead,
+    ChartAiDraftRequest,
     ChartWorkspaceRead,
     ImagingOrderCreateRequest,
     ImagingOrderItem,
@@ -391,6 +393,47 @@ def save_chart_note(
     db.commit()
     db.refresh(note)
     return {"version": next_version, "saved_at": note.saved_at.isoformat()}
+
+
+@router.post("/api/patients/{patient_id}/chart/ai-draft", response_model=ChartAiDraftRead)
+def generate_chart_ai_draft(
+    patient_id: str,
+    payload: ChartAiDraftRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ChartAiDraftRead:
+    patient = get_patient_or_404(db, patient_id)
+    current = payload.current_draft
+    prompt = payload.prompt.strip()
+    context = payload.context.strip()
+    direction = f"記載方針: {prompt}" if prompt else "記載方針: 通常のSOAPとして簡潔に整理"
+
+    subjective = current.get("subjective") or "症状変化、服薬状況、生活状況を確認。"
+    objective = current.get("objective") or "バイタル、検査、処方状況を確認。"
+    assessment = current.get("assessment") or f"{direction}\n直近経過と検査所見を踏まえ、現状評価を行う。"
+    plan = current.get("plan") or "治療継続可否、追加検査、次回確認事項を整理する。"
+
+    if payload.mode == "labs":
+        objective = "\n".join(filter(None, [objective, "検査異常を確認し、臨床経過と合わせて評価。"]))
+    elif payload.mode == "plan":
+        plan = "\n".join(filter(None, [plan, direction, "次回までの観察項目と患者説明を明確化。"]))
+
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="AI診療録下書き",
+        scope="chart",
+        detail=f"{payload.mode} / prompt={prompt[:80] or 'なし'}",
+        patient=patient,
+    )
+    db.commit()
+    return ChartAiDraftRead(
+        subjective=subjective,
+        objective=objective,
+        assessment=assessment,
+        plan=plan,
+        used_context=context,
+    )
 
 
 @router.post("/api/patients/{patient_id}/prescriptions", response_model=PrescriptionRead)

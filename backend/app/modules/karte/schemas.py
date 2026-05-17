@@ -176,6 +176,21 @@ class ChartSaveRequest(BaseModel):
     saved_by: str
 
 
+class ChartAiDraftRequest(BaseModel):
+    prompt: str = ""
+    context: str = ""
+    mode: Literal["soap", "labs", "plan"] = "soap"
+    current_draft: dict[str, str] = {}
+
+
+class ChartAiDraftRead(BaseModel):
+    subjective: str
+    objective: str
+    assessment: str
+    plan: str
+    used_context: str
+
+
 class PrescriptionCreateRequest(BaseModel):
     type: str
     days: str

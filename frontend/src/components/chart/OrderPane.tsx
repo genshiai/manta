@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Plus, Search, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -20,7 +20,7 @@ import type {
   ProcedureOrderEntry,
 } from '../../types/workflow';
 
-type OrderTab = 'prescription' | 'lab' | 'imaging' | 'procedure';
+export type OrderTab = 'prescription' | 'lab' | 'imaging' | 'procedure';
 
 type LabOrderRow = {
   category: string;
@@ -40,6 +40,8 @@ type OrderPaneProps = {
   procedureOrders: ProcedureOrderEntry[];
   isMutating: boolean;
   orderMessage: string;
+  openAddTab?: OrderTab | null;
+  onOpenAddTabHandled?: () => void;
   onAddPrescription: (drugId: string, dosage: string, days: string) => void;
   onAddLab: (setId: string, urgency: '通常' | '至急') => void;
   onAddImaging: (entry: ImagingOrderEntry) => void;
@@ -64,6 +66,8 @@ export const OrderPane = ({
   procedureOrders,
   isMutating,
   orderMessage,
+  openAddTab,
+  onOpenAddTabHandled,
   onAddPrescription,
   onAddLab,
   onAddImaging,
@@ -84,6 +88,12 @@ export const OrderPane = ({
     setTab(nextTab);
     setAddDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (!openAddTab) return;
+    openAddDialog(openAddTab);
+    onOpenAddTabHandled?.();
+  }, [openAddTab, onOpenAddTabHandled]);
 
   const handleAskAi = (query = aiQuery) => {
     const text = query.trim();
