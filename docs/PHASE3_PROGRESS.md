@@ -1,6 +1,6 @@
 # Phase 3 Progress
 
-更新日: 2026-05-09
+更新日: 2026-05-17
 
 Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、入院エピソード、病棟、病床、看護記録、指示簿、経過表、サマリ、AI 要約へ広げる。
 
@@ -76,6 +76,12 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 - 施設別算定ルールに `conditions` / `actions` JSON を追加し、明細単位の点数調整、摘要候補、病名要件、同月回数確認を `claim_line_adjustments` と `ClaimReviewIssue` に展開できるようにした
 - `claim_line_adjustments` の提案を病棟UIで採用/無視できるようにし、採用済みの `points_delta` だけを `ClaimDraft.total_points` へ再計算反映する承認フローを追加した
 - 施設別算定ルールの `actions.comment` / `actions.comment_code` から `receipt_comment_masters` を照合し、`ClaimLineAdjustment` にコメントコード・パターン付きの摘要候補を保持できるようにした
+- `claim_draft_lines` の `receipt_code` / `receipt_name` / `points` / `unit` を病棟ワークスペースの請求点検 drawer から補正できるようにした
+- `GET /api/claim-draft-lines/{line_id}/receipt-code-candidates`: 診療行為マスターから明細名ベースのレセ電コード候補を返す
+- `PATCH /api/claim-draft-lines/{line_id}/receipt-code`: 請求明細のレセ電コードを補正し、該当する未解決コード issue を resolved にする
+- `POST /api/claim-drafts/{claim_draft_id}/recheck`: 請求ドラフトのコード未解決 issue を再生成/解決し、合計点数と送信可否状態を再評価する
+- `GET /api/claim-drafts/{claim_draft_id}/transmissions/orca/preview`: 現在の請求ドラフトから ORCA/レセコン送信前 payload preview を生成し、送信可能明細、停止明細、error/warning 件数を返す
+- 病棟ワークスペースの請求点検 drawer に、未解決 issue の種類別表示、コード補正、再点検、送信前 preview、送信 payload preview を追加した
 
 ## Phase 3 実装範囲
 
@@ -83,7 +89,7 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 | --- | --- | --- |
 | 入院申込・入院決定 | backend API 済み | 患者画面/ホームから入院申込・病床割当する UI |
 | 退院許可・退院実施 | backend API 済み | 退院会計の本番レセコン連携 |
-| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft/Line + 施設別rule DSL/UI + 点検提案承認 + ORCA HTTP adapter 済み | 実ORCA環境での疎通確認、返戻/査定 workflow、診療報酬ルールの網羅 |
+| 退院時処方・会計候補 | レセ電候補付き API/UI + importer + ClaimDraft/Line + 施設別rule DSL/UI + 点検提案承認 + コード補正 + 再点検 + 送信前preview + ORCA HTTP adapter 済み | 医事向け一括点検キュー、実ORCA環境での疎通確認、返戻/査定 workflow、診療報酬ルールの網羅 |
 | 転棟・転床 | backend API/UI 済み | D&D 操作、移動予定管理 |
 | 病棟患者一覧 | API + ホーム表示済み | 病棟/チーム/未実施/退院予定フィルタ強化 |
 | 病床管理一覧 | master/API/UI 済み | 病床稼働率、病床種別、男女/感染制御制約 |
@@ -97,7 +103,20 @@ Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、�
 
 ## 次の実装順
 
-1. 退院会計の本番連携
-   - ORCA/会計連携、施設別算定 rule、実施済みオーダとの厳密照合を追加する。
-2. クリティカルパス運用強化
+1. 医事・レセプトワークスペース
+   - 請求ドラフト一覧、未解決 issue、送信待ち、送信エラー、ORCA送信履歴を患者横断で確認できる一括点検キューを追加する。
+2. 退院会計の本番連携
+   - 実ORCA環境での疎通確認、ORCA payload 仕様への最終変換、返戻/査定 workflow を追加する。
+3. クリティカルパス運用強化
    - 職種別フィルタ、パス改訂履歴を追加する。
+
+## 導線と役割
+
+請求点検は通常の医師・看護師が日常的に触る画面ではなく、退院前や医事確認時に触る「医事・会計」領域として扱う。
+
+- 医師: 病棟ワークスペースで退院計画、退院時処方、文書、必要な実施記録を確認する
+- 看護師: 病棟ワークスペースで指示実施、看護記録、経過表、文書署名状況を確認する
+- 医事/事務: 請求ドラフト、未解決 issue、コード補正、送信前preview、ORCA/レセコン送信履歴を確認する
+- 管理者: 設定画面で施設別算定 rule、ORCA adapter、マスター同期を管理する
+
+現状は病棟患者ごとの `請求点検` drawer から入る。次は患者横断の `医事・レセプトワークスペース` を作り、医事/事務が「未解決」「送信待ち」「送信エラー」「返戻」を一括で処理できる導線へ広げる。
