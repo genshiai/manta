@@ -1067,6 +1067,7 @@ const ImagingTab = ({
   onCancel: (index: number, entry: ImagingOrderEntry) => void;
 }) => {
   const [category, setCategory] = useState('胸部X線');
+  const [status, setStatus] = useState<ImagingOrderEntry['status']>('scheduled');
   const [scheduledAt, setScheduledAt] = useState('');
   const [note, setNote] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -1083,6 +1084,14 @@ const ImagingTab = ({
           画像オーダ追加
         </h3>
         <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="検査種別" />
+        <select
+          className="h-9 rounded-md border border-border bg-card px-3 text-[13px] text-text-primary"
+          onChange={(e) => setStatus(e.target.value as ImagingOrderEntry['status'])}
+          value={status}
+        >
+          <option value="scheduled">予定</option>
+          <option value="draft">下書き</option>
+        </select>
         <Input
           value={scheduledAt}
           onChange={(e) => setScheduledAt(e.target.value)}
@@ -1093,7 +1102,13 @@ const ImagingTab = ({
           variant="default"
           size="sm"
           className="w-full"
-          onClick={() => onAdd({ category, status: 'scheduled', scheduledAt, note })}
+          onClick={() => {
+            onAdd({ category, status, scheduledAt, note });
+            setCategory('胸部X線');
+            setStatus('scheduled');
+            setScheduledAt('');
+            setNote('');
+          }}
           disabled={isMutating || !category}
         >
           <Plus size={14} />
@@ -1109,13 +1124,21 @@ const ImagingTab = ({
           {imagingOrders.length > 0 ? (
             imagingOrders.map((o, idx) => (
               <li
-                // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
-                key={`${o.category}-${o.scheduledAt}-${idx}`}
+                key={o.id ?? `${o.category}-${o.scheduledAt}-${idx}`}
                 className="rounded-md border border-border bg-card px-3 py-2"
               >
                 {editingIndex === idx ? (
                   <div className="space-y-2">
                     <Input value={editForm.category} onChange={(e) => setEditForm((current) => ({ ...current, category: e.target.value }))} />
+                    <select
+                      className="h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] text-text-primary"
+                      onChange={(e) => setEditForm((current) => ({ ...current, status: e.target.value as ImagingOrderEntry['status'] }))}
+                      value={editForm.status}
+                    >
+                      <option value="scheduled">予定</option>
+                      <option value="draft">下書き</option>
+                      <option value="cancelled">取消</option>
+                    </select>
                     <Input value={editForm.scheduledAt} onChange={(e) => setEditForm((current) => ({ ...current, scheduledAt: e.target.value }))} />
                     <Input value={editForm.note} onChange={(e) => setEditForm((current) => ({ ...current, note: e.target.value }))} />
                     <div className="flex flex-wrap gap-2">
@@ -1165,6 +1188,7 @@ const ProcedureTab = ({
   onCancel: (index: number, entry: ProcedureOrderEntry) => void;
 }) => {
   const [title, setTitle] = useState('');
+  const [status, setStatus] = useState<ProcedureOrderEntry['status']>('planned');
   const [note, setNote] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<ProcedureOrderEntry>({ title: '', status: 'planned', note: '' });
@@ -1180,12 +1204,25 @@ const ProcedureTab = ({
           処置を追加
         </h3>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="処置名" />
+        <select
+          className="h-9 rounded-md border border-border bg-card px-3 text-[13px] text-text-primary"
+          onChange={(e) => setStatus(e.target.value as ProcedureOrderEntry['status'])}
+          value={status}
+        >
+          <option value="planned">予定</option>
+          <option value="done">実施済</option>
+        </select>
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="備考" />
         <Button
           variant="default"
           size="sm"
           className="w-full"
-          onClick={() => onAdd({ title, status: 'planned', note })}
+          onClick={() => {
+            onAdd({ title, status, note });
+            setTitle('');
+            setStatus('planned');
+            setNote('');
+          }}
           disabled={isMutating || !title}
         >
           <Plus size={14} />
@@ -1201,13 +1238,21 @@ const ProcedureTab = ({
           {procedureOrders.length > 0 ? (
             procedureOrders.map((o, idx) => (
               <li
-                // biome-ignore lint/suspicious/noArrayIndexKey: append-only list, idx is stable
-                key={`${o.title}-${idx}`}
+                key={o.id ?? `${o.title}-${idx}`}
                 className="rounded-md border border-border bg-card px-3 py-2"
               >
                 {editingIndex === idx ? (
                   <div className="space-y-2">
                     <Input value={editForm.title} onChange={(e) => setEditForm((current) => ({ ...current, title: e.target.value }))} />
+                    <select
+                      className="h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] text-text-primary"
+                      onChange={(e) => setEditForm((current) => ({ ...current, status: e.target.value as ProcedureOrderEntry['status'] }))}
+                      value={editForm.status}
+                    >
+                      <option value="planned">予定</option>
+                      <option value="done">実施済</option>
+                      <option value="cancelled">取消</option>
+                    </select>
                     <Input value={editForm.note} onChange={(e) => setEditForm((current) => ({ ...current, note: e.target.value }))} />
                     <div className="flex flex-wrap gap-2">
                       <Button size="xs" variant="outline" disabled={isMutating || !editForm.title.trim()} onClick={() => { onUpdate(idx, editForm); setEditingIndex(null); }}>保存</Button>
