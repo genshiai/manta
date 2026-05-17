@@ -21,6 +21,7 @@ from .models import ClaimDraft, ClaimLineAdjustment, FacilityClaimRule
 from .schemas import ClaimDraftRead, ClaimDraftUpdateRequest, ClaimLineAdjustmentUpdateRequest
 from .services import (
     build_claim_draft_lines,
+    build_claim_line_code_issues,
     build_claim_review_issues,
     build_claim_rule_adjustments,
     claim_draft_to_read,
@@ -126,6 +127,8 @@ def create_inpatient_claim_draft(
         instructions=instructions,
         lab_orders=lab_orders,
     ):
+        db.add(issue)
+    for issue in build_claim_line_code_issues(claim_draft_id=draft.id, lines=lines):
         db.add(issue)
     rules = db.scalars(
         select(FacilityClaimRule)

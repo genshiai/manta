@@ -305,6 +305,23 @@ def build_claim_review_issues(
     return issues
 
 
+def build_claim_line_code_issues(*, claim_draft_id: int, lines: list[ClaimDraftLine]) -> list[ClaimReviewIssue]:
+    issues: list[ClaimReviewIssue] = []
+    for line in lines:
+        if line.receipt_code:
+            continue
+        issues.append(
+            ClaimReviewIssue(
+                claim_draft_id=claim_draft_id,
+                issue_type="claim_line_unresolved_receipt_code",
+                severity="error",
+                message=f"{line.label} のレセ電コードが未解決です。",
+                evidence=f"{line.line_type} / {line.source_type} / source_id={line.source_id or '-'}",
+            )
+        )
+    return issues
+
+
 def _claim_rule_matches_context(
     rule: FacilityClaimRule,
     *,

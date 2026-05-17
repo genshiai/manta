@@ -33,7 +33,7 @@ from app.modules.master_data.models import (
     ReservationSlotMaster,
     StandardUsageMaster,
 )
-from app.modules.rececon.models import ClaimDraft, ClaimLineAdjustment, FacilityClaimRule
+from app.modules.rececon.models import ClaimDraft, ClaimDraftLine, ClaimLineAdjustment, FacilityClaimRule
 from app.seed import PATIENT_WORKSPACE_BY_ID, sync_patient_order_tables
 
 
@@ -627,6 +627,11 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             db.add(adjustment)
             db.commit()
             adjustment_id = adjustment.id
+            first_line = db.scalar(select(ClaimDraftLine).where(ClaimDraftLine.claim_draft_id == draft_id).limit(1))
+            if first_line is not None:
+                first_line.receipt_code = None
+                first_line.receipt_name = None
+            db.commit()
         get_response = client.get(
             f"/api/inpatient/admissions/{admission_id}/claim-draft",
             headers={"Authorization": f"Bearer {token}"},
@@ -680,7 +685,10 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert update_response.json()["status"] == "ready"
     assert transmit_response.status_code == 201
     assert transmit_response.json()["adapter"] == "orca"
-    assert transmit_response.json()["status"] in {"accepted", "rejected"}
+    assert transmit_response.json()["status"] == "rejected"
+    assert transmit_response.json()["request_payload"]["format_version"] == "manta-orca-claim-candidate-v1"
+    assert transmit_response.json()["request_payload"]["claim"]["summary"]["unresolved_count"] >= 1
+    assert transmit_response.json()["request_payload"]["claim"]["unresolved_items"]
 
     if draft_id is not None:
         with SessionLocal() as db:

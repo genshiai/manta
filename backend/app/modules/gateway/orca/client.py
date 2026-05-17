@@ -54,10 +54,35 @@ def normalize_orca_response(status_code: int, payload: dict[str, object]) -> tup
     return "accepted", None
 
 
+def map_claim_line_to_orca_candidate(line: ClaimDraftLine) -> dict[str, object]:
+    return {
+        "line_id": line.id,
+        "claim_draft_line_id": line.id,
+        "line_type": line.line_type,
+        "source_type": line.source_type,
+        "source_id": line.source_id,
+        "label": line.label,
+        "receipt_code": line.receipt_code,
+        "receipt_name": line.receipt_name,
+        "points": line.points,
+        "quantity": line.quantity,
+        "unit": line.unit,
+        "evidence": line.evidence,
+        "review_status": line.review_status,
+        "code_system": "receipt_computer",
+        "sendable": bool(line.receipt_code),
+        "unresolved_reason": None if line.receipt_code else "missing_receipt_code",
+    }
+
+
 def build_orca_claim_payload(draft: ClaimDraft, patient: Patient, lines: list[ClaimDraftLine]) -> dict[str, object]:
+    mapped_items = [map_claim_line_to_orca_candidate(line) for line in lines]
+    sendable_items = [item for item in mapped_items if item["sendable"]]
+    unresolved_items = [item for item in mapped_items if not item["sendable"]]
     return {
         "adapter": "orca",
         "mode": "mock",
+        "format_version": "manta-orca-claim-candidate-v1",
         "patient": {
             "id": patient.id,
             "name": patient.name,
@@ -67,24 +92,42 @@ def build_orca_claim_payload(draft: ClaimDraft, patient: Patient, lines: list[Cl
             "draft_id": draft.id,
             "admission_id": draft.admission_id,
             "total_points": draft.total_points,
-            "items": [
-                {
-                    "line_id": line.id,
-                    "line_type": line.line_type,
-                    "source_type": line.source_type,
-                    "source_id": line.source_id,
-                    "label": line.label,
-                    "receipt_code": line.receipt_code,
-                    "receipt_name": line.receipt_name,
-                    "points": line.points,
-                    "quantity": line.quantity,
-                    "unit": line.unit,
-                    "evidence": line.evidence,
-                }
-                for line in lines
-            ],
+            "items": mapped_items,
+            "orca_receipt_items": sendable_items,
+            "unresolved_items": unresolved_items,
+            "summary": {
+                "line_count": len(mapped_items),
+                "sendable_count": len(sendable_items),
+                "unresolved_count": len(unresolved_items),
+            },
         },
     }
+
+
+def ensure_orca_code_resolution_issues(db: Session, *, draft: ClaimDraft, lines: list[ClaimDraftLine]) -> None:
+    existing_source_ids = set(
+        db.scalars(
+            select(ClaimReviewIssue.evidence).where(
+                ClaimReviewIssue.claim_draft_id == draft.id,
+                ClaimReviewIssue.issue_type == "claim_line_unresolved_receipt_code",
+            )
+        ).all()
+    )
+    for line in lines:
+        if line.receipt_code:
+            continue
+        evidence = f"{line.line_type} / {line.source_type} / source_id={line.source_id or '-'}"
+        if evidence in existing_source_ids:
+            continue
+        db.add(
+            ClaimReviewIssue(
+                claim_draft_id=draft.id,
+                issue_type="claim_line_unresolved_receipt_code",
+                severity="error",
+                message=f"{line.label} のレセ電コードが未解決です。",
+                evidence=evidence,
+            )
+        )
 
 
 def submit_orca_claim(
@@ -94,17 +137,19 @@ def submit_orca_claim(
     patient: Patient,
     current_user: User,
 ) -> ClaimTransmission:
+    lines = db.scalars(
+        select(ClaimDraftLine)
+        .where(ClaimDraftLine.claim_draft_id == draft.id)
+        .order_by(ClaimDraftLine.id)
+    ).all()
+    ensure_orca_code_resolution_issues(db, draft=draft, lines=lines)
+    db.flush()
     open_errors = db.scalars(
         select(ClaimReviewIssue).where(
             ClaimReviewIssue.claim_draft_id == draft.id,
             ClaimReviewIssue.status == "open",
             ClaimReviewIssue.severity == "error",
         )
-    ).all()
-    lines = db.scalars(
-        select(ClaimDraftLine)
-        .where(ClaimDraftLine.claim_draft_id == draft.id)
-        .order_by(ClaimDraftLine.id)
     ).all()
     payload = build_orca_claim_payload(draft, patient, lines)
     setting = db.get(OrcaAdapterSetting, "default")
