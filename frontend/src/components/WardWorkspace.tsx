@@ -47,6 +47,8 @@ import {
   listInpatientPathwayMasters,
   listNursingNotes,
   listInpatientSummaryReviews,
+  previewClaimDraftOrcaPayload,
+  recheckClaimDraft,
   submitClaimDraftToOrca,
   transferInpatientAdmission,
   updateInpatientBedStatus,
@@ -272,6 +274,7 @@ export const WardWorkspace = ({
   const [editingClaimLineId, setEditingClaimLineId] = useState<number | null>(null);
   const [claimLineForm, setClaimLineForm] = useState({ receiptCode: '', receiptName: '', points: '', unit: '' });
   const [receiptCodeCandidates, setReceiptCodeCandidates] = useState<ReceiptCodeCandidate[]>([]);
+  const [orcaPreviewPayload, setOrcaPreviewPayload] = useState<Record<string, unknown> | null>(null);
   const [isLoadingReceiptCandidates, setIsLoadingReceiptCandidates] = useState(false);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
@@ -313,6 +316,7 @@ export const WardWorkspace = ({
     setIsDraggingLabSelection(false);
     setEditingClaimLineId(null);
     setReceiptCodeCandidates([]);
+    setOrcaPreviewPayload(null);
   }, [selectedAdmissionId]);
 
   const selectedAdmission = useMemo(
@@ -843,6 +847,51 @@ export const WardWorkspace = ({
     }
   };
 
+  const handleRecheckClaimDraft = async () => {
+    if (!claimDraft || isSavingClaimDraft) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const draft = await recheckClaimDraft(claimDraft.id);
+      const preview = await previewClaimDraftOrcaPayload(draft.id);
+      setClaimDraft(draft);
+      setOrcaPreviewPayload(preview);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '請求ドラフトの再点検に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
+    }
+  };
+
+  const handlePreviewClaimDraft = async () => {
+    if (!claimDraft || isSavingClaimDraft) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const preview = await previewClaimDraftOrcaPayload(claimDraft.id);
+      setOrcaPreviewPayload(preview);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '送信前previewの取得に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
+    }
+  };
+
   const handleUpdateClaimLineAdjustmentStatus = async (
     adjustment: ClaimLineAdjustment,
     status: ClaimLineAdjustment['status'],
@@ -919,6 +968,7 @@ export const WardWorkspace = ({
       setClaimDraft(draft);
       setEditingClaimLineId(null);
       setReceiptCodeCandidates([]);
+      setOrcaPreviewPayload(null);
       await refreshEvents();
     } catch (error) {
       if (isUnauthorizedError(error)) {
@@ -940,11 +990,13 @@ export const WardWorkspace = ({
     setErrorMessage(null);
     try {
       const transmission = await submitClaimDraftToOrca(claimDraft.id);
+      const preview = await previewClaimDraftOrcaPayload(claimDraft.id);
       setClaimDraft((current) => current ? {
         ...current,
         status: transmission.status === 'accepted' ? 'submitted' : 'error',
         transmissions: [transmission, ...current.transmissions],
       } : current);
+      setOrcaPreviewPayload(preview);
       await refreshEvents();
     } catch (error) {
       if (isUnauthorizedError(error)) {
@@ -1056,7 +1108,10 @@ export const WardWorkspace = ({
   }, {});
   const unresolvedClaimLineCount = claimDraft?.lines.filter((line) => !line.receiptCode).length ?? 0;
   const latestClaimTransmission = claimDraft?.transmissions[0] ?? null;
-  const latestClaimPayload = latestClaimTransmission ? getOrcaPayloadClaim(latestClaimTransmission.requestPayload) : null;
+  const previewPayloadSource = orcaPreviewPayload ?? latestClaimTransmission?.requestPayload ?? null;
+  const previewValidation = asRecord(previewPayloadSource?.validation);
+  const previewCanSubmit = previewValidation?.can_submit === true;
+  const latestClaimPayload = previewPayloadSource ? getOrcaPayloadClaim(previewPayloadSource) : null;
   const latestPayloadSummary = getPayloadSummary(latestClaimPayload);
   const hasLatestPayloadSummary = Boolean(latestPayloadSummary);
   const latestSendableItems = getPayloadArray(latestClaimPayload, 'orca_receipt_items');
@@ -2230,8 +2285,22 @@ export const WardWorkspace = ({
             {claimDraft ? (
               <>
                 <div className='rounded-md border border-blue-100 bg-blue-50 p-3'>
-                  <p className='text-[13px] font-bold text-blue-950'>{claimDraft.lines.length}明細 / {claimDraft.totalPoints.toLocaleString()}点</p>
-                  <p className='mt-1 text-[12px] text-blue-900'>未解決 {openClaimIssueCount}件 · コード未解決 {unresolvedClaimLineCount}明細 · 提案 {reviewClaimAdjustmentCount}件</p>
+                  <div className='flex flex-wrap items-start justify-between gap-2'>
+                    <div>
+                      <p className='text-[13px] font-bold text-blue-950'>{claimDraft.lines.length}明細 / {claimDraft.totalPoints.toLocaleString()}点</p>
+                      <p className='mt-1 text-[12px] text-blue-900'>未解決 {openClaimIssueCount}件 · コード未解決 {unresolvedClaimLineCount}明細 · 提案 {reviewClaimAdjustmentCount}件</p>
+                      {previewValidation ? (
+                        <p className={cn('mt-1 text-[11px] font-bold', previewCanSubmit ? 'text-green-900' : 'text-red-900')}>
+                          {previewCanSubmit ? '送信前チェック: 送信可能' : `送信前チェック: 停止 ${String(previewValidation.unresolved_count ?? 0)}明細 / error ${String(previewValidation.open_error_count ?? 0)}件`}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button disabled={isSavingClaimDraft} onClick={handleRecheckClaimDraft} size='xs' type='button' variant='outline'>再点検</Button>
+                      <Button disabled={isSavingClaimDraft} onClick={handlePreviewClaimDraft} size='xs' type='button' variant='ghost'>送信前preview</Button>
+                      <Button disabled={isSavingClaimDraft || claimDraft.status === 'submitted'} onClick={handleSubmitClaimDraftToOrca} size='xs' type='button' variant='outline'>ORCA送信</Button>
+                    </div>
+                  </div>
                 </div>
                 <div className='space-y-2'>
                   <p className='text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary'>未解決 issue</p>
@@ -2335,7 +2404,7 @@ export const WardWorkspace = ({
                 {latestClaimTransmission ? (
                   <div className='rounded-md border border-blue-100 bg-blue-50 p-3'>
                     <div className='flex flex-wrap items-center justify-between gap-2'>
-                      <p className='text-[13px] font-bold text-blue-950'>送信 payload preview</p>
+                      <p className='text-[13px] font-bold text-blue-950'>{orcaPreviewPayload ? '送信前 payload preview' : '送信 payload preview'}</p>
                       <span className='rounded border border-blue-200 bg-white px-2 py-1 text-[11px] font-bold text-blue-900'>{latestClaimTransmission.status}</span>
                     </div>
                     <p className='mt-1 text-[11px] text-blue-900'>

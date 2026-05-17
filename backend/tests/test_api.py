@@ -751,6 +751,14 @@ def test_doctor_can_update_claim_line_receipt_code_and_resolve_issue() -> None:
                 "unit": "日",
             },
         )
+        recheck_response = client.post(
+            f"/api/claim-drafts/{draft_id}/recheck",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        preview_response = client.get(
+            f"/api/claim-drafts/{draft_id}/transmissions/orca/preview",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
     assert candidates_response.status_code == 200
     assert update_response.status_code == 200
@@ -764,6 +772,13 @@ def test_doctor_can_update_claim_line_receipt_code_and_resolve_issue() -> None:
         and f"source_id={line_payload['source_id']}" in (issue["evidence"] or "")
         for issue in update_response.json()["issues"]
     )
+    assert recheck_response.status_code == 200
+    assert recheck_response.json()["status"] in {"ready", "error"}
+    assert preview_response.status_code == 200
+    assert preview_response.json()["format_version"] == "manta-orca-claim-candidate-v1"
+    assert "orca_receipt_items" in preview_response.json()["claim"]
+    assert "unresolved_items" in preview_response.json()["claim"]
+    assert "validation" in preview_response.json()
 
     if draft_id is not None:
         with SessionLocal() as db:

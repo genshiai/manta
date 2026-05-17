@@ -68,6 +68,64 @@ def _resolve_receipt_code_issues(db: Session, *, draft_id: int, line: ClaimDraft
             issue.status = "resolved"
 
 
+def _sync_claim_draft_code_issues(db: Session, draft: ClaimDraft) -> list[ClaimDraftLine]:
+    lines = db.scalars(
+        select(ClaimDraftLine).where(ClaimDraftLine.claim_draft_id == draft.id).order_by(ClaimDraftLine.id)
+    ).all()
+    existing_code_issues = db.scalars(
+        select(ClaimReviewIssue).where(
+            ClaimReviewIssue.claim_draft_id == draft.id,
+            ClaimReviewIssue.issue_type == "claim_line_unresolved_receipt_code",
+        )
+    ).all()
+    open_issue_evidence = {issue.evidence for issue in existing_code_issues if issue.status == "open"}
+
+    for line in lines:
+        evidence = _line_code_issue_evidence(line)
+        if line.receipt_code:
+            for issue in existing_code_issues:
+                if issue.evidence == evidence and issue.status == "open":
+                    issue.status = "resolved"
+            continue
+        if evidence not in open_issue_evidence:
+            db.add(
+                ClaimReviewIssue(
+                    claim_draft_id=draft.id,
+                    issue_type="claim_line_unresolved_receipt_code",
+                    severity="error",
+                    message=f"{line.label} のレセ電コードが未解決です。",
+                    evidence=evidence,
+                )
+            )
+            open_issue_evidence.add(evidence)
+
+    if all(line.receipt_code for line in lines):
+        for issue in db.scalars(
+            select(ClaimReviewIssue).where(
+                ClaimReviewIssue.claim_draft_id == draft.id,
+                ClaimReviewIssue.issue_type == "missing_receipt_code",
+                ClaimReviewIssue.status == "open",
+            )
+        ).all():
+            issue.status = "resolved"
+
+    db.flush()
+    open_error_count = db.scalar(
+        select(ClaimReviewIssue)
+        .where(
+            ClaimReviewIssue.claim_draft_id == draft.id,
+            ClaimReviewIssue.status == "open",
+            ClaimReviewIssue.severity == "error",
+        )
+        .limit(1)
+    )
+    draft.total_points = recalculate_claim_draft_total_points(db, draft.id)
+    if draft.status != "submitted":
+        draft.status = "error" if open_error_count is not None else "ready"
+    draft.updated_at = utcnow()
+    return lines
+
+
 def _receipt_candidate_to_read(item: ReceiptMedicalPracticeMaster) -> ReceiptCodeCandidateRead:
     return ReceiptCodeCandidateRead(
         receipt_code=item.receipt_code,
@@ -372,6 +430,46 @@ def update_claim_draft(
         action="請求ドラフト更新",
         scope="billing",
         detail=f"請求ドラフトを {payload.status} に更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(draft)
+    return claim_draft_to_read(db, draft)
+
+
+@router.post("/api/claim-drafts/{claim_draft_id}/recheck", response_model=ClaimDraftRead)
+def recheck_claim_draft(
+    claim_draft_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimDraftRead:
+    draft = db.get(ClaimDraft, claim_draft_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft not found")
+    patient = get_patient_or_404(db, draft.patient_id)
+    _sync_claim_draft_code_issues(db, draft)
+    open_errors = db.scalars(
+        select(ClaimReviewIssue).where(
+            ClaimReviewIssue.claim_draft_id == draft.id,
+            ClaimReviewIssue.status == "open",
+            ClaimReviewIssue.severity == "error",
+        )
+    ).all()
+    if draft.admission_id is not None:
+        add_inpatient_event(
+            db,
+            admission_id=draft.admission_id,
+            event_type="claim_draft_rechecked",
+            title="請求ドラフト再点検",
+            detail=f"status={draft.status} / error={len(open_errors)} / total={draft.total_points}点",
+            actor=current_user.display_name,
+        )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="請求ドラフト再点検",
+        scope="billing",
+        detail=f"請求ドラフト {draft.id} を再点検しました。status={draft.status}",
         patient=patient,
     )
     db.commit()

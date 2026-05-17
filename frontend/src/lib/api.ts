@@ -1959,6 +1959,13 @@ export const updateClaimDraftStatus = async (
   return mapClaimDraft(draft);
 };
 
+export const recheckClaimDraft = async (claimDraftId: number): Promise<ClaimDraft> => {
+  const draft = await request<ApiClaimDraft>(`/api/claim-drafts/${claimDraftId}/recheck`, {
+    method: 'POST',
+  });
+  return mapClaimDraft(draft);
+};
+
 export const updateClaimLineAdjustmentStatus = async (
   adjustmentId: number,
   status: ClaimLineAdjustment['status'],
@@ -1997,6 +2004,9 @@ export const updateClaimDraftLineReceiptCode = async (
   });
   return mapClaimDraft(draft);
 };
+
+export const previewClaimDraftOrcaPayload = async (claimDraftId: number): Promise<Record<string, unknown>> =>
+  request<Record<string, unknown>>(`/api/claim-drafts/${claimDraftId}/transmissions/orca/preview`);
 
 export const submitClaimDraftToOrca = async (claimDraftId: number): Promise<ClaimDraft['transmissions'][number]> => {
   const transmission = await request<ApiClaimTransmission>(`/api/claim-drafts/${claimDraftId}/transmissions/orca`, {
