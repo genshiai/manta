@@ -564,6 +564,7 @@ def test_get_and_update_inpatient_discharge_plan() -> None:
 def test_create_and_update_inpatient_claim_draft() -> None:
     draft_id: int | None = None
     adjustment_id: int | None = None
+    pending_lab_order_id: int | None = None
     comment_code = "820999994"
     base_total = 0
     with TestClient(app) as client:
@@ -595,7 +596,19 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             "/api/inpatient/admissions",
             headers={"Authorization": f"Bearer {token}"},
         )
-        admission_id = admissions_response.json()[0]["id"]
+        admission = admissions_response.json()[0]
+        admission_id = admission["id"]
+        with SessionLocal() as db:
+            pending_lab_order = LabOrder(
+                patient_id=admission["patient"]["id"],
+                category="退院前採血",
+                status="pending",
+                urgency="通常",
+                items=["CBC", "CRP"],
+            )
+            db.add(pending_lab_order)
+            db.commit()
+            pending_lab_order_id = pending_lab_order.id
         create_response = client.post(
             f"/api/inpatient/admissions/{admission_id}/claim-draft",
             headers={"Authorization": f"Bearer {token}"},
@@ -648,6 +661,7 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert any(item["comment_code"] == comment_code for item in draft["adjustments"])
     assert isinstance(draft["total_points"], int)
     assert "issues" in draft
+    assert any(item["issue_type"] == "lab_order_not_done" for item in draft["issues"])
     assert get_response.status_code == 200
     assert get_response.json()["id"] == draft_id
     assert accept_adjustment_response.status_code == 200
@@ -676,6 +690,10 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             comment_master = db.get(ReceiptCommentMaster, comment_code)
             if comment_master is not None:
                 db.delete(comment_master)
+            if pending_lab_order_id is not None:
+                pending_lab_order = db.get(LabOrder, pending_lab_order_id)
+                if pending_lab_order is not None:
+                    db.delete(pending_lab_order)
             db.commit()
 
 

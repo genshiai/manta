@@ -128,6 +128,8 @@ def build_claim_draft_lines(
 
     lab_candidate = by_category.get("検査")
     for order in lab_orders[:20]:
+        if order.status == "cancelled":
+            continue
         for item in order.items:
             lines.append(
                 ClaimDraftLine(
@@ -207,6 +209,41 @@ def build_claim_review_issues(
             )
 
     done_instructions = [instruction for instruction in instructions if instruction.status == "done"]
+    for order in lab_orders:
+        if order.status == "cancelled":
+            issues.append(
+                ClaimReviewIssue(
+                    claim_draft_id=claim_draft_id,
+                    issue_type="lab_order_cancelled",
+                    severity="info",
+                    message=f"{order.category} は取消済みのため請求明細から除外しました。",
+                    evidence=f"検査項目: {', '.join(order.items[:6])}",
+                )
+            )
+        elif order.status not in {"completed", "done"}:
+            issues.append(
+                ClaimReviewIssue(
+                    claim_draft_id=claim_draft_id,
+                    issue_type="lab_order_not_done",
+                    severity="warning",
+                    message=f"{order.category} は未実施のため請求前確認が必要です。",
+                    evidence=f"status={order.status} / 検査項目: {', '.join(order.items[:6])}",
+                )
+            )
+
+    for instruction in instructions:
+        if instruction.status == "done":
+            continue
+        issues.append(
+            ClaimReviewIssue(
+                claim_draft_id=claim_draft_id,
+                issue_type="instruction_not_done",
+                severity="warning" if instruction.status != "cancelled" else "info",
+                message=f"{instruction.title} は実施済みではありません。",
+                evidence=f"{instruction.category} / status={instruction.status}",
+            )
+        )
+
     rules = db.scalars(
         select(FacilityClaimRule)
         .where(FacilityClaimRule.is_active == sa_true())
