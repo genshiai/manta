@@ -59,6 +59,22 @@ class ClaimDraftLineRead(BaseModel):
     created_at: datetime
 
 
+class ClaimDraftLineReceiptCodeUpdateRequest(BaseModel):
+    receipt_code: str
+    receipt_name: str | None = None
+    points: int | None = None
+    unit: str | None = None
+    resolve_issues: bool = True
+
+
+class ReceiptCodeCandidateRead(BaseModel):
+    receipt_code: str
+    receipt_name: str
+    points: int | None = None
+    unit: str | None = None
+    category: str | None = None
+
+
 class ClaimLineAdjustmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

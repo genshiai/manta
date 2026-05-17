@@ -17,8 +17,15 @@ from ..inpatient.services import (
 )
 from ..karte.models import LabOrder, PrescriptionOrder
 from ..karte.services import get_patient_or_404
-from .models import ClaimDraft, ClaimLineAdjustment, FacilityClaimRule
-from .schemas import ClaimDraftRead, ClaimDraftUpdateRequest, ClaimLineAdjustmentUpdateRequest
+from ..master_data.models import ReceiptMedicalPracticeMaster
+from .models import ClaimDraft, ClaimDraftLine, ClaimLineAdjustment, ClaimReviewIssue, FacilityClaimRule
+from .schemas import (
+    ClaimDraftLineReceiptCodeUpdateRequest,
+    ClaimDraftRead,
+    ClaimDraftUpdateRequest,
+    ClaimLineAdjustmentUpdateRequest,
+    ReceiptCodeCandidateRead,
+)
 from .services import (
     build_claim_draft_lines,
     build_claim_line_code_issues,
@@ -31,6 +38,44 @@ from .services import (
 
 
 router = APIRouter()
+
+
+def _line_code_issue_evidence(line: ClaimDraftLine) -> str:
+    return f"{line.line_type} / {line.source_type} / source_id={line.source_id or '-'}"
+
+
+def _resolve_receipt_code_issues(db: Session, *, draft_id: int, line: ClaimDraftLine) -> None:
+    issue_types = {"claim_line_unresolved_receipt_code", "missing_receipt_code"}
+    evidence = _line_code_issue_evidence(line)
+    issues = db.scalars(
+        select(ClaimReviewIssue).where(
+            ClaimReviewIssue.claim_draft_id == draft_id,
+            ClaimReviewIssue.status == "open",
+            ClaimReviewIssue.issue_type.in_(issue_types),
+        )
+    ).all()
+    remaining_missing_lines = db.scalars(
+        select(ClaimDraftLine).where(
+            ClaimDraftLine.claim_draft_id == draft_id,
+            ClaimDraftLine.id != line.id,
+            ClaimDraftLine.receipt_code.is_(None),
+        )
+    ).all()
+    for issue in issues:
+        if issue.issue_type == "claim_line_unresolved_receipt_code" and issue.evidence == evidence:
+            issue.status = "resolved"
+        elif issue.issue_type == "missing_receipt_code" and not remaining_missing_lines:
+            issue.status = "resolved"
+
+
+def _receipt_candidate_to_read(item: ReceiptMedicalPracticeMaster) -> ReceiptCodeCandidateRead:
+    return ReceiptCodeCandidateRead(
+        receipt_code=item.receipt_code,
+        receipt_name=item.name,
+        points=item.points,
+        unit=item.unit_name,
+        category=item.category,
+    )
 
 
 @router.get("/api/inpatient/admissions/{admission_id}/claim-draft", response_model=ClaimDraftRead | None)
@@ -202,6 +247,96 @@ def update_claim_line_adjustment(
         action="請求点数調整",
         scope="billing",
         detail=f"{adjustment.reason} を {payload.status} に更新しました。合計 {draft.total_points}点。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(draft)
+    return claim_draft_to_read(db, draft)
+
+
+@router.get("/api/claim-draft-lines/{line_id}/receipt-code-candidates", response_model=list[ReceiptCodeCandidateRead])
+def list_claim_draft_line_receipt_code_candidates(
+    line_id: int,
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[ReceiptCodeCandidateRead]:
+    line = db.get(ClaimDraftLine, line_id)
+    if line is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft line not found")
+
+    keywords = [part.strip() for part in line.label.replace(":", " ").replace("　", " ").split() if len(part.strip()) >= 2]
+    keywords.extend([line.line_type, line.receipt_name or ""])
+    seen_codes: set[str] = set()
+    candidates: list[ReceiptMedicalPracticeMaster] = []
+    for keyword in keywords:
+        if not keyword:
+            continue
+        rows = db.scalars(
+            select(ReceiptMedicalPracticeMaster)
+            .where(ReceiptMedicalPracticeMaster.name.ilike(f"%{keyword}%"))
+            .order_by(ReceiptMedicalPracticeMaster.name, ReceiptMedicalPracticeMaster.receipt_code)
+            .limit(8)
+        ).all()
+        for row in rows:
+            if row.receipt_code in seen_codes:
+                continue
+            seen_codes.add(row.receipt_code)
+            candidates.append(row)
+        if len(candidates) >= 8:
+            break
+    return [_receipt_candidate_to_read(item) for item in candidates[:8]]
+
+
+@router.patch("/api/claim-draft-lines/{line_id}/receipt-code", response_model=ClaimDraftRead)
+def update_claim_draft_line_receipt_code(
+    line_id: int,
+    payload: ClaimDraftLineReceiptCodeUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClaimDraftRead:
+    line = db.get(ClaimDraftLine, line_id)
+    if line is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft line not found")
+    draft = db.get(ClaimDraft, line.claim_draft_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim draft not found")
+    patient = get_patient_or_404(db, draft.patient_id)
+
+    receipt_code = payload.receipt_code.strip()
+    if not receipt_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="receipt_code is required")
+    master = db.get(ReceiptMedicalPracticeMaster, receipt_code)
+    line.receipt_code = receipt_code
+    line.receipt_name = payload.receipt_name.strip() if payload.receipt_name else master.name if master else line.receipt_name
+    if payload.points is not None:
+        line.points = payload.points
+    elif master is not None and master.points is not None:
+        line.points = master.points
+    if "unit" in payload.model_fields_set:
+        line.unit = payload.unit
+    elif master is not None and master.unit_name:
+        line.unit = master.unit_name
+    line.review_status = "candidate"
+    if payload.resolve_issues:
+        _resolve_receipt_code_issues(db, draft_id=draft.id, line=line)
+    draft.total_points = recalculate_claim_draft_total_points(db, draft.id)
+    draft.updated_at = utcnow()
+
+    if draft.admission_id is not None:
+        add_inpatient_event(
+            db,
+            admission_id=draft.admission_id,
+            event_type="claim_line_receipt_code_updated",
+            title="請求明細コード補正",
+            detail=f"{line.label}: {line.receipt_code} {line.receipt_name or ''}".strip(),
+            actor=current_user.display_name,
+        )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="請求明細コード補正",
+        scope="billing",
+        detail=f"{line.label} のレセ電コードを {line.receipt_code} に更新しました。",
         patient=patient,
     )
     db.commit()

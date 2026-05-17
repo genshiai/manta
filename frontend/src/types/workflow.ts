@@ -378,6 +378,14 @@ export type ClaimDraftLine = {
   createdAt: string;
 };
 
+export type ReceiptCodeCandidate = {
+  receiptCode: string;
+  receiptName: string;
+  points?: number;
+  unit?: string;
+  category?: string;
+};
+
 export type ClaimLineAdjustment = {
   id: number;
   claimDraftId: number;

@@ -38,6 +38,7 @@ import {
   getInpatientProgress,
   getInpatientSummaryDraft,
   isUnauthorizedError,
+  listClaimDraftLineReceiptCodeCandidates,
   listInpatientAdmissions,
   listInpatientBeds,
   listInpatientDocuments,
@@ -50,6 +51,7 @@ import {
   transferInpatientAdmission,
   updateInpatientBedStatus,
   updateClaimDraftStatus,
+  updateClaimDraftLineReceiptCode,
   updateClaimLineAdjustmentStatus,
   updateInpatientDocument,
   updateInpatientDischargePlan,
@@ -63,6 +65,7 @@ import type {
   InpatientAiSummaryReview,
   InpatientBed,
   ClaimDraft,
+  ClaimDraftLine,
   ClaimLineAdjustment,
   InpatientDocument,
   InpatientDocumentType,
@@ -75,6 +78,7 @@ import type {
   InpatientProgress,
   InpatientSummaryDraft,
   NursingNote,
+  ReceiptCodeCandidate,
 } from '../types/workflow';
 import { Button } from './ui/button';
 import { Drawer } from './ui/drawer';
@@ -132,6 +136,20 @@ const claimAdjustmentStatusClasses: Record<ClaimLineAdjustment['status'], string
   ignored: 'border-solid-gray-200 bg-solid-gray-50 text-solid-gray-700',
 };
 
+const claimIssueLabels: Record<string, string> = {
+  claim_line_unresolved_receipt_code: '明細コード未解決',
+  missing_receipt_code: '候補コードなし',
+  lab_order_not_done: '検査未実施',
+  instruction_not_done: '指示未実施',
+};
+
+const claimIssueClasses: Record<string, string> = {
+  claim_line_unresolved_receipt_code: 'border-red-200 bg-red-50 text-red-950',
+  missing_receipt_code: 'border-red-200 bg-red-50 text-red-950',
+  lab_order_not_done: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+  instruction_not_done: 'border-yellow-200 bg-yellow-50 text-yellow-1100',
+};
+
 const documentStatusLabels: Record<InpatientDocument['status'], string> = {
   draft: '下書き',
   signed: '署名済',
@@ -170,6 +188,23 @@ const emptyInstructionForm = {
   category: '検査',
   title: '',
   dueAt: '',
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+const getOrcaPayloadClaim = (payload: Record<string, unknown>) => asRecord(payload.claim);
+
+const getPayloadArray = (claim: Record<string, unknown> | null, key: string): Record<string, unknown>[] => {
+  const value = claim?.[key];
+  return Array.isArray(value) ? value.map(asRecord).filter((item): item is Record<string, unknown> => Boolean(item)) : [];
+};
+
+const getPayloadSummary = (claim: Record<string, unknown> | null) => asRecord(claim?.summary);
+
+const payloadText = (item: Record<string, unknown>, key: string) => {
+  const value = item[key];
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 };
 
 type WardDrawerPanel = 'summary' | 'claim' | 'events' | null;
@@ -234,6 +269,10 @@ export const WardWorkspace = ({
   const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
   const [dischargePlan, setDischargePlan] = useState<InpatientDischargePlan | null>(null);
   const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
+  const [editingClaimLineId, setEditingClaimLineId] = useState<number | null>(null);
+  const [claimLineForm, setClaimLineForm] = useState({ receiptCode: '', receiptName: '', points: '', unit: '' });
+  const [receiptCodeCandidates, setReceiptCodeCandidates] = useState<ReceiptCodeCandidate[]>([]);
+  const [isLoadingReceiptCandidates, setIsLoadingReceiptCandidates] = useState(false);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [instructionForm, setInstructionForm] = useState(emptyInstructionForm);
@@ -272,6 +311,8 @@ export const WardWorkspace = ({
     setSelectedLabRowKeys(new Set());
     setLastSelectedLabKey(null);
     setIsDraggingLabSelection(false);
+    setEditingClaimLineId(null);
+    setReceiptCodeCandidates([]);
   }, [selectedAdmissionId]);
 
   const selectedAdmission = useMemo(
@@ -827,6 +868,69 @@ export const WardWorkspace = ({
     }
   };
 
+  const startEditClaimLine = async (line: ClaimDraftLine) => {
+    setEditingClaimLineId(line.id);
+    setClaimLineForm({
+      receiptCode: line.receiptCode ?? '',
+      receiptName: line.receiptName ?? '',
+      points: String(line.points),
+      unit: line.unit ?? '',
+    });
+    setReceiptCodeCandidates([]);
+    setIsLoadingReceiptCandidates(true);
+    try {
+      const candidates = await listClaimDraftLineReceiptCodeCandidates(line.id);
+      setReceiptCodeCandidates(candidates);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setReceiptCodeCandidates([]);
+    } finally {
+      setIsLoadingReceiptCandidates(false);
+    }
+  };
+
+  const applyReceiptCodeCandidate = (candidate: ReceiptCodeCandidate) => {
+    setClaimLineForm({
+      receiptCode: candidate.receiptCode,
+      receiptName: candidate.receiptName,
+      points: candidate.points !== undefined ? String(candidate.points) : claimLineForm.points,
+      unit: candidate.unit ?? claimLineForm.unit,
+    });
+  };
+
+  const handleUpdateClaimLineReceiptCode = async (line: ClaimDraftLine) => {
+    if (isSavingClaimDraft || !claimLineForm.receiptCode.trim()) {
+      return;
+    }
+
+    setIsSavingClaimDraft(true);
+    setErrorMessage(null);
+    try {
+      const draft = await updateClaimDraftLineReceiptCode(line.id, {
+        receiptCode: claimLineForm.receiptCode.trim(),
+        receiptName: claimLineForm.receiptName.trim() || undefined,
+        points: claimLineForm.points.trim() ? Number(claimLineForm.points) : undefined,
+        unit: claimLineForm.unit.trim() || undefined,
+        resolveIssues: true,
+      });
+      setClaimDraft(draft);
+      setEditingClaimLineId(null);
+      setReceiptCodeCandidates([]);
+      await refreshEvents();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '請求明細コードの補正に失敗しました。');
+    } finally {
+      setIsSavingClaimDraft(false);
+    }
+  };
+
   const handleSubmitClaimDraftToOrca = async () => {
     if (!claimDraft || isSavingClaimDraft) {
       return;
@@ -940,6 +1044,23 @@ export const WardWorkspace = ({
   const unsignedDocumentCount = documents.filter((document) => document.status !== 'signed').length;
   const openClaimIssueCount = claimDraft?.issues.filter((issue) => issue.status === 'open').length ?? 0;
   const reviewClaimAdjustmentCount = claimDraft?.adjustments.filter((adjustment) => adjustment.status === 'suggested').length ?? 0;
+  const highlightedClaimIssues = claimDraft?.issues.filter((issue) => issue.status === 'open' && [
+    'claim_line_unresolved_receipt_code',
+    'missing_receipt_code',
+    'lab_order_not_done',
+    'instruction_not_done',
+  ].includes(issue.issueType)) ?? [];
+  const claimIssuesByType = highlightedClaimIssues.reduce<Record<string, ClaimDraft['issues']>>((groups, issue) => {
+    groups[issue.issueType] = [...(groups[issue.issueType] ?? []), issue];
+    return groups;
+  }, {});
+  const unresolvedClaimLineCount = claimDraft?.lines.filter((line) => !line.receiptCode).length ?? 0;
+  const latestClaimTransmission = claimDraft?.transmissions[0] ?? null;
+  const latestClaimPayload = latestClaimTransmission ? getOrcaPayloadClaim(latestClaimTransmission.requestPayload) : null;
+  const latestPayloadSummary = getPayloadSummary(latestClaimPayload);
+  const hasLatestPayloadSummary = Boolean(latestPayloadSummary);
+  const latestSendableItems = getPayloadArray(latestClaimPayload, 'orca_receipt_items');
+  const latestUnresolvedItems = getPayloadArray(latestClaimPayload, 'unresolved_items');
   const dischargeStatusLabel = dischargePlan?.status === 'ready'
     ? '退院準備完了'
     : dischargePlan?.status === 'reviewed'
@@ -2110,7 +2231,86 @@ export const WardWorkspace = ({
               <>
                 <div className='rounded-md border border-blue-100 bg-blue-50 p-3'>
                   <p className='text-[13px] font-bold text-blue-950'>{claimDraft.lines.length}明細 / {claimDraft.totalPoints.toLocaleString()}点</p>
-                  <p className='mt-1 text-[12px] text-blue-900'>未解決 {openClaimIssueCount}件 · 提案 {reviewClaimAdjustmentCount}件</p>
+                  <p className='mt-1 text-[12px] text-blue-900'>未解決 {openClaimIssueCount}件 · コード未解決 {unresolvedClaimLineCount}明細 · 提案 {reviewClaimAdjustmentCount}件</p>
+                </div>
+                <div className='space-y-2'>
+                  <p className='text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary'>未解決 issue</p>
+                  {Object.keys(claimIssuesByType).length > 0 ? (
+                    Object.entries(claimIssuesByType).map(([issueType, issues]) => (
+                      <div className='rounded-md border border-border bg-card p-3' key={issueType}>
+                        <div className='flex flex-wrap items-center justify-between gap-2'>
+                          <span className={cn('rounded border px-2 py-1 text-[11px] font-bold', claimIssueClasses[issueType] ?? 'border-blue-100 bg-blue-50 text-blue-900')}>
+                            {claimIssueLabels[issueType] ?? issueType}
+                          </span>
+                          <span className='text-[11px] font-bold text-text-tertiary'>{issues.length}件</span>
+                        </div>
+                        <div className='mt-2 space-y-1.5'>
+                          {issues.map((issue) => (
+                            <div className='rounded border border-border bg-surface-subtle px-2 py-1.5' key={issue.id}>
+                              <p className='text-[12px] font-bold text-text-primary'>{issue.message}</p>
+                              {issue.evidence ? <p className='mt-1 text-[11px] leading-normal text-text-tertiary'>根拠: {issue.evidence}</p> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className='rounded-md border border-green-100 bg-green-50 p-3 text-[12px] font-bold text-green-900'>
+                      主要な未解決 issue はありません。
+                    </div>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <p className='text-[11px] font-bold uppercase tracking-[0.08em] text-text-tertiary'>請求明細コード補正</p>
+                  {claimDraft.lines.map((line) => (
+                    <div className={cn('rounded-md border p-3', line.receiptCode ? 'border-border bg-card' : 'border-red-200 bg-red-50')} key={line.id}>
+                      <div className='flex flex-wrap items-start justify-between gap-2'>
+                        <div>
+                          <p className='text-[13px] font-bold text-text-primary'>{line.lineType}</p>
+                          <p className='mt-1 text-[12px] leading-normal text-text-secondary'>{line.label}</p>
+                        </div>
+                        <span className='text-[11px] font-bold text-text-tertiary'>{line.points.toLocaleString()}点 x {line.quantity}{line.unit ?? ''}</span>
+                      </div>
+                      {line.receiptCode ? (
+                        <p className='mt-2 rounded border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-900'>{line.receiptCode} {line.receiptName}</p>
+                      ) : (
+                        <p className='mt-2 rounded border border-red-200 bg-white px-2 py-1 text-[11px] font-bold text-red-900'>レセ電コード未解決</p>
+                      )}
+                      {editingClaimLineId === line.id ? (
+                        <div className='mt-3 space-y-2'>
+                          <div className='grid gap-2 sm:grid-cols-2'>
+                            <Input onChange={(event) => setClaimLineForm((current) => ({ ...current, receiptCode: event.target.value }))} placeholder='レセ電コード' value={claimLineForm.receiptCode} />
+                            <Input onChange={(event) => setClaimLineForm((current) => ({ ...current, receiptName: event.target.value }))} placeholder='名称' value={claimLineForm.receiptName} />
+                            <Input onChange={(event) => setClaimLineForm((current) => ({ ...current, points: event.target.value }))} placeholder='点数' value={claimLineForm.points} />
+                            <Input onChange={(event) => setClaimLineForm((current) => ({ ...current, unit: event.target.value }))} placeholder='単位' value={claimLineForm.unit} />
+                          </div>
+                          <div className='space-y-1.5'>
+                            <p className='text-[11px] font-bold text-text-tertiary'>候補</p>
+                            {isLoadingReceiptCandidates ? (
+                              <p className='text-[12px] text-text-tertiary'>候補検索中...</p>
+                            ) : receiptCodeCandidates.length > 0 ? (
+                              receiptCodeCandidates.map((candidate) => (
+                                <button className='block w-full rounded border border-border bg-white px-2 py-1.5 text-left hover:bg-blue-50' key={candidate.receiptCode} onClick={() => applyReceiptCodeCandidate(candidate)} type='button'>
+                                  <span className='text-[12px] font-bold text-blue-950'>{candidate.receiptCode} {candidate.receiptName}</span>
+                                  <span className='mt-0.5 block text-[11px] text-text-tertiary'>{candidate.points ?? '-'}点 {candidate.unit ?? ''} {candidate.category ?? ''}</span>
+                                </button>
+                              ))
+                            ) : (
+                              <p className='text-[12px] text-text-tertiary'>候補なし。手入力で補正できます。</p>
+                            )}
+                          </div>
+                          <div className='flex flex-wrap gap-2'>
+                            <Button disabled={isSavingClaimDraft || !claimLineForm.receiptCode.trim()} onClick={() => handleUpdateClaimLineReceiptCode(line)} size='xs' type='button' variant='outline'>保存して issue 解決</Button>
+                            <Button onClick={() => setEditingClaimLineId(null)} size='xs' type='button' variant='ghost'>閉じる</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className='mt-3 flex flex-wrap gap-2'>
+                          <Button disabled={isSavingClaimDraft} onClick={() => startEditClaimLine(line)} size='xs' type='button' variant={line.receiptCode ? 'ghost' : 'outline'}>{line.receiptCode ? 'コード修正' : 'コード補正'}</Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
                 {claimDraft.adjustments.map((adjustment) => (
                   <div className='rounded-md border border-border bg-card p-3' key={adjustment.id}>
@@ -2132,6 +2332,41 @@ export const WardWorkspace = ({
                     {issue.evidence ? <p className='mt-1 text-[11px] leading-normal text-text-tertiary'>根拠: {issue.evidence}</p> : null}
                   </div>
                 ))}
+                {latestClaimTransmission ? (
+                  <div className='rounded-md border border-blue-100 bg-blue-50 p-3'>
+                    <div className='flex flex-wrap items-center justify-between gap-2'>
+                      <p className='text-[13px] font-bold text-blue-950'>送信 payload preview</p>
+                      <span className='rounded border border-blue-200 bg-white px-2 py-1 text-[11px] font-bold text-blue-900'>{latestClaimTransmission.status}</span>
+                    </div>
+                    <p className='mt-1 text-[11px] text-blue-900'>
+                      {hasLatestPayloadSummary
+                        ? `summary: ${String(latestPayloadSummary?.line_count ?? 0)}明細 / 送信可能 ${String(latestPayloadSummary?.sendable_count ?? 0)} / 停止 ${String(latestPayloadSummary?.unresolved_count ?? 0)}`
+                        : '旧形式の送信履歴です。次回送信から送信可能/停止明細を表示します。'}
+                    </p>
+                    {hasLatestPayloadSummary ? <div className='mt-3 grid gap-2 lg:grid-cols-2'>
+                      <div className='rounded-md border border-green-100 bg-white p-2'>
+                        <p className='text-[11px] font-bold text-green-900'>送れる明細: {latestSendableItems.length}</p>
+                        <div className='mt-2 space-y-1'>
+                          {latestSendableItems.slice(0, 6).map((item, index) => (
+                            <p className='rounded bg-green-50 px-2 py-1 text-[11px] leading-normal text-green-950' key={`${payloadText(item, 'line_id')}-${index}`}>
+                              {payloadText(item, 'receipt_code')} {payloadText(item, 'label')}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                      <div className='rounded-md border border-red-100 bg-white p-2'>
+                        <p className='text-[11px] font-bold text-red-900'>止まっている明細: {latestUnresolvedItems.length}</p>
+                        <div className='mt-2 space-y-1'>
+                          {latestUnresolvedItems.slice(0, 6).map((item, index) => (
+                            <p className='rounded bg-red-50 px-2 py-1 text-[11px] leading-normal text-red-950' key={`${payloadText(item, 'line_id')}-${index}`}>
+                              {payloadText(item, 'unresolved_reason')} · {payloadText(item, 'label')}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div> : null}
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className='rounded-md border border-border bg-surface-subtle p-4 text-[13px] text-text-secondary'>

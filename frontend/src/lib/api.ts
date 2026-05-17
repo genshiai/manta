@@ -13,6 +13,7 @@ import type {
   ClaimDraft,
   ClaimLineAdjustment,
   FacilityClaimRule,
+  ReceiptCodeCandidate,
   OrcaAdapterSetting,
   OrcaConnectionTestResult,
   ChartOrderConfig,
@@ -621,6 +622,14 @@ type ApiClaimDraftLine = {
   evidence: string | null;
   review_status: string;
   created_at: string;
+};
+
+type ApiReceiptCodeCandidate = {
+  receipt_code: string;
+  receipt_name: string;
+  points: number | null;
+  unit: string | null;
+  category: string | null;
 };
 
 type ApiClaimLineAdjustment = {
@@ -1381,6 +1390,14 @@ const mapClaimDraftLine = (item: ApiClaimDraftLine) => ({
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapReceiptCodeCandidate = (item: ApiReceiptCodeCandidate): ReceiptCodeCandidate => ({
+  receiptCode: item.receipt_code,
+  receiptName: item.receipt_name,
+  points: item.points ?? undefined,
+  unit: item.unit ?? undefined,
+  category: item.category ?? undefined,
+});
+
 const mapClaimLineAdjustment = (item: ApiClaimLineAdjustment) => ({
   id: item.id,
   claimDraftId: item.claim_draft_id,
@@ -1949,6 +1966,34 @@ export const updateClaimLineAdjustmentStatus = async (
   const draft = await request<ApiClaimDraft>(`/api/claim-line-adjustments/${adjustmentId}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+  return mapClaimDraft(draft);
+};
+
+export const listClaimDraftLineReceiptCodeCandidates = async (lineId: number): Promise<ReceiptCodeCandidate[]> => {
+  const candidates = await request<ApiReceiptCodeCandidate[]>(`/api/claim-draft-lines/${lineId}/receipt-code-candidates`);
+  return candidates.map(mapReceiptCodeCandidate);
+};
+
+export const updateClaimDraftLineReceiptCode = async (
+  lineId: number,
+  payload: {
+    receiptCode: string;
+    receiptName?: string;
+    points?: number;
+    unit?: string;
+    resolveIssues?: boolean;
+  },
+): Promise<ClaimDraft> => {
+  const draft = await request<ApiClaimDraft>(`/api/claim-draft-lines/${lineId}/receipt-code`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      receipt_code: payload.receiptCode,
+      receipt_name: payload.receiptName,
+      points: payload.points,
+      unit: payload.unit,
+      resolve_issues: payload.resolveIssues ?? true,
+    }),
   });
   return mapClaimDraft(draft);
 };

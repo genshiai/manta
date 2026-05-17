@@ -33,7 +33,7 @@ from app.modules.master_data.models import (
     ReservationSlotMaster,
     StandardUsageMaster,
 )
-from app.modules.rececon.models import ClaimDraft, ClaimDraftLine, ClaimLineAdjustment, FacilityClaimRule
+from app.modules.rececon.models import ClaimDraft, ClaimDraftLine, ClaimLineAdjustment, ClaimReviewIssue, FacilityClaimRule
 from app.seed import PATIENT_WORKSPACE_BY_ID, sync_patient_order_tables
 
 
@@ -702,6 +702,74 @@ def test_create_and_update_inpatient_claim_draft() -> None:
                 pending_lab_order = db.get(LabOrder, pending_lab_order_id)
                 if pending_lab_order is not None:
                     db.delete(pending_lab_order)
+            db.commit()
+
+
+def test_doctor_can_update_claim_line_receipt_code_and_resolve_issue() -> None:
+    draft_id: int | None = None
+    with TestClient(app) as client:
+        token = login(client, "dr.tanaka", "manta-demo")
+        admissions_response = client.get(
+            "/api/inpatient/admissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        admission_id = admissions_response.json()[0]["id"]
+        create_response = client.post(
+            f"/api/inpatient/admissions/{admission_id}/claim-draft",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_response.status_code == 201
+        draft_id = create_response.json()["id"]
+        with SessionLocal() as db:
+            line = db.scalar(select(ClaimDraftLine).where(ClaimDraftLine.claim_draft_id == draft_id).limit(1))
+            assert line is not None
+            line.receipt_code = None
+            line.receipt_name = None
+            db.add(
+                ClaimReviewIssue(
+                    claim_draft_id=draft_id,
+                    issue_type="claim_line_unresolved_receipt_code",
+                    severity="error",
+                    message=f"{line.label} のレセ電コードが未解決です。",
+                    evidence=f"{line.line_type} / {line.source_type} / source_id={line.source_id or '-'}",
+                )
+            )
+            db.commit()
+            line_id = line.id
+
+        candidates_response = client.get(
+            f"/api/claim-draft-lines/{line_id}/receipt-code-candidates",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        update_response = client.patch(
+            f"/api/claim-draft-lines/{line_id}/receipt-code",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "receipt_code": "190233410",
+                "receipt_name": "入院基本料補正テスト",
+                "points": 150,
+                "unit": "日",
+            },
+        )
+
+    assert candidates_response.status_code == 200
+    assert update_response.status_code == 200
+    line_payload = next(line for line in update_response.json()["lines"] if line["id"] == line_id)
+    assert line_payload["receipt_code"] == "190233410"
+    assert line_payload["receipt_name"] == "入院基本料補正テスト"
+    assert line_payload["points"] == 150
+    assert not any(
+        issue["issue_type"] == "claim_line_unresolved_receipt_code"
+        and issue["status"] == "open"
+        and f"source_id={line_payload['source_id']}" in (issue["evidence"] or "")
+        for issue in update_response.json()["issues"]
+    )
+
+    if draft_id is not None:
+        with SessionLocal() as db:
+            persisted = db.get(ClaimDraft, draft_id)
+            if persisted is not None:
+                db.delete(persisted)
             db.commit()
 
 
