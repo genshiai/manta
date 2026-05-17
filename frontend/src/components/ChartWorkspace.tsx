@@ -4,6 +4,9 @@ import {
   addLabOrder,
   addPrescription,
   addProcedureOrder,
+  cancelImagingOrder,
+  cancelLabOrder,
+  cancelProcedureOrder,
   cancelReservation,
   copyLastPrescriptions,
   getChartOrderConfig,
@@ -14,6 +17,9 @@ import {
   saveChart,
   savePatientContext,
   saveReservation,
+  updateImagingOrder,
+  updateLabOrder,
+  updateProcedureOrder,
 } from '../lib/api';
 import type { PatientRecord, ReceptionStatus } from '../data/chartMock';
 import type {
@@ -87,8 +93,10 @@ type ChartWorkspaceProps = {
 };
 
 type LabOrderRow = {
+  id: number;
+  patientId: string;
   category: string;
-  status: 'done' | 'pending';
+  status: 'done' | 'pending' | 'cancelled';
   urgency?: '通常' | '至急';
   items: string[];
   createdAt?: string;
@@ -491,6 +499,123 @@ export function ChartWorkspace({
     }
   };
 
+  const handleUpdateLab = async (
+    order: LabOrderRow,
+    payload: { category?: string; urgency?: '通常' | '至急' | null; items?: string[]; status?: LabOrderRow['status'] },
+  ) => {
+    setIsMutating(true);
+    try {
+      await updateLabOrder(order.id, payload);
+      const refreshed = await getChartWorkspace(patient.id);
+      setLabOrders(refreshed.labOrders);
+      setOrderMessage(`検査オーダを更新しました: ${payload.category ?? order.category}`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(`検査更新に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleCancelLab = async (order: LabOrderRow) => {
+    setIsMutating(true);
+    try {
+      await cancelLabOrder(order.id);
+      const refreshed = await getChartWorkspace(patient.id);
+      setLabOrders(refreshed.labOrders);
+      setOrderMessage(`検査オーダを取消しました: ${order.category}`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(`検査取消に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleUpdateImaging = async (index: number, entry: ImagingOrderEntry) => {
+    setIsMutating(true);
+    try {
+      await updateImagingOrder(patient.id, index, entry);
+      const refreshed = await getChartWorkspace(patient.id);
+      setImagingOrders(refreshed.imagingOrders);
+      setOrderMessage(`画像オーダを更新しました: ${entry.category}`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(`画像更新に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleCancelImaging = async (index: number, entry: ImagingOrderEntry) => {
+    setIsMutating(true);
+    try {
+      await cancelImagingOrder(patient.id, index);
+      const refreshed = await getChartWorkspace(patient.id);
+      setImagingOrders(refreshed.imagingOrders);
+      setOrderMessage(`画像オーダを取消しました: ${entry.category}`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(`画像取消に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleUpdateProcedure = async (index: number, entry: ProcedureOrderEntry) => {
+    setIsMutating(true);
+    try {
+      await updateProcedureOrder(patient.id, index, entry);
+      const refreshed = await getChartWorkspace(patient.id);
+      setProcedureOrders(refreshed.procedureOrders);
+      setOrderMessage(`処置を更新しました: ${entry.title}`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(`処置更新に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleCancelProcedure = async (index: number, entry: ProcedureOrderEntry) => {
+    setIsMutating(true);
+    try {
+      await cancelProcedureOrder(patient.id, index);
+      const refreshed = await getChartWorkspace(patient.id);
+      setProcedureOrders(refreshed.procedureOrders);
+      setOrderMessage(`処置を取消しました: ${entry.title}`);
+      onDataChanged();
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setOrderMessage(`処置取消に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   const handleSaveContext = async (
     nextProfile: IdEntry<PatientProfileEntry>[],
     nextProblems: IdEntry<ProblemListItem>[],
@@ -737,6 +862,12 @@ export function ChartWorkspace({
           onAddLab={handleAddLab}
           onAddImaging={handleAddImaging}
           onAddProcedure={handleAddProcedure}
+          onUpdateLab={handleUpdateLab}
+          onCancelLab={handleCancelLab}
+          onUpdateImaging={handleUpdateImaging}
+          onCancelImaging={handleCancelImaging}
+          onUpdateProcedure={handleUpdateProcedure}
+          onCancelProcedure={handleCancelProcedure}
           onAddPrescriptionsBatch={handleAddPrescriptionsBatch}
         />
       }

@@ -23,8 +23,10 @@ import type {
 export type OrderTab = 'prescription' | 'lab' | 'imaging' | 'procedure';
 
 type LabOrderRow = {
+  id: number;
+  patientId: string;
   category: string;
-  status: 'done' | 'pending';
+  status: 'done' | 'pending' | 'cancelled';
   urgency?: '通常' | '至急';
   items: string[];
   createdAt?: string;
@@ -46,6 +48,15 @@ type OrderPaneProps = {
   onAddLab: (setId: string, urgency: '通常' | '至急') => void;
   onAddImaging: (entry: ImagingOrderEntry) => void;
   onAddProcedure: (entry: ProcedureOrderEntry) => void;
+  onUpdateLab: (
+    order: LabOrderRow,
+    payload: { category?: string; urgency?: '通常' | '至急' | null; items?: string[]; status?: LabOrderRow['status'] },
+  ) => void;
+  onCancelLab: (order: LabOrderRow) => void;
+  onUpdateImaging: (index: number, entry: ImagingOrderEntry) => void;
+  onCancelImaging: (index: number, entry: ImagingOrderEntry) => void;
+  onUpdateProcedure: (index: number, entry: ProcedureOrderEntry) => void;
+  onCancelProcedure: (index: number, entry: ProcedureOrderEntry) => void;
   onAddPrescriptionsBatch?: (items: PrescriptionSetItem[]) => Promise<void>;
 };
 
@@ -72,6 +83,12 @@ export const OrderPane = ({
   onAddLab,
   onAddImaging,
   onAddProcedure,
+  onUpdateLab,
+  onCancelLab,
+  onUpdateImaging,
+  onCancelImaging,
+  onUpdateProcedure,
+  onCancelProcedure,
   onAddPrescriptionsBatch,
 }: OrderPaneProps) => {
   const [tab, setTab] = useState<OrderTab>('prescription');
@@ -292,6 +309,8 @@ export const OrderPane = ({
                 labOrders={labOrders}
                 isMutating={isMutating}
                 onAdd={onAddLab}
+                onUpdate={onUpdateLab}
+                onCancel={onCancelLab}
               />
             </TabsContent>
 
@@ -300,6 +319,8 @@ export const OrderPane = ({
                 imagingOrders={imagingOrders}
                 isMutating={isMutating}
                 onAdd={onAddImaging}
+                onUpdate={onUpdateImaging}
+                onCancel={onCancelImaging}
               />
             </TabsContent>
 
@@ -308,6 +329,8 @@ export const OrderPane = ({
                 procedureOrders={procedureOrders}
                 isMutating={isMutating}
                 onAdd={onAddProcedure}
+                onUpdate={onUpdateProcedure}
+                onCancel={onCancelProcedure}
               />
             </TabsContent>
           </Tabs>
@@ -878,15 +901,32 @@ const LabTab = ({
   labOrders,
   isMutating,
   onAdd,
+  onUpdate,
+  onCancel,
 }: {
   orderConfig: ChartOrderConfig;
   labOrders: LabOrderRow[];
   isMutating: boolean;
   onAdd: (setId: string, urgency: '通常' | '至急') => void;
+  onUpdate: (
+    order: LabOrderRow,
+    payload: { category?: string; urgency?: '通常' | '至急' | null; items?: string[]; status?: LabOrderRow['status'] },
+  ) => void;
+  onCancel: (order: LabOrderRow) => void;
 }) => {
   const [setId, setSetId] = useState(orderConfig.labSetOptions[0]?.id ?? '');
   const [urgency, setUrgency] = useState<'通常' | '至急'>('通常');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editCategory, setEditCategory] = useState('');
+  const [editUrgency, setEditUrgency] = useState<'通常' | '至急'>('通常');
+  const [editItemsText, setEditItemsText] = useState('');
   const set = orderConfig.labSetOptions.find((s) => s.id === setId);
+  const startEdit = (order: LabOrderRow) => {
+    setEditingId(order.id);
+    setEditCategory(order.category);
+    setEditUrgency(order.urgency ?? '通常');
+    setEditItemsText(order.items.join('、'));
+  };
 
   return (
     <div className="space-y-5">
@@ -949,20 +989,55 @@ const LabTab = ({
                 key={`${o.category}-${idx}`}
                 className="rounded-md border border-border bg-card px-3 py-2"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[13px] font-bold text-text-primary">{o.category}</p>
-                  <span
-                    className={`text-[11px] ${o.status === 'done' ? 'text-success' : 'text-text-tertiary'}`}
-                  >
-                    {o.status === 'done' ? '完了' : 'オーダ中'}
-                    {o.urgency === '至急' ? ' ・ 至急' : ''}
-                  </span>
-                </div>
-                {o.items.length > 0 ? (
-                  <p className="mt-0.5 truncate text-[12px] text-text-tertiary">
-                    {o.items.join('・')}
-                  </p>
-                ) : null}
+                {editingId === o.id ? (
+                  <div className="space-y-2">
+                    <Input value={editCategory} onChange={(e) => setEditCategory(e.target.value)} />
+                    <select
+                      value={editUrgency}
+                      onChange={(e) => setEditUrgency(e.target.value as '通常' | '至急')}
+                      className="h-9 w-full rounded-md border border-border bg-card px-2 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20"
+                    >
+                      <option value="通常">通常</option>
+                      <option value="至急">至急</option>
+                    </select>
+                    <Input value={editItemsText} onChange={(e) => setEditItemsText(e.target.value)} />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        disabled={isMutating || !editCategory.trim()}
+                        onClick={() => {
+                          onUpdate(o, {
+                            category: editCategory,
+                            urgency: editUrgency,
+                            items: editItemsText.split(/[、,]/).map((item) => item.trim()).filter(Boolean),
+                          });
+                          setEditingId(null);
+                        }}
+                      >
+                        保存
+                      </Button>
+                      <Button size="xs" variant="ghost" onClick={() => setEditingId(null)}>閉じる</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[13px] font-bold text-text-primary">{o.category}</p>
+                      <span className={`text-[11px] ${o.status === 'done' ? 'text-success' : 'text-text-tertiary'}`}>
+                        {o.status === 'done' ? '完了' : o.status === 'cancelled' ? '取消' : 'オーダ中'}
+                        {o.urgency === '至急' ? ' ・ 至急' : ''}
+                      </span>
+                    </div>
+                    {o.items.length > 0 ? (
+                      <p className="mt-0.5 truncate text-[12px] text-text-tertiary">{o.items.join('・')}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="xs" variant="ghost" disabled={isMutating || o.status === 'cancelled'} onClick={() => startEdit(o)}>編集</Button>
+                      <Button size="xs" variant="ghost" disabled={isMutating || o.status === 'cancelled'} onClick={() => onCancel(o)}>取消</Button>
+                    </div>
+                  </>
+                )}
               </li>
             ))
           ) : (
@@ -982,14 +1057,24 @@ const ImagingTab = ({
   imagingOrders,
   isMutating,
   onAdd,
+  onUpdate,
+  onCancel,
 }: {
   imagingOrders: ImagingOrderEntry[];
   isMutating: boolean;
   onAdd: (entry: ImagingOrderEntry) => void;
+  onUpdate: (index: number, entry: ImagingOrderEntry) => void;
+  onCancel: (index: number, entry: ImagingOrderEntry) => void;
 }) => {
   const [category, setCategory] = useState('胸部X線');
   const [scheduledAt, setScheduledAt] = useState('');
   const [note, setNote] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<ImagingOrderEntry>({ category: '', status: 'scheduled', scheduledAt: '', note: '' });
+  const startEdit = (index: number, entry: ImagingOrderEntry) => {
+    setEditingIndex(index);
+    setEditForm(entry);
+  };
 
   return (
     <div className="space-y-5">
@@ -1028,11 +1113,29 @@ const ImagingTab = ({
                 key={`${o.category}-${o.scheduledAt}-${idx}`}
                 className="rounded-md border border-border bg-card px-3 py-2"
               >
-                <p className="text-[13px] font-bold text-text-primary">{o.category}</p>
-                <p className="text-[12px] text-text-tertiary">
-                  {o.scheduledAt} ・ {o.status === 'scheduled' ? '予定' : '下書き'}
-                </p>
-                {o.note ? <p className="mt-0.5 text-[12px] text-text-secondary">{o.note}</p> : null}
+                {editingIndex === idx ? (
+                  <div className="space-y-2">
+                    <Input value={editForm.category} onChange={(e) => setEditForm((current) => ({ ...current, category: e.target.value }))} />
+                    <Input value={editForm.scheduledAt} onChange={(e) => setEditForm((current) => ({ ...current, scheduledAt: e.target.value }))} />
+                    <Input value={editForm.note} onChange={(e) => setEditForm((current) => ({ ...current, note: e.target.value }))} />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="xs" variant="outline" disabled={isMutating || !editForm.category.trim()} onClick={() => { onUpdate(idx, editForm); setEditingIndex(null); }}>保存</Button>
+                      <Button size="xs" variant="ghost" onClick={() => setEditingIndex(null)}>閉じる</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[13px] font-bold text-text-primary">{o.category}</p>
+                    <p className="text-[12px] text-text-tertiary">
+                      {o.scheduledAt} ・ {o.status === 'scheduled' ? '予定' : o.status === 'cancelled' ? '取消' : '下書き'}
+                    </p>
+                    {o.note ? <p className="mt-0.5 text-[12px] text-text-secondary">{o.note}</p> : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="xs" variant="ghost" disabled={isMutating || o.status === 'cancelled'} onClick={() => startEdit(idx, o)}>編集</Button>
+                      <Button size="xs" variant="ghost" disabled={isMutating || o.status === 'cancelled'} onClick={() => onCancel(idx, o)}>取消</Button>
+                    </div>
+                  </>
+                )}
               </li>
             ))
           ) : (
@@ -1052,13 +1155,23 @@ const ProcedureTab = ({
   procedureOrders,
   isMutating,
   onAdd,
+  onUpdate,
+  onCancel,
 }: {
   procedureOrders: ProcedureOrderEntry[];
   isMutating: boolean;
   onAdd: (entry: ProcedureOrderEntry) => void;
+  onUpdate: (index: number, entry: ProcedureOrderEntry) => void;
+  onCancel: (index: number, entry: ProcedureOrderEntry) => void;
 }) => {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<ProcedureOrderEntry>({ title: '', status: 'planned', note: '' });
+  const startEdit = (index: number, entry: ProcedureOrderEntry) => {
+    setEditingIndex(index);
+    setEditForm(entry);
+  };
 
   return (
     <div className="space-y-5">
@@ -1092,11 +1205,28 @@ const ProcedureTab = ({
                 key={`${o.title}-${idx}`}
                 className="rounded-md border border-border bg-card px-3 py-2"
               >
-                <p className="text-[13px] font-bold text-text-primary">{o.title}</p>
-                <p className="text-[12px] text-text-tertiary">
-                  {o.status === 'planned' ? '予定' : '完了'}
-                </p>
-                {o.note ? <p className="mt-0.5 text-[12px] text-text-secondary">{o.note}</p> : null}
+                {editingIndex === idx ? (
+                  <div className="space-y-2">
+                    <Input value={editForm.title} onChange={(e) => setEditForm((current) => ({ ...current, title: e.target.value }))} />
+                    <Input value={editForm.note} onChange={(e) => setEditForm((current) => ({ ...current, note: e.target.value }))} />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="xs" variant="outline" disabled={isMutating || !editForm.title.trim()} onClick={() => { onUpdate(idx, editForm); setEditingIndex(null); }}>保存</Button>
+                      <Button size="xs" variant="ghost" onClick={() => setEditingIndex(null)}>閉じる</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[13px] font-bold text-text-primary">{o.title}</p>
+                    <p className="text-[12px] text-text-tertiary">
+                      {o.status === 'planned' ? '予定' : o.status === 'cancelled' ? '取消' : '完了'}
+                    </p>
+                    {o.note ? <p className="mt-0.5 text-[12px] text-text-secondary">{o.note}</p> : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="xs" variant="ghost" disabled={isMutating || o.status === 'cancelled'} onClick={() => startEdit(idx, o)}>編集</Button>
+                      <Button size="xs" variant="ghost" disabled={isMutating || o.status === 'cancelled'} onClick={() => onCancel(idx, o)}>取消</Button>
+                    </div>
+                  </>
+                )}
               </li>
             ))
           ) : (

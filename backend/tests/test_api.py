@@ -16,7 +16,7 @@ from app.modules.inpatient.models import (
     InpatientInstruction,
     InpatientPathwayAssignment,
 )
-from app.modules.karte.models import Patient, PrescriptionOrder, Reservation
+from app.modules.karte.models import LabOrder, Patient, PrescriptionOrder, Reservation
 from app.modules.master_data.models import (
     ChartTemplateMaster,
     DiagnosisAliasMaster,
@@ -1968,6 +1968,24 @@ def test_doctor_can_add_imaging_and_procedure_orders() -> None:
                     "actor": "田中 太郎",
                 },
             )
+            imaging_update_response = client.patch(
+                "/api/patients/0009900041/imaging-orders/0",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={"category": "皮膚エコー再検", "scheduled_at": "2026/05/18 10:00", "note": "再検予定"},
+            )
+            procedure_update_response = client.patch(
+                "/api/patients/0009900041/procedure-orders/0",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={"title": "保湿指導再説明", "note": "家族へも説明"},
+            )
+            imaging_cancel_response = client.delete(
+                "/api/patients/0009900041/imaging-orders/0",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+            procedure_cancel_response = client.delete(
+                "/api/patients/0009900041/procedure-orders/0",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
             chart_response = client.get(
                 "/api/patients/0009900041/chart",
                 headers={"Authorization": f"Bearer {doctor_token}"},
@@ -1979,6 +1997,60 @@ def test_doctor_can_add_imaging_and_procedure_orders() -> None:
     assert imaging_response.json()["category"] == "皮膚エコー"
     assert procedure_response.status_code == 200
     assert procedure_response.json()["title"] == "保湿指導"
+    assert imaging_update_response.status_code == 200
+    assert imaging_update_response.json()["category"] == "皮膚エコー再検"
+    assert procedure_update_response.status_code == 200
+    assert procedure_update_response.json()["title"] == "保湿指導再説明"
+    assert imaging_cancel_response.status_code == 200
+    assert imaging_cancel_response.json()["status"] == "cancelled"
+    assert procedure_cancel_response.status_code == 200
+    assert procedure_cancel_response.json()["status"] == "cancelled"
     assert chart_response.status_code == 200
-    assert chart_response.json()["imaging_orders"][0]["category"] == "皮膚エコー"
-    assert chart_response.json()["procedure_orders"][0]["title"] == "保湿指導"
+    assert chart_response.json()["imaging_orders"][0]["status"] == "cancelled"
+    assert chart_response.json()["procedure_orders"][0]["status"] == "cancelled"
+
+
+def test_doctor_can_update_and_cancel_lab_order() -> None:
+    order_id: int | None = None
+    try:
+        with TestClient(app) as client:
+            doctor_token = login(client, "dr.tanaka", "manta-demo")
+            create_response = client.post(
+                "/api/patients/0009900041/lab-orders",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "category": "取込テスト検査",
+                    "urgency": "通常",
+                    "items": ["TEST-LAB-ORDER-1"],
+                    "actor": "田中 太郎",
+                },
+            )
+            assert create_response.status_code == 200
+            order_id = create_response.json()["id"]
+            update_response = client.patch(
+                f"/api/lab-orders/{order_id}",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+                json={
+                    "category": "取込テスト検査更新",
+                    "urgency": "至急",
+                    "items": ["TEST-LAB-ORDER-2"],
+                },
+            )
+            cancel_response = client.delete(
+                f"/api/lab-orders/{order_id}",
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+
+        assert update_response.status_code == 200
+        assert update_response.json()["category"] == "取込テスト検査更新"
+        assert update_response.json()["urgency"] == "至急"
+        assert update_response.json()["items"] == ["TEST-LAB-ORDER-2"]
+        assert cancel_response.status_code == 200
+        assert cancel_response.json()["status"] == "cancelled"
+    finally:
+        if order_id is not None:
+            with SessionLocal() as db:
+                order = db.get(LabOrder, order_id)
+                if order is not None:
+                    db.delete(order)
+                    db.commit()

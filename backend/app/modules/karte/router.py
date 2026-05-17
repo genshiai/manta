@@ -23,9 +23,11 @@ from .schemas import (
     ChartWorkspaceRead,
     ImagingOrderCreateRequest,
     ImagingOrderItem,
+    ImagingOrderUpdateRequest,
     LabLongTrendItem,
     LabOrderCreateRequest,
     LabOrderRead,
+    LabOrderUpdateRequest,
     PatientContextRead,
     PatientContextUpdateRequest,
     PatientStatusUpdateRequest,
@@ -40,6 +42,7 @@ from .schemas import (
     PrescriptionTimelineGroupRead,
     ProcedureOrderCreateRequest,
     ProcedureOrderItem,
+    ProcedureOrderUpdateRequest,
     ReservationRead,
     ReservationUpsertRequest,
 )
@@ -551,6 +554,62 @@ def create_lab_order(
     return order
 
 
+@router.patch("/api/lab-orders/{order_id}", response_model=LabOrderRead)
+def update_lab_order(
+    order_id: int,
+    payload: LabOrderUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LabOrderRead:
+    order = db.get(LabOrder, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lab order not found")
+    patient = get_patient_or_404(db, order.patient_id)
+    if payload.category is not None:
+        order.category = payload.category
+    if payload.status is not None:
+        order.status = payload.status
+    if "urgency" in payload.model_fields_set:
+        order.urgency = payload.urgency
+    if payload.items is not None:
+        order.items = payload.items
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="検査更新",
+        scope="order",
+        detail=f"{order.category} を更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@router.delete("/api/lab-orders/{order_id}", response_model=LabOrderRead)
+def cancel_lab_order(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LabOrderRead:
+    order = db.get(LabOrder, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lab order not found")
+    patient = get_patient_or_404(db, order.patient_id)
+    order.status = "cancelled"
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="検査取消",
+        scope="order",
+        detail=f"{order.category} を取消しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(order)
+    return order
+
+
 @router.post("/api/patients/{patient_id}/imaging-orders", response_model=ImagingOrderItem)
 def create_imaging_order(
     patient_id: str,
@@ -583,6 +642,70 @@ def create_imaging_order(
     return ImagingOrderItem(**patient.imaging_orders[0])
 
 
+@router.patch("/api/patients/{patient_id}/imaging-orders/{order_index}", response_model=ImagingOrderItem)
+def update_imaging_order(
+    patient_id: str,
+    order_index: int,
+    payload: ImagingOrderUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ImagingOrderItem:
+    patient = get_patient_or_404(db, patient_id)
+    imaging_orders = list(patient.imaging_orders or [])
+    if order_index < 0 or order_index >= len(imaging_orders):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imaging order not found")
+    order = dict(imaging_orders[order_index])
+    if payload.category is not None:
+        order["category"] = payload.category
+    if payload.status is not None:
+        order["status"] = payload.status
+    if payload.scheduled_at is not None:
+        order["scheduled_at"] = payload.scheduled_at
+    if payload.note is not None:
+        order["note"] = payload.note
+    imaging_orders[order_index] = order
+    patient.imaging_orders = imaging_orders
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="画像更新",
+        scope="order",
+        detail=f"{order.get('category', '画像オーダ')} を更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(patient)
+    return ImagingOrderItem(**patient.imaging_orders[order_index])
+
+
+@router.delete("/api/patients/{patient_id}/imaging-orders/{order_index}", response_model=ImagingOrderItem)
+def cancel_imaging_order(
+    patient_id: str,
+    order_index: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ImagingOrderItem:
+    patient = get_patient_or_404(db, patient_id)
+    imaging_orders = list(patient.imaging_orders or [])
+    if order_index < 0 or order_index >= len(imaging_orders):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imaging order not found")
+    order = dict(imaging_orders[order_index])
+    order["status"] = "cancelled"
+    imaging_orders[order_index] = order
+    patient.imaging_orders = imaging_orders
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="画像取消",
+        scope="order",
+        detail=f"{order.get('category', '画像オーダ')} を取消しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(patient)
+    return ImagingOrderItem(**patient.imaging_orders[order_index])
+
+
 @router.post("/api/patients/{patient_id}/procedure-orders", response_model=ProcedureOrderItem)
 def create_procedure_order(
     patient_id: str,
@@ -612,6 +735,68 @@ def create_procedure_order(
     db.commit()
     db.refresh(patient)
     return ProcedureOrderItem(**patient.procedure_orders[0])
+
+
+@router.patch("/api/patients/{patient_id}/procedure-orders/{order_index}", response_model=ProcedureOrderItem)
+def update_procedure_order(
+    patient_id: str,
+    order_index: int,
+    payload: ProcedureOrderUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProcedureOrderItem:
+    patient = get_patient_or_404(db, patient_id)
+    procedure_orders = list(patient.procedure_orders or [])
+    if order_index < 0 or order_index >= len(procedure_orders):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedure order not found")
+    order = dict(procedure_orders[order_index])
+    if payload.title is not None:
+        order["title"] = payload.title
+    if payload.status is not None:
+        order["status"] = payload.status
+    if payload.note is not None:
+        order["note"] = payload.note
+    procedure_orders[order_index] = order
+    patient.procedure_orders = procedure_orders
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="処置更新",
+        scope="order",
+        detail=f"{order.get('title', '処置オーダ')} を更新しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(patient)
+    return ProcedureOrderItem(**patient.procedure_orders[order_index])
+
+
+@router.delete("/api/patients/{patient_id}/procedure-orders/{order_index}", response_model=ProcedureOrderItem)
+def cancel_procedure_order(
+    patient_id: str,
+    order_index: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProcedureOrderItem:
+    patient = get_patient_or_404(db, patient_id)
+    procedure_orders = list(patient.procedure_orders or [])
+    if order_index < 0 or order_index >= len(procedure_orders):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedure order not found")
+    order = dict(procedure_orders[order_index])
+    order["status"] = "cancelled"
+    procedure_orders[order_index] = order
+    patient.procedure_orders = procedure_orders
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="処置取消",
+        scope="order",
+        detail=f"{order.get('title', '処置オーダ')} を取消しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(patient)
+    return ProcedureOrderItem(**patient.procedure_orders[order_index])
 
 
 @router.post("/api/patients/{patient_id}/reservation", response_model=ReservationRead)

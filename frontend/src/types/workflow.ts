@@ -105,14 +105,14 @@ export type ChartHistoryEntry = {
 
 export type ImagingOrderEntry = {
   category: string;
-  status: 'scheduled' | 'draft';
+  status: 'scheduled' | 'draft' | 'cancelled';
   scheduledAt: string;
   note: string;
 };
 
 export type ProcedureOrderEntry = {
   title: string;
-  status: 'planned' | 'done';
+  status: 'planned' | 'done' | 'cancelled';
   note: string;
 };
 
@@ -680,8 +680,10 @@ export type ChartWorkspaceData = {
   prescriptions: PrescriptionEntry[];
   prescriptionHistory: PrescriptionHistoryGroup[];
   labOrders: Array<{
+    id: number;
+    patientId: string;
     category: string;
-    status: 'done' | 'pending';
+    status: 'done' | 'pending' | 'cancelled';
     urgency?: '通常' | '至急';
     items: string[];
     createdAt?: string;

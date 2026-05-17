@@ -43,8 +43,10 @@ type ChartView =
   | 'search';
 
 type LabOrderRow = {
+  id: number;
+  patientId: string;
   category: string;
-  status: 'done' | 'pending';
+  status: 'done' | 'pending' | 'cancelled';
   urgency?: '通常' | '至急';
   items: string[];
   createdAt?: string;

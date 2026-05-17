@@ -179,8 +179,10 @@ type ApiPrescriptionCopyPreview = {
 };
 
 type ApiLabOrder = {
+  id: number;
+  patient_id: string;
   category: string;
-  status: 'done' | 'pending';
+  status: 'done' | 'pending' | 'cancelled';
   urgency: '通常' | '至急' | null;
   items: string[];
   created_at: string;
@@ -258,13 +260,13 @@ type ApiChartWorkspace = {
   chart_history: Array<{ date: string; department: string; title: string; summary: string }>;
   imaging_orders: Array<{
     category: string;
-    status: 'scheduled' | 'draft';
+    status: 'scheduled' | 'draft' | 'cancelled';
     scheduled_at: string;
     note: string;
   }>;
   procedure_orders: Array<{
     title: string;
-    status: 'planned' | 'done';
+    status: 'planned' | 'done' | 'cancelled';
     note: string;
   }>;
   prescriptions: ApiPrescription[];
@@ -855,6 +857,8 @@ const mapPrescriptionTimeline = (items: ApiPrescriptionTimelineGroup[]): Prescri
   }));
 
 const mapLabOrder = (item: ApiLabOrder): ChartWorkspaceData['labOrders'][number] => ({
+  id: item.id,
+  patientId: item.patient_id,
   category: item.category,
   status: item.status,
   urgency: item.urgency ?? undefined,
@@ -989,7 +993,7 @@ const mapChartHistory = (
   }));
 
 const mapImagingOrders = (
-  items: Array<{ category: string; status: 'scheduled' | 'draft'; scheduled_at: string; note: string }>,
+  items: Array<{ category: string; status: 'scheduled' | 'draft' | 'cancelled'; scheduled_at: string; note: string }>,
 ): ImagingOrderEntry[] =>
   items.map((item) => ({
     category: item.category,
@@ -999,7 +1003,7 @@ const mapImagingOrders = (
   }));
 
 const mapProcedureOrders = (
-  items: Array<{ title: string; status: 'planned' | 'done'; note: string }>,
+  items: Array<{ title: string; status: 'planned' | 'done' | 'cancelled'; note: string }>,
 ): ProcedureOrderEntry[] =>
   items.map((item) => ({
     title: item.title,
@@ -2719,11 +2723,36 @@ export const addLabOrder = async (
     }),
   });
 
+export const updateLabOrder = async (
+  orderId: number,
+  payload: {
+    category?: string;
+    status?: 'done' | 'pending' | 'cancelled';
+    urgency?: '通常' | '至急' | null;
+    items?: string[];
+  },
+) => {
+  const body: Record<string, string | string[] | null> = {};
+  if (payload.category !== undefined) body.category = payload.category;
+  if (payload.status !== undefined) body.status = payload.status;
+  if (payload.urgency !== undefined) body.urgency = payload.urgency;
+  if (payload.items !== undefined) body.items = payload.items;
+  return request<ApiLabOrder>(`/api/lab-orders/${orderId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+};
+
+export const cancelLabOrder = async (orderId: number) =>
+  request<ApiLabOrder>(`/api/lab-orders/${orderId}`, {
+    method: 'DELETE',
+  });
+
 export const addImagingOrder = async (
   patientId: string,
   payload: {
     category: string;
-    status: 'scheduled' | 'draft';
+    status: 'scheduled' | 'draft' | 'cancelled';
     scheduledAt: string;
     note: string;
     actor: string;
@@ -2745,11 +2774,41 @@ export const addImagingOrder = async (
     }),
   });
 
+export const updateImagingOrder = async (
+  patientId: string,
+  orderIndex: number,
+  payload: Partial<ImagingOrderEntry>,
+) =>
+  request<{
+    category: string;
+    status: 'scheduled' | 'draft' | 'cancelled';
+    scheduled_at: string;
+    note: string;
+  }>(`/api/patients/${patientId}/imaging-orders/${orderIndex}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      category: payload.category ?? null,
+      status: payload.status ?? null,
+      scheduled_at: payload.scheduledAt ?? null,
+      note: payload.note ?? null,
+    }),
+  });
+
+export const cancelImagingOrder = async (patientId: string, orderIndex: number) =>
+  request<{
+    category: string;
+    status: 'scheduled' | 'draft' | 'cancelled';
+    scheduled_at: string;
+    note: string;
+  }>(`/api/patients/${patientId}/imaging-orders/${orderIndex}`, {
+    method: 'DELETE',
+  });
+
 export const addProcedureOrder = async (
   patientId: string,
   payload: {
     title: string;
-    status: 'planned' | 'done';
+    status: 'planned' | 'done' | 'cancelled';
     note: string;
     actor: string;
   },
@@ -2766,6 +2825,33 @@ export const addProcedureOrder = async (
       note: payload.note,
       actor: payload.actor,
     }),
+  });
+
+export const updateProcedureOrder = async (
+  patientId: string,
+  orderIndex: number,
+  payload: Partial<ProcedureOrderEntry>,
+) =>
+  request<{
+    title: string;
+    status: 'planned' | 'done' | 'cancelled';
+    note: string;
+  }>(`/api/patients/${patientId}/procedure-orders/${orderIndex}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      title: payload.title ?? null,
+      status: payload.status ?? null,
+      note: payload.note ?? null,
+    }),
+  });
+
+export const cancelProcedureOrder = async (patientId: string, orderIndex: number) =>
+  request<{
+    title: string;
+    status: 'planned' | 'done' | 'cancelled';
+    note: string;
+  }>(`/api/patients/${patientId}/procedure-orders/${orderIndex}`, {
+    method: 'DELETE',
   });
 
 export const saveReservation = async (

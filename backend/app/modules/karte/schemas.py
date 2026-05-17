@@ -94,30 +94,43 @@ class ChartHistoryItem(BaseModel):
 
 class ImagingOrderItem(BaseModel):
     category: str
-    status: Literal["scheduled", "draft"]
+    status: Literal["scheduled", "draft", "cancelled"]
     scheduled_at: str
     note: str
 
 
 class ImagingOrderCreateRequest(BaseModel):
     category: str
-    status: Literal["scheduled", "draft"]
+    status: Literal["scheduled", "draft", "cancelled"]
     scheduled_at: str
     note: str
     actor: str
 
 
+class ImagingOrderUpdateRequest(BaseModel):
+    category: str | None = None
+    status: Literal["scheduled", "draft", "cancelled"] | None = None
+    scheduled_at: str | None = None
+    note: str | None = None
+
+
 class ProcedureOrderItem(BaseModel):
     title: str
-    status: Literal["planned", "done"]
+    status: Literal["planned", "done", "cancelled"]
     note: str
 
 
 class ProcedureOrderCreateRequest(BaseModel):
     title: str
-    status: Literal["planned", "done"]
+    status: Literal["planned", "done", "cancelled"]
     note: str
     actor: str
+
+
+class ProcedureOrderUpdateRequest(BaseModel):
+    title: str | None = None
+    status: Literal["planned", "done", "cancelled"] | None = None
+    note: str | None = None
 
 
 class PatientSummaryRead(BaseModel):
@@ -281,9 +294,18 @@ class LabOrderCreateRequest(BaseModel):
     actor: str
 
 
+class LabOrderUpdateRequest(BaseModel):
+    category: str | None = None
+    status: str | None = None
+    urgency: str | None = None
+    items: list[str] | None = None
+
+
 class LabOrderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
+    patient_id: str
     category: str
     status: str
     urgency: str | None = None
