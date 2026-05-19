@@ -33,10 +33,11 @@ private → public 化前に完了させる必須項目のリスト。
 
 ### B1. ライセンスファイル
 
-- [ ] `LICENSE` (リポジトリルート): FSL-1.1-Apache-2.0 全文
-- [ ] `licenses/connectors/LICENSE`: Apache 2.0 全文 (gateway 配下に適用)
-- [ ] `licenses/design-tokens/LICENSE`: MIT 全文 (公開可能な UI 部分に適用)
-- [ ] 各サブディレクトリの README に該当ライセンスを明記
+- [ ] `LICENSE` (リポジトリルート): **Apache License 2.0** 全文。全領域統一
+- [ ] `NOTICE` (リポジトリルート): Copyright と **「Powered by Manta」attribution 要件**を明記。Apache 2.0 §4(d) で derived works に保持義務
+- [ ] `TRADEMARKS.md`: 商標ポリシー (攻撃的普及型: fork は Manta 由来明記必須、「Powered by Manta」バッジ自由使用)
+- [ ] ブランド資産ページ `docs/brand/` 準備: 公式ロゴ・「Powered by Manta」バッジ (PNG/SVG)、color hex
+- [ ] 別タスク化: 特許庁に「Manta」商標出願 (クラス 9: ソフトウェア / クラス 42: SaaS)
 
 ### B2. ルートドキュメント
 

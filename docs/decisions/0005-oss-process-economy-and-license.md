@@ -1,4 +1,4 @@
-# 0005. Manta を プロセスエコノミー として OSS 公開、ライセンスは FSL-1.1-Apache-2.0 を採用
+# 0005. Manta を プロセスエコノミー として OSS 公開、ライセンスは Apache 2.0 統一、商標で別途保護
 
 - **Status**: Proposed
 - **Date**: 2026-05-18
@@ -66,24 +66,95 @@ Manta は **プロセスエコノミー** として GitHub public 化し、**継
 Zensical は 2025-11 リリースで実績が少ない。リスクが顕在化した場合は **`mkdocs.yml` 互換性により Material for MkDocs へフォールバック可能**。コンテンツ (markdown) は変更不要。
 - PR TIMES は **β公開 / 初導入医療機関 / 主要提携 / 資金調達** などのマイルストーンと紐づけて投下、継続発信媒体としては使わない
 
-### ライセンス構成
+### ライセンス: 全領域 Apache 2.0 統一
 
-**3 階層のライセンスを使い分ける**:
+**3 層分割や FSL は採用しない**。リポジトリ全体に **Apache 2.0** 一本で統一する。
 
-| 範囲 | ライセンス | 理由 |
+| 観点 | Apache 2.0 単独 | FSL 3 層分割 (旧案) |
 |---|---|---|
-| **core** (backend application, frontend application) | **FSL-1.1-Apache-2.0** | 競合 SaaS 化を 2 年間防ぎつつ、社内利用・コントリビュート・読解は完全自由。2 年後に Apache 2.0 へ自動変換 |
-| **connectors** (`gateway/`, ORCA adapter, FHIR utility, master sync) | **Apache 2.0** | 医療 IT エコシステム全体の標準化に寄与。連携を作りやすくすることが Manta 普及にも資する |
-| **design tokens / UI primitives** (`frontend/src/styles/theme.css`, 公開可能な UI コンポーネント) | **MIT** | 視覚的影響力を最大化。「モダンな医療系 UI」のリファレンス実装としての価値を最大化 |
+| 説明コスト | 最小 | 高 (3 種類のライセンス境界を維持) |
+| コントリビューター混乱 | なし | あり |
+| 普及スピード | 最大 | 中 |
+| 商用 fork リスク | あり (受容) | 低 (2 年保護) |
+| 「本気度」シグナル | ◎ Kubernetes / TensorFlow と同等 | △ 「保護を残している」と読まれる |
 
-### FSL-1.1-Apache-2.0 の意味
+**Apache 2.0 を選ぶ理由**:
+- 普及最大化 (Kubernetes, Android, TensorFlow, Apache Spark など定番)
+- 特許条項あり = コントリビューターが後から特許で殴ってこない保証
+- 大企業採用に好まれる
+- MIT より少し長いが、特許保護で医療AI 領域には適切
+- GPL は「コードを使うと自分のコードも GPL になる」連鎖が嫌われ、貢献者離れに繋がる
 
-- **許可**: read / modify / internal use / contribute / commercial use (競合 SaaS を除く)
-- **禁止**: Manta と機能的に競合する商用 SaaS / 製品の構築・販売
-- **自動変換**: 各リリースは公開から 2 年後に Apache 2.0 へ自動切り替え
-- **特許**: 貢献者は特許ライセンスを許諾
+**商用 fork リスクは受容**: 既存レセコン大手 / HIS ベンダーが fork して自社製品化する可能性はあるが、コミュニティ・ブランド・ドメイン知識・実装速度は fork できない。Linux / Apache HTTP Server / Kubernetes も同じ前提で世界制覇した。
 
-参考: https://fsl.software/
+### ブランド戦略: 「Powered by Manta」モデル (攻撃的普及)
+
+従来の OSS の防御的ブランド保護 (Firefox/IceWeasel: 名前を使わせない) ではなく、**攻撃的普及型** を採用する。fork や派生プロダクトに対して「Manta 由来であることを明記せよ」を強制し、Manta ブランドの偏在を作る。
+
+**参考モデル**:
+- **Intel Inside**: 搭載 PC は Intel ロゴ表示が条件、Intel ブランドが PC エコシステムに偏在
+- **Powered by Vercel / Made with Next.js**: フロントエンドフレームワークが利用先で常に可視化
+- **Built on Stripe**: 決済 SaaS が組み込み先で信頼の証として表示
+- **WordPress**: 公式テーマで "Powered by WordPress" フッター、世界の Web の 40% で可視化
+- **Creative Commons BY**: 出典明記が義務、明記しないと違反
+
+**ロジック**: 名前を使わせない (防御) より、名前を使わせて出典強制 (攻撃) の方がブランド拡散は圧倒的に強い。Manta が使われるほど Manta の名前が世界に増える。
+
+### Apache 2.0 §4(d) の NOTICE 条項で実現
+
+Apache 2.0 はライセンス本文で「NOTICE ファイルの中身は derived work でも保持必須」と定めている (§4(d))。NOTICE に attribution 要件を書けば、fork も派生サービスもそれを引き継ぐ義務がある。
+
+### NOTICE 雛形
+
+```text
+Manta
+Copyright 2026 GENSHI AI, Inc.
+
+This product is based on Manta (https://manta.genshi.ai/),
+an open-source EHR and medical billing platform developed by
+GENSHI AI, Inc.
+
+Derived works and products built on Manta MUST:
+- Retain this NOTICE file in source distributions
+- Display "Based on Manta" or "Powered by Manta" attribution
+  in user-facing documentation, "About" screens, and the
+  primary README
+- Link back to https://manta.genshi.ai/ where reasonable
+- Use the official "Powered by Manta" badge (provided at
+  manta.genshi.ai/brand) where a visual mark is appropriate
+
+The "Manta" and "GENSHI AI" names and logos are trademarks of
+GENSHI AI, Inc. See TRADEMARKS.md for full guidelines.
+```
+
+### TRADEMARKS.md の方針 (攻撃的普及型)
+
+- 「Manta」「Manta開発WG」「GENSHI AI」は GENSHI AI 株式会社の商標
+- **fork や派生プロダクトは Manta 由来であることを明記する義務**
+- **「Based on Manta」「Powered by Manta」「Manta-compatible」は積極推奨**。これらの表記は商用サービスでも自由に使える
+- **公式「Powered by Manta」バッジを配布**、誰でも商用サービスに貼ってよい
+- ただし、混乱防止のため以下は禁止:
+  - プロダクト名そのものを単に「Manta」「Manta XX」と名乗ること (例: "Manta Pro", "Manta Cloud" を Manta 公式と誤認させる名乗りは NG)
+  - 「Manta 公式」「Manta 認定」を許可なく名乗ること
+- 教育・記事・スクショ・解説は fair use として完全自由
+
+### ブランド資産配布
+
+- `manta.genshi.ai/brand/` で公式ロゴ・「Powered by Manta」バッジ・color hex を PNG/SVG/Figma で配布
+- `manta.genshi.ai/showcase/` (Hall of Fame) で Manta 採用サービスを掲載、相互利益で採用ハードルを下げる
+- 将来的に「Manta Compatible」認定プログラム検討 (Kubernetes Certified 風)
+
+### 商標登録 (別途タスク)
+
+- 特許庁に「Manta」を出願 (クラス 9: ソフトウェア、クラス 42: SaaS)
+- 既登録の GENSHI AI 商標と同等に保護
+- 「Powered by Manta」マーク自体も商標として保護検討
+
+### 必須ファイル
+
+- `LICENSE`: Apache 2.0 全文 (リポジトリルート)
+- `NOTICE`: Copyright と attribution 要件、再配布時必須
+- `TRADEMARKS.md`: 商標ポリシー全文、「Powered by Manta」推奨運用
 
 ### コントリビューター契約
 
@@ -126,12 +197,17 @@ Zensical は 2025-11 リリースで実績が少ない。リスクが顕在化�
 ## Alternatives Considered（他に検討した選択肢）
 
 - **完全クローズド**: プロセスエコノミーのメリット (共創、ブランド、信頼) を全て失うため不採用
-- **Apache 2.0 単独**: 競合に完全に渡るため不採用。レセコン業界の構造を考えると保護期間が必要
-- **BSL 1.1 (4 年)**: 採用例が豊富で説明しやすいが、4 年は医療 AI の進化速度に対して長過ぎる。FSL の 2 年で十分
-- **AGPL v3**: SaaS 提供者にソース公開を強制でき保護は強いが、企業ユーザーの忌避感が強く共創スピードが落ちる
-- **SSPL**: OSI 非認定で「open washing」の批判を受ける可能性があり、GENSHI AI の Open Knowledge ブランドと相性が悪い
+- **FSL-1.1-Apache-2.0 (旧案)**: 競合 SaaS 化を 2 年間防げるが、説明コストが高く、コントリビューターに「商用利用への制約」と誤読されて参加を躊躇させるため不採用。普及最大化を優先
+- **3 層分割 (FSL core / Apache connectors / MIT design)**: 説明コストが高すぎ、コントリビューターが「自分の貢献がどのライセンスに入るか」を悩む。普及スピードが落ちるため不採用
+- **BSL 1.1 (4 年)**: 採用例豊富だが商用保護を残す形で、Linux/Kubernetes 路線とは哲学が違うため不採用
+- **AGPL v3**: SaaS 提供者にソース公開強制で保護強だが、企業ユーザーの忌避感が強く共創スピード低下
+- **GPL v3 / GPL v2 (Linux/Git 路線)**: copyleft で「コードを使うと自分のコードも GPL」連鎖が嫌われ、特に企業エンジニア・派生プロダクトから敬遠される。普及最大化と矛盾
+- **MIT 単独**: 最もシンプルだが特許条項なし。医療AI 領域では特許リスクが高いため、Apache 2.0 の特許保護を優先
+- **SSPL**: OSI 非認定で「open washing」の批判を受ける可能性
 - **CLA 採用**: コントリビュート障壁が上がるため不採用、DCO で十分
 - **PR TIMES を継続発信媒体として併用**: 1 件あたりのコストと媒体特性 (点の通知) を考えると、X / Zenn / note の方が継続発信に向く。PR TIMES はマイルストーン専用に絞る
+- **ブランド保護をライセンスでやる (例: 旧 BSD 4-Clause の広告条項)**: 現代では非推奨、ライセンス汚染・互換性問題を起こす。Apache 2.0 NOTICE + 商標で別レイヤー管理が正解
+- **「IceWeasel モデル」(fork は別名強制)**: 防御的だが普及スピードが落ちる。Manta は **攻撃的普及型 (Powered by Manta モデル)** を選択し、fork に Manta 由来明記を強制することでブランド偏在を狙う
 
 ## Lessons Learned / 振り返り（後追い記入）
 
@@ -139,9 +215,11 @@ Zensical は 2025-11 リリースで実績が少ない。リスクが顕在化�
 
 ## References
 
-- [Functional Source License (FSL) 公式](https://fsl.software/)
-- [Sentry の FSL 採用記事](https://blog.sentry.io/introducing-the-functional-source-license-freedom-without-free-riding/)
-- [Business Source License 1.1](https://mariadb.com/bsl11/)
+- [Apache License 2.0 全文](https://www.apache.org/licenses/LICENSE-2.0)
+- [Apache Software Foundation 商標ポリシー](https://www.apache.org/foundation/marks/) (参考にできる)
+- [Linux 商標と Linux Foundation の管理](https://www.linuxfoundation.org/legal/trademark-usage)
+- [Mozilla 商標ポリシー (Firefox の参考事例)](https://www.mozilla.org/en-US/foundation/trademarks/policy/)
+- [CNCF (Kubernetes) 商標ポリシー](https://www.linuxfoundation.org/legal/trademark-usage)
 - [けんすう氏 プロセスエコノミー note](https://kensuu.com/n/nf4270e069c20)
 - 関連: [PUBLIC_RELEASE_CHECKLIST.md](../PUBLIC_RELEASE_CHECKLIST.md)
 - 関連 ADR: [0004 Mantaレセコンと AI 算定補助層](0004-receipt-gateway-and-ai-claims-assist.md)
