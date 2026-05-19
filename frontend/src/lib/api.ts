@@ -11,11 +11,28 @@ import type {
   AdminUserSummary,
   AuditLogEntry,
   ClaimDraft,
+  ClaimDraftSummary,
   ClaimLineAdjustment,
+  ClaimReturnAnalytics,
+  ClaimReturnAnalyticsComparison,
+  ClaimReturnSlaAlert,
+  ClaimReturnSlaEscalation,
+  ClaimReturnSlaSummary,
+  ClaimSlaNotificationDryRun,
+  ClaimSlaSetting,
+  ClaimReturnTrendPoint,
+  ClaimReturnEvent,
+  ClaimReturnEventSummary,
+  ClaimTransmissionSummary,
+  MonthlyClaimClose,
+  MonthlyCloseSummary,
   FacilityClaimRule,
   ReceiptCodeCandidate,
   OrcaAdapterSetting,
   OrcaConnectionTestResult,
+  OrcaResponseAnalysis,
+  OrcaResponseMappingDiff,
+  OrcaResponseSample,
   ChartOrderConfig,
   ChartTemplate,
   ChartHistoryEntry,
@@ -664,6 +681,142 @@ type ApiClaimDraft = {
   transmissions: ApiClaimTransmission[];
 };
 
+type ApiClaimDraftSummary = {
+  id: number;
+  patient_id: string;
+  patient_name: string;
+  patient_kana: string;
+  department: string;
+  doctor: string;
+  admission_id: number | null;
+  admission_status: string | null;
+  ward_id: string | null;
+  bed_id: string | null;
+  primary_diagnosis: string | null;
+  status: ApiClaimDraft['status'];
+  source_type: string;
+  total_points: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  line_count: number;
+  open_issue_count: number;
+  open_error_count: number;
+  open_warning_count: number;
+  unresolved_line_count: number;
+  suggested_adjustment_count: number;
+  latest_transmission_status: ApiClaimTransmission['status'] | null;
+  latest_transmission_at: string | null;
+  open_return_event_count: number;
+};
+
+type ApiClaimReturnEvent = {
+  id: number;
+  claim_draft_id: number;
+  transmission_id: number | null;
+  event_type: 'return' | 'assessment' | 'notice';
+  severity: 'info' | 'warning' | 'error';
+  status: 'open' | 'in_progress' | 'resolved' | 'ignored';
+  title: string;
+  message: string;
+  reason_code: string | null;
+  payer: string | null;
+  received_at: string;
+  due_at: string | null;
+  assignee: string | null;
+  resolution_note: string | null;
+  raw_payload: Record<string, unknown>;
+  created_by: string;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ApiClaimReturnEventSummary = ApiClaimReturnEvent & {
+  patient_id: string;
+  patient_name: string;
+  patient_kana: string;
+  department: string;
+  admission_id: number | null;
+  claim_status: ApiClaimDraft['status'];
+  total_points: number;
+};
+
+type ApiMonthlyCloseSummary = {
+  month: string;
+  claim_count: number;
+  total_points: number;
+  unsubmitted_count: number;
+  submitted_count: number;
+  open_return_count: number;
+  assessment_count: number;
+  reclaim_waiting_count: number;
+  unresolved_issue_count: number;
+  assignee_buckets: Array<{ key: string; label: string; count: number; total_points: number }>;
+  status_buckets: Array<{ key: string; label: string; count: number; total_points: number }>;
+  close: ApiMonthlyClaimClose | null;
+};
+
+type ApiMonthlyClaimClose = {
+  month: string;
+  status: 'pending_approval' | 'closed' | 'cancelled';
+  claim_count: number;
+  total_points: number;
+  unsubmitted_count: number;
+  open_return_count: number;
+  unresolved_issue_count: number;
+  snapshot: Record<string, unknown>;
+  requested_by: string | null;
+  requested_at: string | null;
+  closed_by: string;
+  closed_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  approval_note: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  updated_at: string;
+};
+
+type ApiClaimReturnAnalytics = {
+  month: string;
+  total_count: number;
+  open_count: number;
+  in_progress_count: number;
+  resolved_count: number;
+  ignored_count: number;
+  reason_buckets: Array<{
+    key: string;
+    label: string;
+    event_type: ApiClaimReturnEvent['event_type'] | null;
+    severity: 'info' | 'warning' | 'error' | null;
+    count: number;
+    open_count: number;
+    resolved_count: number;
+    latest_received_at: string | null;
+  }>;
+  event_type_buckets: Array<{ key: string; label: string; count: number; total_points: number }>;
+  status_buckets: Array<{ key: string; label: string; count: number; total_points: number }>;
+};
+
+type ApiClaimReturnAnalyticsComparison = {
+  current: ApiClaimReturnAnalytics;
+  previous: ApiClaimReturnAnalytics;
+  total_delta: number;
+  open_delta: number;
+  reason_deltas: Array<{
+    key: string;
+    label: string;
+    current_count: number;
+    previous_count: number;
+    delta: number;
+    current_open_count: number;
+    previous_open_count: number;
+    open_delta: number;
+  }>;
+};
+
 type ApiClaimTransmission = {
   id: number;
   claim_draft_id: number;
@@ -675,6 +828,88 @@ type ApiClaimTransmission = {
   sent_by: string;
   sent_at: string;
   created_at: string;
+};
+
+type ApiClaimTransmissionSummary = ApiClaimTransmission & {
+  patient_id: string;
+  patient_name: string;
+  patient_kana: string;
+  department: string;
+  admission_id: number | null;
+  claim_status: ApiClaimDraft['status'];
+  total_points: number;
+  transmission_count: number;
+  is_reclaim: boolean;
+};
+
+type ApiClaimReturnTrendPoint = {
+  month: string;
+  total_count: number;
+  open_count: number;
+  resolved_count: number;
+  assessment_count: number;
+  return_count: number;
+  top_reason_code: string | null;
+  top_reason_count: number;
+};
+
+type ApiClaimReturnSlaSummary = {
+  generated_at: string;
+  open_count: number;
+  overdue_count: number;
+  due_soon_count: number;
+  no_due_count: number;
+  assignee_buckets: Array<{
+    assignee: string;
+    open_count: number;
+    overdue_count: number;
+    due_soon_count: number;
+    no_due_count: number;
+    oldest_received_at: string | null;
+    latest_due_at: string | null;
+  }>;
+};
+
+type ApiClaimReturnSlaAlert = {
+  event_id: number;
+  claim_draft_id: number;
+  patient_id: string;
+  patient_name: string;
+  assignee: string;
+  status: ApiClaimReturnEvent['status'];
+  title: string;
+  reason_code: string | null;
+  severity: 'overdue' | 'due_soon' | 'no_due';
+  received_at: string;
+  due_at: string | null;
+  hours_until_due: number | null;
+};
+
+type ApiClaimReturnSlaEscalation = {
+  escalated_count: number;
+  event_ids: number[];
+  assignee: string;
+  note: string | null;
+};
+
+type ApiClaimSlaSetting = {
+  id: string;
+  due_soon_hours: number;
+  include_no_due: boolean;
+  escalation_assignee: string;
+  notify_destinations: Array<Record<string, unknown>>;
+  escalation_rules: Array<Record<string, unknown>>;
+  note: string | null;
+  updated_by: string | null;
+  updated_at: string;
+};
+
+type ApiClaimSlaNotificationDryRun = {
+  generated_at: string;
+  destination_count: number;
+  alert_count: number;
+  destinations: Array<Record<string, unknown>>;
+  alerts: ApiClaimReturnSlaAlert[];
 };
 
 type ApiFacilityClaimRule = {
@@ -703,6 +938,7 @@ type ApiOrcaAdapterSetting = {
   claim_endpoint: string;
   health_endpoint: string;
   mode: 'mock' | 'http';
+  response_mappings: Array<Record<string, unknown>>;
   note: string | null;
   updated_by: string | null;
   updated_at: string;
@@ -714,6 +950,33 @@ type ApiOrcaConnectionTest = {
   url: string | null;
   message: string;
   response_payload: Record<string, unknown>;
+};
+
+type ApiOrcaResponseAnalysis = {
+  status_code: number;
+  normalized: Record<string, unknown>;
+  reason_count: number;
+  mapping_count: number;
+};
+
+type ApiOrcaResponseMappingDiff = {
+  baseline: ApiOrcaResponseAnalysis;
+  candidate: ApiOrcaResponseAnalysis;
+  added_reasons: Array<Record<string, unknown>>;
+  removed_reasons: Array<Record<string, unknown>>;
+  changed_reasons: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+};
+
+type ApiOrcaResponseSample = {
+  id: number;
+  claim_draft_id: number | null;
+  name: string;
+  status_code: number;
+  payload: Record<string, unknown>;
+  normalized: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
 };
 
 type ApiDiagnosisSearchResult = {
@@ -784,6 +1047,37 @@ const request = async <T>(
   }
 
   return response.json() as Promise<T>;
+};
+
+const requestText = async (
+  path: string,
+  init?: RequestInit,
+  options?: { requiresAuth?: boolean; accessToken?: string },
+): Promise<string> => {
+  const requiresAuth = options?.requiresAuth ?? true;
+  const token = requiresAuth ? (options?.accessToken ?? getAccessToken()) : null;
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let detail = '';
+
+    try {
+      detail = (JSON.parse(errorText) as { detail?: string }).detail ?? '';
+    } catch {
+      detail = '';
+    }
+
+    throw new ApiError(response.status, detail || errorText || `${response.status} ${response.statusText}`);
+  }
+
+  return response.text();
 };
 
 export const isUnauthorizedError = (error: unknown): error is ApiError =>
@@ -1373,6 +1667,19 @@ const mapClaimTransmission = (item: ApiClaimTransmission) => ({
   createdAt: formatTimestamp(item.created_at),
 });
 
+const mapClaimTransmissionSummary = (item: ApiClaimTransmissionSummary): ClaimTransmissionSummary => ({
+  ...mapClaimTransmission(item),
+  patientId: item.patient_id,
+  patientName: item.patient_name,
+  patientKana: item.patient_kana,
+  department: item.department,
+  admissionId: item.admission_id ?? undefined,
+  claimStatus: item.claim_status,
+  totalPoints: item.total_points,
+  transmissionCount: item.transmission_count,
+  isReclaim: item.is_reclaim,
+});
+
 const mapClaimDraftLine = (item: ApiClaimDraftLine) => ({
   id: item.id,
   claimDraftId: item.claim_draft_id,
@@ -1439,6 +1746,235 @@ const mapClaimDraft = (item: ApiClaimDraft): ClaimDraft => ({
   transmissions: item.transmissions.map(mapClaimTransmission),
 });
 
+const mapClaimDraftSummary = (item: ApiClaimDraftSummary): ClaimDraftSummary => ({
+  id: item.id,
+  patientId: item.patient_id,
+  patientName: item.patient_name,
+  patientKana: item.patient_kana,
+  department: item.department,
+  doctor: item.doctor,
+  admissionId: item.admission_id ?? undefined,
+  admissionStatus: item.admission_status ?? undefined,
+  wardId: item.ward_id ?? undefined,
+  bedId: item.bed_id ?? undefined,
+  primaryDiagnosis: item.primary_diagnosis ?? undefined,
+  status: item.status,
+  sourceType: item.source_type,
+  totalPoints: item.total_points,
+  createdBy: item.created_by,
+  createdAt: formatTimestamp(item.created_at),
+  updatedAt: formatTimestamp(item.updated_at),
+  lineCount: item.line_count,
+  openIssueCount: item.open_issue_count,
+  openErrorCount: item.open_error_count,
+  openWarningCount: item.open_warning_count,
+  unresolvedLineCount: item.unresolved_line_count,
+  suggestedAdjustmentCount: item.suggested_adjustment_count,
+  latestTransmissionStatus: item.latest_transmission_status ?? undefined,
+  latestTransmissionAt: item.latest_transmission_at ? formatTimestamp(item.latest_transmission_at) : undefined,
+  openReturnEventCount: item.open_return_event_count,
+});
+
+const mapClaimReturnEvent = (item: ApiClaimReturnEvent): ClaimReturnEvent => ({
+  id: item.id,
+  claimDraftId: item.claim_draft_id,
+  transmissionId: item.transmission_id ?? undefined,
+  eventType: item.event_type,
+  severity: item.severity,
+  status: item.status,
+  title: item.title,
+  message: item.message,
+  reasonCode: item.reason_code ?? undefined,
+  payer: item.payer ?? undefined,
+  receivedAt: formatTimestamp(item.received_at),
+  dueAt: item.due_at ? formatTimestamp(item.due_at) : undefined,
+  assignee: item.assignee ?? undefined,
+  resolutionNote: item.resolution_note ?? undefined,
+  rawPayload: item.raw_payload,
+  createdBy: item.created_by,
+  updatedBy: item.updated_by ?? undefined,
+  createdAt: formatTimestamp(item.created_at),
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapClaimReturnEventSummary = (item: ApiClaimReturnEventSummary): ClaimReturnEventSummary => ({
+  ...mapClaimReturnEvent(item),
+  patientId: item.patient_id,
+  patientName: item.patient_name,
+  patientKana: item.patient_kana,
+  department: item.department,
+  admissionId: item.admission_id ?? undefined,
+  claimStatus: item.claim_status,
+  totalPoints: item.total_points,
+});
+
+const mapMonthlyCloseSummary = (item: ApiMonthlyCloseSummary): MonthlyCloseSummary => ({
+  month: item.month,
+  claimCount: item.claim_count,
+  totalPoints: item.total_points,
+  unsubmittedCount: item.unsubmitted_count,
+  submittedCount: item.submitted_count,
+  openReturnCount: item.open_return_count,
+  assessmentCount: item.assessment_count,
+  reclaimWaitingCount: item.reclaim_waiting_count,
+  unresolvedIssueCount: item.unresolved_issue_count,
+  assigneeBuckets: item.assignee_buckets.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    count: bucket.count,
+    totalPoints: bucket.total_points,
+  })),
+  statusBuckets: item.status_buckets.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    count: bucket.count,
+    totalPoints: bucket.total_points,
+  })),
+  close: item.close ? mapMonthlyClaimClose(item.close) : undefined,
+});
+
+const mapMonthlyClaimClose = (item: ApiMonthlyClaimClose): MonthlyClaimClose => ({
+  month: item.month,
+  status: item.status,
+  claimCount: item.claim_count,
+  totalPoints: item.total_points,
+  unsubmittedCount: item.unsubmitted_count,
+  openReturnCount: item.open_return_count,
+  unresolvedIssueCount: item.unresolved_issue_count,
+  snapshot: item.snapshot,
+  requestedBy: item.requested_by ?? undefined,
+  requestedAt: item.requested_at ? formatTimestamp(item.requested_at) : undefined,
+  closedBy: item.closed_by,
+  closedAt: formatTimestamp(item.closed_at),
+  approvedBy: item.approved_by ?? undefined,
+  approvedAt: item.approved_at ? formatTimestamp(item.approved_at) : undefined,
+  approvalNote: item.approval_note ?? undefined,
+  cancelledBy: item.cancelled_by ?? undefined,
+  cancelledAt: item.cancelled_at ? formatTimestamp(item.cancelled_at) : undefined,
+  cancelReason: item.cancel_reason ?? undefined,
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapClaimReturnAnalytics = (item: ApiClaimReturnAnalytics): ClaimReturnAnalytics => ({
+  month: item.month,
+  totalCount: item.total_count,
+  openCount: item.open_count,
+  inProgressCount: item.in_progress_count,
+  resolvedCount: item.resolved_count,
+  ignoredCount: item.ignored_count,
+  reasonBuckets: item.reason_buckets.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    eventType: bucket.event_type ?? undefined,
+    severity: bucket.severity ?? undefined,
+    count: bucket.count,
+    openCount: bucket.open_count,
+    resolvedCount: bucket.resolved_count,
+    latestReceivedAt: bucket.latest_received_at ? formatTimestamp(bucket.latest_received_at) : undefined,
+  })),
+  eventTypeBuckets: item.event_type_buckets.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    count: bucket.count,
+    totalPoints: bucket.total_points,
+  })),
+  statusBuckets: item.status_buckets.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    count: bucket.count,
+    totalPoints: bucket.total_points,
+  })),
+});
+
+const mapClaimReturnAnalyticsComparison = (
+  item: ApiClaimReturnAnalyticsComparison,
+): ClaimReturnAnalyticsComparison => ({
+  current: mapClaimReturnAnalytics(item.current),
+  previous: mapClaimReturnAnalytics(item.previous),
+  totalDelta: item.total_delta,
+  openDelta: item.open_delta,
+  reasonDeltas: item.reason_deltas.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    currentCount: bucket.current_count,
+    previousCount: bucket.previous_count,
+    delta: bucket.delta,
+    currentOpenCount: bucket.current_open_count,
+    previousOpenCount: bucket.previous_open_count,
+    openDelta: bucket.open_delta,
+  })),
+});
+
+const mapClaimReturnTrendPoint = (item: ApiClaimReturnTrendPoint): ClaimReturnTrendPoint => ({
+  month: item.month,
+  totalCount: item.total_count,
+  openCount: item.open_count,
+  resolvedCount: item.resolved_count,
+  assessmentCount: item.assessment_count,
+  returnCount: item.return_count,
+  topReasonCode: item.top_reason_code ?? undefined,
+  topReasonCount: item.top_reason_count,
+});
+
+const mapClaimReturnSlaSummary = (item: ApiClaimReturnSlaSummary): ClaimReturnSlaSummary => ({
+  generatedAt: formatTimestamp(item.generated_at),
+  openCount: item.open_count,
+  overdueCount: item.overdue_count,
+  dueSoonCount: item.due_soon_count,
+  noDueCount: item.no_due_count,
+  assigneeBuckets: item.assignee_buckets.map((bucket) => ({
+    assignee: bucket.assignee,
+    openCount: bucket.open_count,
+    overdueCount: bucket.overdue_count,
+    dueSoonCount: bucket.due_soon_count,
+    noDueCount: bucket.no_due_count,
+    oldestReceivedAt: bucket.oldest_received_at ? formatTimestamp(bucket.oldest_received_at) : undefined,
+    latestDueAt: bucket.latest_due_at ? formatTimestamp(bucket.latest_due_at) : undefined,
+  })),
+});
+
+const mapClaimReturnSlaAlert = (item: ApiClaimReturnSlaAlert): ClaimReturnSlaAlert => ({
+  eventId: item.event_id,
+  claimDraftId: item.claim_draft_id,
+  patientId: item.patient_id,
+  patientName: item.patient_name,
+  assignee: item.assignee,
+  status: item.status,
+  title: item.title,
+  reasonCode: item.reason_code ?? undefined,
+  severity: item.severity,
+  receivedAt: formatTimestamp(item.received_at),
+  dueAt: item.due_at ? formatTimestamp(item.due_at) : undefined,
+  hoursUntilDue: item.hours_until_due ?? undefined,
+});
+
+const mapClaimReturnSlaEscalation = (item: ApiClaimReturnSlaEscalation): ClaimReturnSlaEscalation => ({
+  escalatedCount: item.escalated_count,
+  eventIds: item.event_ids,
+  assignee: item.assignee,
+  note: item.note ?? undefined,
+});
+
+const mapClaimSlaSetting = (item: ApiClaimSlaSetting): ClaimSlaSetting => ({
+  id: item.id,
+  dueSoonHours: item.due_soon_hours,
+  includeNoDue: item.include_no_due,
+  escalationAssignee: item.escalation_assignee,
+  notifyDestinations: item.notify_destinations,
+  escalationRules: item.escalation_rules,
+  note: item.note ?? undefined,
+  updatedBy: item.updated_by ?? undefined,
+  updatedAt: formatTimestamp(item.updated_at),
+});
+
+const mapClaimSlaNotificationDryRun = (item: ApiClaimSlaNotificationDryRun): ClaimSlaNotificationDryRun => ({
+  generatedAt: formatTimestamp(item.generated_at),
+  destinationCount: item.destination_count,
+  alertCount: item.alert_count,
+  destinations: item.destinations,
+  alerts: item.alerts.map(mapClaimReturnSlaAlert),
+});
+
 const mapFacilityClaimRule = (item: ApiFacilityClaimRule): FacilityClaimRule => ({
   id: item.id,
   sortOrder: item.sort_order,
@@ -1465,6 +2001,7 @@ const mapOrcaAdapterSetting = (item: ApiOrcaAdapterSetting): OrcaAdapterSetting 
   claimEndpoint: item.claim_endpoint,
   healthEndpoint: item.health_endpoint,
   mode: item.mode,
+  responseMappings: item.response_mappings,
   note: item.note ?? undefined,
   updatedBy: item.updated_by ?? undefined,
   updatedAt: formatTimestamp(item.updated_at),
@@ -1476,6 +2013,33 @@ const mapOrcaConnectionTest = (item: ApiOrcaConnectionTest): OrcaConnectionTestR
   url: item.url ?? undefined,
   message: item.message,
   responsePayload: item.response_payload,
+});
+
+const mapOrcaResponseAnalysis = (item: ApiOrcaResponseAnalysis): OrcaResponseAnalysis => ({
+  statusCode: item.status_code,
+  normalized: item.normalized,
+  reasonCount: item.reason_count,
+  mappingCount: item.mapping_count,
+});
+
+const mapOrcaResponseMappingDiff = (item: ApiOrcaResponseMappingDiff): OrcaResponseMappingDiff => ({
+  baseline: mapOrcaResponseAnalysis(item.baseline),
+  candidate: mapOrcaResponseAnalysis(item.candidate),
+  addedReasons: item.added_reasons,
+  removedReasons: item.removed_reasons,
+  changedReasons: item.changed_reasons,
+  summary: item.summary,
+});
+
+const mapOrcaResponseSample = (item: ApiOrcaResponseSample): OrcaResponseSample => ({
+  id: item.id,
+  claimDraftId: item.claim_draft_id ?? undefined,
+  name: item.name,
+  statusCode: item.status_code,
+  payload: item.payload,
+  normalized: item.normalized,
+  createdBy: item.created_by,
+  createdAt: formatTimestamp(item.created_at),
 });
 
 export const login = async (userId: string, password: string): Promise<UserSession> => {
@@ -1941,6 +2505,246 @@ export const getInpatientClaimDraft = async (admissionId: number): Promise<Claim
   return draft ? mapClaimDraft(draft) : null;
 };
 
+export const listClaimDrafts = async (params: {
+  status?: ClaimDraft['status'] | 'all';
+  queue?: 'all' | 'open_issues' | 'ready' | 'transmission_error' | 'submitted';
+  search?: string;
+  limit?: number;
+} = {}): Promise<ClaimDraftSummary[]> => {
+  const query = new URLSearchParams();
+  query.set('status', params.status ?? 'all');
+  query.set('queue', params.queue ?? 'all');
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.limit) {
+    query.set('limit', String(params.limit));
+  }
+  const drafts = await request<ApiClaimDraftSummary[]>(`/api/claim-drafts?${query.toString()}`);
+  return drafts.map(mapClaimDraftSummary);
+};
+
+export const getClaimDraft = async (claimDraftId: number): Promise<ClaimDraft> => {
+  const draft = await request<ApiClaimDraft>(`/api/claim-drafts/${claimDraftId}`);
+  return mapClaimDraft(draft);
+};
+
+export const listClaimReturnEvents = async (params: {
+  status?: ClaimReturnEvent['status'] | 'all';
+  eventType?: ClaimReturnEvent['eventType'] | 'all';
+  assignee?: 'all' | 'mine' | 'unassigned' | string;
+  search?: string;
+  limit?: number;
+} = {}): Promise<ClaimReturnEventSummary[]> => {
+  const query = new URLSearchParams();
+  query.set('status', params.status ?? 'open');
+  query.set('event_type', params.eventType ?? 'all');
+  query.set('assignee', params.assignee ?? 'all');
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.limit) {
+    query.set('limit', String(params.limit));
+  }
+  const events = await request<ApiClaimReturnEventSummary[]>(`/api/claim-return-events?${query.toString()}`);
+  return events.map(mapClaimReturnEventSummary);
+};
+
+export const getMonthlyCloseSummary = async (month: string): Promise<MonthlyCloseSummary> => {
+  const summary = await request<ApiMonthlyCloseSummary>(`/api/billing/monthly-close?month=${encodeURIComponent(month)}`);
+  return mapMonthlyCloseSummary(summary);
+};
+
+export const getMonthlyCloseReport = async (month: string): Promise<Record<string, unknown>> =>
+  request<Record<string, unknown>>(`/api/billing/monthly-close/${encodeURIComponent(month)}/report`);
+
+export const closeMonthlyClaims = async (month: string, force = false): Promise<MonthlyClaimClose> => {
+  const close = await request<ApiMonthlyClaimClose>(`/api/billing/monthly-close/${encodeURIComponent(month)}/close`, {
+    method: 'POST',
+    body: JSON.stringify({ force }),
+  });
+  return mapMonthlyClaimClose(close);
+};
+
+export const requestMonthlyClaimClose = async (
+  month: string,
+  payload: { force?: boolean; note?: string } = {},
+): Promise<MonthlyClaimClose> => {
+  const close = await request<ApiMonthlyClaimClose>(`/api/billing/monthly-close/${encodeURIComponent(month)}/request-close`, {
+    method: 'POST',
+    body: JSON.stringify({ force: payload.force ?? false, note: payload.note ?? null }),
+  });
+  return mapMonthlyClaimClose(close);
+};
+
+export const approveMonthlyClaimClose = async (month: string, note?: string): Promise<MonthlyClaimClose> => {
+  const close = await request<ApiMonthlyClaimClose>(`/api/billing/monthly-close/${encodeURIComponent(month)}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ note: note ?? null }),
+  });
+  return mapMonthlyClaimClose(close);
+};
+
+export const cancelMonthlyClaimClose = async (month: string, reason: string): Promise<MonthlyClaimClose> => {
+  const close = await request<ApiMonthlyClaimClose>(`/api/billing/monthly-close/${encodeURIComponent(month)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+  return mapMonthlyClaimClose(close);
+};
+
+export const getClaimReturnAnalytics = async (month: string): Promise<ClaimReturnAnalytics> => {
+  const analytics = await request<ApiClaimReturnAnalytics>(`/api/claim-return-events/analytics?month=${encodeURIComponent(month)}`);
+  return mapClaimReturnAnalytics(analytics);
+};
+
+export const compareClaimReturnAnalytics = async (month: string): Promise<ClaimReturnAnalyticsComparison> => {
+  const comparison = await request<ApiClaimReturnAnalyticsComparison>(
+    `/api/claim-return-events/analytics/compare?month=${encodeURIComponent(month)}`,
+  );
+  return mapClaimReturnAnalyticsComparison(comparison);
+};
+
+export const listClaimReturnTrend = async (month: string, months = 6): Promise<ClaimReturnTrendPoint[]> => {
+  const trend = await request<ApiClaimReturnTrendPoint[]>(
+    `/api/claim-return-events/analytics/trend?month=${encodeURIComponent(month)}&months=${months}`,
+  );
+  return trend.map(mapClaimReturnTrendPoint);
+};
+
+export const getClaimReturnSlaSummary = async (): Promise<ClaimReturnSlaSummary> => {
+  const summary = await request<ApiClaimReturnSlaSummary>('/api/claim-return-events/sla');
+  return mapClaimReturnSlaSummary(summary);
+};
+
+export const listClaimReturnSlaAlerts = async (): Promise<ClaimReturnSlaAlert[]> => {
+  const alerts = await request<ApiClaimReturnSlaAlert[]>('/api/claim-return-events/sla/alerts');
+  return alerts.map(mapClaimReturnSlaAlert);
+};
+
+export const escalateClaimReturnSla = async (
+  payload: { assignee?: string; includeDueSoon?: boolean; note?: string } = {},
+): Promise<ClaimReturnSlaEscalation> => {
+  const result = await request<ApiClaimReturnSlaEscalation>('/api/claim-return-events/sla/escalate', {
+    method: 'POST',
+    body: JSON.stringify({
+      assignee: payload.assignee ?? '管理者',
+      include_due_soon: payload.includeDueSoon ?? false,
+      note: payload.note ?? null,
+    }),
+  });
+  return mapClaimReturnSlaEscalation(result);
+};
+
+export const getClaimSlaSetting = async (): Promise<ClaimSlaSetting> => {
+  const setting = await request<ApiClaimSlaSetting>('/api/claim-return-events/sla/settings');
+  return mapClaimSlaSetting(setting);
+};
+
+export const updateClaimSlaSetting = async (payload: {
+  dueSoonHours: number;
+  includeNoDue: boolean;
+  escalationAssignee: string;
+  notifyDestinations: Array<Record<string, unknown>>;
+  escalationRules: Array<Record<string, unknown>>;
+  note?: string;
+}): Promise<ClaimSlaSetting> => {
+  const setting = await request<ApiClaimSlaSetting>('/api/claim-return-events/sla/settings', {
+    method: 'PUT',
+    body: JSON.stringify({
+      due_soon_hours: payload.dueSoonHours,
+      include_no_due: payload.includeNoDue,
+      escalation_assignee: payload.escalationAssignee,
+      notify_destinations: payload.notifyDestinations,
+      escalation_rules: payload.escalationRules,
+      note: payload.note ?? null,
+    }),
+  });
+  return mapClaimSlaSetting(setting);
+};
+
+export const dryRunClaimSlaNotifications = async (): Promise<ClaimSlaNotificationDryRun> => {
+  const result = await request<ApiClaimSlaNotificationDryRun>('/api/claim-return-events/sla/notifications/dry-run', {
+    method: 'POST',
+  });
+  return mapClaimSlaNotificationDryRun(result);
+};
+
+export const listClaimTransmissions = async (params: {
+  month?: string;
+  status?: ClaimTransmissionSummary['status'] | 'all';
+  search?: string;
+  reclaimOnly?: boolean;
+  limit?: number;
+} = {}): Promise<ClaimTransmissionSummary[]> => {
+  const query = new URLSearchParams();
+  query.set('status', params.status ?? 'all');
+  if (params.month) {
+    query.set('month', params.month);
+  }
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.reclaimOnly) {
+    query.set('reclaim_only', 'true');
+  }
+  if (params.limit) {
+    query.set('limit', String(params.limit));
+  }
+  const transmissions = await request<ApiClaimTransmissionSummary[]>(`/api/claim-transmissions?${query.toString()}`);
+  return transmissions.map(mapClaimTransmissionSummary);
+};
+
+export const exportClaimTransmissionsCsv = async (params: {
+  month?: string;
+  status?: ClaimTransmissionSummary['status'] | 'all';
+  search?: string;
+  reclaimOnly?: boolean;
+} = {}): Promise<string> => {
+  const query = new URLSearchParams();
+  query.set('status', params.status ?? 'all');
+  if (params.month) {
+    query.set('month', params.month);
+  }
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.reclaimOnly) {
+    query.set('reclaim_only', 'true');
+  }
+  return requestText(`/api/claim-transmissions/export.csv?${query.toString()}`);
+};
+
+export const assignClaimReturnEvent = async (
+  eventId: number,
+  assignee?: string,
+): Promise<ClaimReturnEvent> => {
+  const event = await request<ApiClaimReturnEvent>(`/api/claim-return-events/${eventId}/assignee`, {
+    method: 'PATCH',
+    body: JSON.stringify({ assignee: assignee ?? null }),
+  });
+  return mapClaimReturnEvent(event);
+};
+
+export const updateClaimReturnEvent = async (
+  eventId: number,
+  payload: {
+    status: ClaimReturnEvent['status'];
+    assignee?: string;
+    resolutionNote?: string;
+  },
+): Promise<ClaimReturnEvent> => {
+  const event = await request<ApiClaimReturnEvent>(`/api/claim-return-events/${eventId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: payload.status,
+      assignee: payload.assignee ?? null,
+      resolution_note: payload.resolutionNote ?? null,
+    }),
+  });
+  return mapClaimReturnEvent(event);
+};
+
 export const createInpatientClaimDraft = async (admissionId: number): Promise<ClaimDraft> => {
   const draft = await request<ApiClaimDraft>(`/api/inpatient/admissions/${admissionId}/claim-draft`, {
     method: 'POST',
@@ -2008,6 +2812,9 @@ export const updateClaimDraftLineReceiptCode = async (
 export const previewClaimDraftOrcaPayload = async (claimDraftId: number): Promise<Record<string, unknown>> =>
   request<Record<string, unknown>>(`/api/claim-drafts/${claimDraftId}/transmissions/orca/preview`);
 
+export const dryRunClaimDraftOrcaPayload = async (claimDraftId: number): Promise<Record<string, unknown>> =>
+  request<Record<string, unknown>>(`/api/claim-drafts/${claimDraftId}/transmissions/orca/dry-run`);
+
 export const submitClaimDraftToOrca = async (claimDraftId: number): Promise<ClaimDraft['transmissions'][number]> => {
   const transmission = await request<ApiClaimTransmission>(`/api/claim-drafts/${claimDraftId}/transmissions/orca`, {
     method: 'POST',
@@ -2017,6 +2824,17 @@ export const submitClaimDraftToOrca = async (claimDraftId: number): Promise<Clai
 
 export const listFacilityClaimRules = async (): Promise<FacilityClaimRule[]> => {
   const rules = await request<ApiFacilityClaimRule[]>('/api/admin/claim-rules');
+  return rules.map(mapFacilityClaimRule);
+};
+
+export const exportFacilityClaimRules = async (): Promise<Record<string, unknown>> =>
+  request<Record<string, unknown>>('/api/admin/claim-rules/export');
+
+export const importFacilityClaimRules = async (payload: Record<string, unknown>): Promise<FacilityClaimRule[]> => {
+  const rules = await request<ApiFacilityClaimRule[]>('/api/admin/claim-rules/import', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
   return rules.map(mapFacilityClaimRule);
 };
 
@@ -2082,6 +2900,7 @@ export const updateOrcaAdapterSetting = async (payload: {
   claimEndpoint: string;
   healthEndpoint: string;
   mode: OrcaAdapterSetting['mode'];
+  responseMappings?: Array<Record<string, unknown>>;
   note?: string;
 }): Promise<OrcaAdapterSetting> => {
   const setting = await request<ApiOrcaAdapterSetting>('/api/admin/orca/settings', {
@@ -2096,6 +2915,7 @@ export const updateOrcaAdapterSetting = async (payload: {
       claim_endpoint: payload.claimEndpoint,
       health_endpoint: payload.healthEndpoint,
       mode: payload.mode,
+      response_mappings: payload.responseMappings ?? [],
       note: payload.note ?? null,
     }),
   });
@@ -2108,6 +2928,88 @@ export const testOrcaConnection = async (): Promise<OrcaConnectionTestResult> =>
   });
   return mapOrcaConnectionTest(result);
 };
+
+export const analyzeOrcaResponse = async (payload: {
+  statusCode: number;
+  payload: Record<string, unknown>;
+  responseMappings?: Array<Record<string, unknown>>;
+}): Promise<OrcaResponseAnalysis> => {
+  const result = await request<ApiOrcaResponseAnalysis>('/api/orca/response/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      status_code: payload.statusCode,
+      payload: payload.payload,
+      response_mappings: payload.responseMappings ?? null,
+    }),
+  });
+  return mapOrcaResponseAnalysis(result);
+};
+
+export const testOrcaResponseMappings = async (payload: {
+  statusCode: number;
+  payload: Record<string, unknown>;
+  responseMappings: Array<Record<string, unknown>>;
+}): Promise<OrcaResponseAnalysis> => {
+  const result = await request<ApiOrcaResponseAnalysis>('/api/orca/response-mappings/test', {
+    method: 'POST',
+    body: JSON.stringify({
+      status_code: payload.statusCode,
+      payload: payload.payload,
+      response_mappings: payload.responseMappings,
+    }),
+  });
+  return mapOrcaResponseAnalysis(result);
+};
+
+export const diffOrcaResponseMappings = async (payload: {
+  statusCode: number;
+  payload: Record<string, unknown>;
+  responseMappings: Array<Record<string, unknown>>;
+}): Promise<OrcaResponseMappingDiff> => {
+  const result = await request<ApiOrcaResponseMappingDiff>('/api/orca/response-mappings/diff', {
+    method: 'POST',
+    body: JSON.stringify({
+      status_code: payload.statusCode,
+      payload: payload.payload,
+      response_mappings: payload.responseMappings,
+    }),
+  });
+  return mapOrcaResponseMappingDiff(result);
+};
+
+export const listOrcaResponseSamples = async (): Promise<OrcaResponseSample[]> => {
+  const samples = await request<ApiOrcaResponseSample[]>('/api/orca/response-samples');
+  return samples.map(mapOrcaResponseSample);
+};
+
+export const createOrcaResponseSample = async (payload: {
+  name: string;
+  statusCode: number;
+  payload: Record<string, unknown>;
+  claimDraftId?: number;
+  responseMappings?: Array<Record<string, unknown>>;
+}): Promise<OrcaResponseSample> => {
+  const sample = await request<ApiOrcaResponseSample>('/api/orca/response-samples', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: payload.name,
+      status_code: payload.statusCode,
+      payload: payload.payload,
+      claim_draft_id: payload.claimDraftId ?? null,
+      response_mappings: payload.responseMappings ?? null,
+    }),
+  });
+  return mapOrcaResponseSample(sample);
+};
+
+export const createReturnEventFromOrcaSample = async (
+  sampleId: number,
+  claimDraftId: number,
+): Promise<Record<string, unknown>> =>
+  request<Record<string, unknown>>(`/api/orca/response-samples/${sampleId}/return-event`, {
+    method: 'POST',
+    body: JSON.stringify({ claim_draft_id: claimDraftId }),
+  });
 
 export const getChartWorkspace = async (patientId: string): Promise<ChartWorkspaceData> => {
   const workspace = await request<ApiChartWorkspace>(`/api/patients/${patientId}/chart`);

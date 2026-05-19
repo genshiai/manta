@@ -27,6 +27,20 @@ class FacilityClaimRule(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class ClaimSlaSetting(Base):
+    __tablename__ = "claim_sla_settings"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    due_soon_hours: Mapped[int] = mapped_column(Integer, default=48)
+    include_no_due: Mapped[bool] = mapped_column(Boolean, default=True)
+    escalation_assignee: Mapped[str] = mapped_column(String(128), default="管理者")
+    notify_destinations: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+    escalation_rules: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class ClaimDraft(Base):
     __tablename__ = "claim_drafts"
 
@@ -104,3 +118,53 @@ class ClaimTransmission(Base):
     sent_by: Mapped[str] = mapped_column(String(128))
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ClaimReturnEvent(Base):
+    __tablename__ = "claim_return_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    claim_draft_id: Mapped[int] = mapped_column(ForeignKey("claim_drafts.id", ondelete="CASCADE"), index=True)
+    transmission_id: Mapped[int | None] = mapped_column(
+        ForeignKey("claim_transmissions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(32), default="return", index=True)
+    severity: Mapped[str] = mapped_column(String(32), default="warning", index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text)
+    reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    payer: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    assignee: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(128))
+    updated_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class MonthlyClaimClose(Base):
+    __tablename__ = "monthly_claim_closes"
+
+    month: Mapped[str] = mapped_column(String(7), primary_key=True)
+    status: Mapped[str] = mapped_column(String(32), default="closed", index=True)
+    claim_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_points: Mapped[int] = mapped_column(Integer, default=0)
+    unsubmitted_count: Mapped[int] = mapped_column(Integer, default=0)
+    open_return_count: Mapped[int] = mapped_column(Integer, default=0)
+    unresolved_issue_count: Mapped[int] = mapped_column(Integer, default=0)
+    snapshot: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    requested_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    closed_by: Mapped[str] = mapped_column(String(128))
+    closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    approved_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    approval_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancelled_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

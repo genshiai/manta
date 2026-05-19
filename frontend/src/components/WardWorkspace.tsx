@@ -268,6 +268,7 @@ export const WardWorkspace = ({
   const [pathway, setPathway] = useState<InpatientPathway | null>(null);
   const [pathwayMasters, setPathwayMasters] = useState<InpatientPathwayMaster[]>([]);
   const [selectedPathwayMasterId, setSelectedPathwayMasterId] = useState('');
+  const [pathwayRoleFilter, setPathwayRoleFilter] = useState('all');
   const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
   const [dischargePlan, setDischargePlan] = useState<InpatientDischargePlan | null>(null);
   const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
@@ -665,6 +666,20 @@ export const WardWorkspace = ({
     } finally {
       setIsSavingDocument(false);
     }
+  };
+
+  const handlePrintDocument = (document: InpatientDocument) => {
+    const content = [
+      `<h1>${document.title}</h1>`,
+      `<p>患者: ${selectedAdmission?.patientName ?? ''} / 入院ID: ${selectedAdmission?.id ?? ''}</p>`,
+      `<p>状態: ${documentStatusLabels[document.status]} / 作成: ${document.createdBy} / 更新: ${document.updatedAt}</p>`,
+      `<pre>${document.body.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char] ?? char)}</pre>`,
+    ].join('\n');
+    downloadTextFile(
+      `inpatient-document-${document.id}.html`,
+      `<!doctype html><html lang="ja"><meta charset="utf-8"><title>${document.title}</title><body>${content}</body></html>`,
+      'text/html;charset=utf-8',
+    );
   };
 
   const handleCreateSummaryDocument = async () => {
@@ -1179,6 +1194,16 @@ export const WardWorkspace = ({
     },
     { pending: 0, done: 0, variance: 0, skipped: 0 } as Record<InpatientPathwayTask['status'], number>,
   );
+  const pathwayRoles = Array.from(new Set((pathway?.tasks ?? []).map((task) => task.role || '未設定'))).sort();
+  const filteredPathwayTasks = (pathway?.tasks ?? []).filter((task) => pathwayRoleFilter === 'all' || (task.role || '未設定') === pathwayRoleFilter);
+  const nursingNecessity = {
+    pendingInstructions: pendingInstructions.length,
+    recentNursingNotes: nursingNotes.filter((note) => note.recordedAt.slice(0, 10) === new Date().toLocaleDateString('sv-SE')).length,
+    unsignedDocuments: unsignedDocumentCount,
+    varianceTasks: pathway?.tasks.filter((task) => task.status === 'variance').length ?? 0,
+  };
+  const nursingNecessityScore = nursingNecessity.pendingInstructions * 2 + nursingNecessity.varianceTasks * 2 + nursingNecessity.unsignedDocuments + Math.max(0, 2 - nursingNecessity.recentNursingNotes);
+  const nursingNecessityLevel = nursingNecessityScore >= 6 ? '高' : nursingNecessityScore >= 3 ? '中' : '低';
   const bedsByWard = useMemo(() => {
     const grouped = new Map<string, InpatientBed[]>();
     beds.forEach((bed) => {
@@ -1560,6 +1585,63 @@ export const WardWorkspace = ({
                 </div>
               </div>
             </section>
+
+            <section className='rounded-8 border border-border bg-card'>
+              <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                <div className='flex items-center gap-2'>
+                  <ListChecks size={17} className='text-brand' />
+                  <div>
+                    <h2 className='text-[16px] font-bold text-text-primary'>クリティカルパス運用</h2>
+                    <p className='mt-1 text-[12px] text-text-tertiary'>職種別フィルタと改訂履歴の入口を追加しました。</p>
+                  </div>
+                </div>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <select
+                    className='h-8 rounded-md border border-border bg-white px-2 text-[12px] font-bold text-text-primary'
+                    onChange={(event) => setPathwayRoleFilter(event.target.value)}
+                    value={pathwayRoleFilter}
+                  >
+                    <option value='all'>全職種</option>
+                    {pathwayRoles.map((role) => <option key={role} value={role}>{role}</option>)}
+                  </select>
+                  <select
+                    className='h-8 rounded-md border border-border bg-white px-2 text-[12px] font-bold text-text-primary'
+                    onChange={(event) => setSelectedPathwayMasterId(event.target.value)}
+                    value={selectedPathwayMasterId}
+                  >
+                    {pathwayMasters.map((master) => <option key={master.id} value={master.id}>{master.name}</option>)}
+                  </select>
+                  <Button disabled={!selectedAdmission || isStartingPathway} onClick={handleStartPathway} size='xs' type='button' variant='outline'>開始/改訂</Button>
+                </div>
+              </div>
+              <div className='grid gap-3 border-b border-border p-4 sm:grid-cols-4'>
+                {(['pending', 'done', 'variance', 'skipped'] as InpatientPathwayTask['status'][]).map((status) => (
+                  <div className='rounded-md border border-border bg-surface-subtle p-3' key={status}>
+                    <p className='text-[11px] font-bold text-text-tertiary'>{pathwayStatusLabels[status]}</p>
+                    <p className='mt-2 text-[22px] font-bold text-text-primary'>{pathwayTaskCounts?.[status] ?? 0}</p>
+                  </div>
+                ))}
+              </div>
+              <div className='divide-y divide-border'>
+                {filteredPathwayTasks.slice(0, 8).map((task) => (
+                  <div className='grid gap-3 px-4 py-3 lg:grid-cols-[7rem_minmax(0,1fr)_8rem_12rem]' key={task.id}>
+                    <span className='text-[12px] font-bold text-text-tertiary'>Day {task.dayOffset}</span>
+                    <div>
+                      <p className='text-[13px] font-bold text-text-primary'>{task.title}</p>
+                      <p className='mt-1 text-[11px] text-text-tertiary'>{task.role ?? '職種未設定'} / {task.category}</p>
+                    </div>
+                    <span className={cn('h-fit rounded border px-2 py-1 text-[11px] font-bold', pathwayStatusClasses[task.status])}>{pathwayStatusLabels[task.status]}</span>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button disabled={task.status === 'done'} onClick={() => handlePathwayTaskStatus(task, 'done')} size='xs' type='button' variant='outline'>完了</Button>
+                      <Button disabled={task.status === 'variance'} onClick={() => handlePathwayTaskStatus(task, 'variance')} size='xs' type='button' variant='ghost'>逸脱</Button>
+                    </div>
+                  </div>
+                ))}
+                {filteredPathwayTasks.length === 0 ? (
+                  <div className='px-4 py-6 text-[13px] text-text-tertiary'>表示できるパスタスクはありません。</div>
+                ) : null}
+              </div>
+            </section>
           </TabsContent>
 
           <TabsContent className='grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,0.75fr)]' value='orders'>
@@ -1734,7 +1816,15 @@ export const WardWorkspace = ({
                             type='button'
                             variant='ghost'
                           >
-                            署名
+                            承認/署名
+                          </Button>
+                          <Button
+                            onClick={() => handlePrintDocument(document)}
+                            size='xs'
+                            type='button'
+                            variant='ghost'
+                          >
+                            印刷HTML
                           </Button>
                           <Button
                             disabled={document.status === 'archived' || isSavingDocument}
@@ -1800,6 +1890,36 @@ export const WardWorkspace = ({
 
           <TabsContent value='progress'>
             <section className='space-y-4'>
+              <div className='rounded-8 border border-border bg-card'>
+                <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
+                  <div className='flex items-center gap-2'>
+                    <BadgeCheck size={17} className='text-brand' />
+                    <h2 className='text-[16px] font-bold text-text-primary'>看護必要度サマリ</h2>
+                  </div>
+                  <span className={cn('rounded-md border px-2 py-1 text-[12px] font-bold', nursingNecessityLevel === '高' ? 'border-red-200 bg-red-50 text-red-1000' : nursingNecessityLevel === '中' ? 'border-yellow-200 bg-yellow-50 text-yellow-1100' : 'border-green-200 bg-green-50 text-green-900')}>
+                    {nursingNecessityLevel}
+                  </span>
+                </div>
+                <div className='grid gap-3 p-4 sm:grid-cols-4'>
+                  <div className='rounded-md border border-border bg-surface-subtle p-3'>
+                    <p className='text-[11px] font-bold text-text-tertiary'>未実施指示</p>
+                    <p className='mt-2 text-[22px] font-bold text-text-primary'>{nursingNecessity.pendingInstructions}</p>
+                  </div>
+                  <div className='rounded-md border border-border bg-surface-subtle p-3'>
+                    <p className='text-[11px] font-bold text-text-tertiary'>本日看護記録</p>
+                    <p className='mt-2 text-[22px] font-bold text-text-primary'>{nursingNecessity.recentNursingNotes}</p>
+                  </div>
+                  <div className='rounded-md border border-border bg-surface-subtle p-3'>
+                    <p className='text-[11px] font-bold text-text-tertiary'>未署名文書</p>
+                    <p className='mt-2 text-[22px] font-bold text-text-primary'>{nursingNecessity.unsignedDocuments}</p>
+                  </div>
+                  <div className='rounded-md border border-border bg-surface-subtle p-3'>
+                    <p className='text-[11px] font-bold text-text-tertiary'>パス逸脱</p>
+                    <p className='mt-2 text-[22px] font-bold text-text-primary'>{nursingNecessity.varianceTasks}</p>
+                  </div>
+                </div>
+              </div>
+
               <div className='rounded-8 border border-border bg-card'>
                 <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
                   <div className='flex items-center gap-2'>

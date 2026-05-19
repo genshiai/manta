@@ -2,7 +2,7 @@ import type { PatientRecord } from '../data/chartMock';
 import type { UserSession } from '../types/workflow';
 
 type StatusFooterProps = {
-  screen: 'reception' | 'chart' | 'settings' | 'ward';
+  screen: 'reception' | 'chart' | 'settings' | 'ward' | 'billing';
   currentPatient?: PatientRecord;
   chartMeta: {
     isDirty: boolean;
@@ -24,7 +24,15 @@ export const StatusFooter = ({ screen, currentPatient, chartMeta, currentUser }:
         <span>{currentUser.displayName}</span>
         <span className='text-solid-gray-400'>·</span>
         <span>
-          {screen === 'reception' ? 'ホーム' : screen === 'chart' ? 'AIカルテ' : screen === 'ward' ? '病棟' : '管理設定'}
+          {screen === 'reception'
+            ? 'ホーム'
+            : screen === 'chart'
+              ? 'AIカルテ'
+              : screen === 'ward'
+                ? '病棟'
+                : screen === 'billing'
+                  ? '医事・レセプト'
+                  : '管理設定'}
         </span>
         {screen === 'chart' ? (
           <>

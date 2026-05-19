@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -130,6 +130,53 @@ def update_facility_claim_rule(
     db.commit()
     db.refresh(rule)
     return FacilityClaimRuleRead.model_validate(rule)
+
+
+@router.get("/api/admin/claim-rules/export", response_model=dict[str, object])
+def export_facility_claim_rules(
+    _: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    rules = db.scalars(select(FacilityClaimRule).order_by(FacilityClaimRule.sort_order, FacilityClaimRule.id)).all()
+    return {
+        "format": "manta-facility-claim-rules-v1",
+        "exported_at": utcnow().isoformat(),
+        "rules": [FacilityClaimRuleRead.model_validate(rule).model_dump(mode="json") for rule in rules],
+    }
+
+
+@router.post("/api/admin/claim-rules/import", response_model=list[FacilityClaimRuleRead])
+def import_facility_claim_rules(
+    payload: dict[str, object] = Body(...),
+    current_user: User = Depends(require_role("管理者")),
+    db: Session = Depends(get_db),
+) -> list[FacilityClaimRuleRead]:
+    raw_rules = payload.get("rules")
+    if not isinstance(raw_rules, list):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="rules array is required")
+    imported: list[FacilityClaimRule] = []
+    for raw_rule in raw_rules:
+        if not isinstance(raw_rule, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="rule must be object")
+        request = FacilityClaimRuleCreateRequest.model_validate(raw_rule)
+        rule = db.get(FacilityClaimRule, request.id)
+        if rule is None:
+            rule = FacilityClaimRule(**request.model_dump())
+            db.add(rule)
+        else:
+            for key, value in request.model_dump().items():
+                setattr(rule, key, value)
+            rule.updated_at = utcnow()
+        imported.append(rule)
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="施設別算定ルールimport",
+        scope="system",
+        detail=f"算定ルール {len(imported)}件を import しました。",
+    )
+    db.commit()
+    return [FacilityClaimRuleRead.model_validate(rule) for rule in imported]
 
 
 @router.get("/api/admin/orca/settings", response_model=OrcaAdapterSettingRead)

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppHeader } from './components/AppHeader';
+import { BillingWorkspace } from './components/BillingWorkspace';
 import { ChartWorkspace } from './components/ChartWorkspace';
 import { LoginScreen } from './components/LoginScreen';
 import { ReceptionBoard } from './components/ReceptionBoard';
@@ -13,8 +14,8 @@ import { type HomeSettings, readHomeSettings, writeHomeSettings } from './lib/ho
 import { removeStorage, readStorage, writeStorage } from './lib/storage';
 import type { ChartMeta, InpatientAdmission, UserSession } from './types/workflow';
 
-type Screen = 'login' | 'reception' | 'chart' | 'settings' | 'ward';
-type ChartReturnScreen = 'reception' | 'ward';
+type Screen = 'login' | 'reception' | 'chart' | 'settings' | 'ward' | 'billing';
+type ChartReturnScreen = 'reception' | 'ward' | 'billing';
 type StatusFilter = ReceptionStatus | 'all';
 type DepartmentFilter = string | 'all';
 type SortKey = 'receptionNumber' | 'reservationTime' | 'elapsed';
@@ -413,7 +414,7 @@ function App() {
         onNavigate={setScreen}
         onSearchChange={handleSearchChange}
         onSwitchUser={handleSwitchUser}
-        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : 'reception'}
+        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : 'reception'}
         searchQuery={searchQuery}
       />
 
@@ -431,6 +432,15 @@ function App() {
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
             onOpenChart={(patientId) => handleOpenChart(patientId, 'ward')}
             onRefreshAdmissions={setInpatientAdmissions}
+          />
+        ) : screen === 'billing' ? (
+          <BillingWorkspace
+            currentUser={session}
+            onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+            onOpenChart={(patientId) => handleOpenChart(patientId, 'billing')}
+            onSearchChange={handleSearchChange}
+            patients={patients}
+            searchQuery={searchQuery}
           />
         ) : screen === 'reception' ? (
           <ReceptionBoard
@@ -478,7 +488,7 @@ function App() {
         chartMeta={chartMeta}
         currentPatient={currentPatient ?? undefined}
         currentUser={session}
-        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : 'reception'}
+        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : 'reception'}
       />
     </div>
   );

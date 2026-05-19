@@ -28,7 +28,7 @@ export type AdminUserSummary = {
   passwordExpiresAt: string;
 };
 
-export type AuditScope = 'auth' | 'patient' | 'chart' | 'order' | 'reservation' | 'system';
+export type AuditScope = 'auth' | 'patient' | 'chart' | 'order' | 'reservation' | 'system' | 'billing';
 export type AdmissionStatus = 'planned' | 'active' | 'discharge_permitted' | 'discharged' | 'cancelled';
 export type BedStatus = 'available' | 'occupied' | 'cleaning' | 'blocked';
 
@@ -414,6 +414,18 @@ export type ClaimTransmission = {
   createdAt: string;
 };
 
+export type ClaimTransmissionSummary = ClaimTransmission & {
+  patientId: string;
+  patientName: string;
+  patientKana: string;
+  department: string;
+  admissionId?: number;
+  claimStatus: ClaimDraft['status'];
+  totalPoints: number;
+  transmissionCount: number;
+  isReclaim: boolean;
+};
+
 export type ClaimDraft = {
   id: number;
   patientId: string;
@@ -429,6 +441,225 @@ export type ClaimDraft = {
   adjustments: ClaimLineAdjustment[];
   issues: ClaimReviewIssue[];
   transmissions: ClaimTransmission[];
+};
+
+export type ClaimDraftSummary = {
+  id: number;
+  patientId: string;
+  patientName: string;
+  patientKana: string;
+  department: string;
+  doctor: string;
+  admissionId?: number;
+  admissionStatus?: string;
+  wardId?: string;
+  bedId?: string;
+  primaryDiagnosis?: string;
+  status: ClaimDraft['status'];
+  sourceType: string;
+  totalPoints: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lineCount: number;
+  openIssueCount: number;
+  openErrorCount: number;
+  openWarningCount: number;
+  unresolvedLineCount: number;
+  suggestedAdjustmentCount: number;
+  latestTransmissionStatus?: ClaimTransmission['status'];
+  latestTransmissionAt?: string;
+  openReturnEventCount: number;
+};
+
+export type ClaimReturnEvent = {
+  id: number;
+  claimDraftId: number;
+  transmissionId?: number;
+  eventType: 'return' | 'assessment' | 'notice';
+  severity: 'info' | 'warning' | 'error';
+  status: 'open' | 'in_progress' | 'resolved' | 'ignored';
+  title: string;
+  message: string;
+  reasonCode?: string;
+  payer?: string;
+  receivedAt: string;
+  dueAt?: string;
+  assignee?: string;
+  resolutionNote?: string;
+  rawPayload: Record<string, unknown>;
+  createdBy: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ClaimReturnEventSummary = ClaimReturnEvent & {
+  patientId: string;
+  patientName: string;
+  patientKana: string;
+  department: string;
+  admissionId?: number;
+  claimStatus: ClaimDraft['status'];
+  totalPoints: number;
+};
+
+export type MonthlyCloseBucket = {
+  key: string;
+  label: string;
+  count: number;
+  totalPoints: number;
+};
+
+export type MonthlyClaimClose = {
+  month: string;
+  status: 'pending_approval' | 'closed' | 'cancelled';
+  claimCount: number;
+  totalPoints: number;
+  unsubmittedCount: number;
+  openReturnCount: number;
+  unresolvedIssueCount: number;
+  snapshot: Record<string, unknown>;
+  requestedBy?: string;
+  requestedAt?: string;
+  closedBy: string;
+  closedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  approvalNote?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
+  updatedAt: string;
+};
+
+export type ClaimReturnReasonBucket = {
+  key: string;
+  label: string;
+  eventType?: ClaimReturnEvent['eventType'];
+  severity?: 'info' | 'warning' | 'error';
+  count: number;
+  openCount: number;
+  resolvedCount: number;
+  latestReceivedAt?: string;
+};
+
+export type ClaimReturnAnalytics = {
+  month: string;
+  totalCount: number;
+  openCount: number;
+  inProgressCount: number;
+  resolvedCount: number;
+  ignoredCount: number;
+  reasonBuckets: ClaimReturnReasonBucket[];
+  eventTypeBuckets: MonthlyCloseBucket[];
+  statusBuckets: MonthlyCloseBucket[];
+};
+
+export type ClaimReturnReasonDelta = {
+  key: string;
+  label: string;
+  currentCount: number;
+  previousCount: number;
+  delta: number;
+  currentOpenCount: number;
+  previousOpenCount: number;
+  openDelta: number;
+};
+
+export type ClaimReturnAnalyticsComparison = {
+  current: ClaimReturnAnalytics;
+  previous: ClaimReturnAnalytics;
+  totalDelta: number;
+  openDelta: number;
+  reasonDeltas: ClaimReturnReasonDelta[];
+};
+
+export type ClaimReturnTrendPoint = {
+  month: string;
+  totalCount: number;
+  openCount: number;
+  resolvedCount: number;
+  assessmentCount: number;
+  returnCount: number;
+  topReasonCode?: string;
+  topReasonCount: number;
+};
+
+export type ClaimReturnAssigneeSla = {
+  assignee: string;
+  openCount: number;
+  overdueCount: number;
+  dueSoonCount: number;
+  noDueCount: number;
+  oldestReceivedAt?: string;
+  latestDueAt?: string;
+};
+
+export type ClaimReturnSlaSummary = {
+  generatedAt: string;
+  openCount: number;
+  overdueCount: number;
+  dueSoonCount: number;
+  noDueCount: number;
+  assigneeBuckets: ClaimReturnAssigneeSla[];
+};
+
+export type ClaimReturnSlaAlert = {
+  eventId: number;
+  claimDraftId: number;
+  patientId: string;
+  patientName: string;
+  assignee: string;
+  status: ClaimReturnEvent['status'];
+  title: string;
+  reasonCode?: string;
+  severity: 'overdue' | 'due_soon' | 'no_due';
+  receivedAt: string;
+  dueAt?: string;
+  hoursUntilDue?: number;
+};
+
+export type ClaimReturnSlaEscalation = {
+  escalatedCount: number;
+  eventIds: number[];
+  assignee: string;
+  note?: string;
+};
+
+export type ClaimSlaSetting = {
+  id: string;
+  dueSoonHours: number;
+  includeNoDue: boolean;
+  escalationAssignee: string;
+  notifyDestinations: Array<Record<string, unknown>>;
+  escalationRules: Array<Record<string, unknown>>;
+  note?: string;
+  updatedBy?: string;
+  updatedAt: string;
+};
+
+export type ClaimSlaNotificationDryRun = {
+  generatedAt: string;
+  destinationCount: number;
+  alertCount: number;
+  destinations: Array<Record<string, unknown>>;
+  alerts: ClaimReturnSlaAlert[];
+};
+
+export type MonthlyCloseSummary = {
+  month: string;
+  claimCount: number;
+  totalPoints: number;
+  unsubmittedCount: number;
+  submittedCount: number;
+  openReturnCount: number;
+  assessmentCount: number;
+  reclaimWaitingCount: number;
+  unresolvedIssueCount: number;
+  assigneeBuckets: MonthlyCloseBucket[];
+  statusBuckets: MonthlyCloseBucket[];
+  close?: MonthlyClaimClose;
 };
 
 export type FacilityClaimRule = {
@@ -457,6 +688,7 @@ export type OrcaAdapterSetting = {
   claimEndpoint: string;
   healthEndpoint: string;
   mode: 'mock' | 'http';
+  responseMappings: Array<Record<string, unknown>>;
   note?: string;
   updatedBy?: string;
   updatedAt: string;
@@ -468,6 +700,33 @@ export type OrcaConnectionTestResult = {
   url?: string;
   message: string;
   responsePayload: Record<string, unknown>;
+};
+
+export type OrcaResponseAnalysis = {
+  statusCode: number;
+  normalized: Record<string, unknown>;
+  reasonCount: number;
+  mappingCount: number;
+};
+
+export type OrcaResponseMappingDiff = {
+  baseline: OrcaResponseAnalysis;
+  candidate: OrcaResponseAnalysis;
+  addedReasons: Array<Record<string, unknown>>;
+  removedReasons: Array<Record<string, unknown>>;
+  changedReasons: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+};
+
+export type OrcaResponseSample = {
+  id: number;
+  claimDraftId?: number;
+  name: string;
+  statusCode: number;
+  payload: Record<string, unknown>;
+  normalized: Record<string, unknown>;
+  createdBy: string;
+  createdAt: string;
 };
 
 export type ChartVersion = {

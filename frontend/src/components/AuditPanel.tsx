@@ -13,6 +13,7 @@ const scopeColorMap = {
   order: 'orange',
   reservation: 'cyan',
   system: 'gray',
+  billing: 'yellow',
 } as const;
 
 export const AuditPanel = ({ logs, title = '操作ログ' }: AuditPanelProps) => (

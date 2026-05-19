@@ -11,23 +11,30 @@ import {
   buttonBaseStyle,
 } from '../vendor/dads';
 import {
+  analyzeOrcaResponse,
   createChartTemplateMaster,
   createFacilityClaimRule,
+  createOrcaResponseSample,
   createLabSetMaster,
   createPrescriptionCatalogItem,
   createPrescriptionSetMaster,
   createReservationSlotMaster,
   createStandardUsageMaster,
   createUser,
+  diffOrcaResponseMappings,
+  exportFacilityClaimRules,
   getChartOrderConfig,
   getOrcaAdapterSetting,
+  importFacilityClaimRules,
   isForbiddenError,
   isUnauthorizedError,
   listAuditLogs,
   listFacilityClaimRules,
+  listOrcaResponseSamples,
   listUsers,
   resetUserPassword,
   testOrcaConnection,
+  testOrcaResponseMappings,
   updateChartTemplateMaster,
   updateFacilityClaimRule,
   updateLabSetMaster,
@@ -58,6 +65,9 @@ import type {
   LabSetOption,
   OrcaAdapterSetting,
   OrcaConnectionTestResult,
+  OrcaResponseAnalysis,
+  OrcaResponseMappingDiff,
+  OrcaResponseSample,
   PrescriptionCatalogItem,
   PrescriptionSetMaster,
   ReservationSlot,
@@ -293,8 +303,18 @@ type OrcaSettingFormState = {
   claimEndpoint: string;
   healthEndpoint: string;
   mode: OrcaAdapterSetting['mode'];
+  responseMappingsText: string;
   note: string;
 };
+
+const defaultOrcaDiagnosticPayload = JSON.stringify(
+  {
+    status: 'rejected',
+    messages: ['病名要件の確認が必要です。', '摘要コメントを確認してください。'],
+  },
+  null,
+  2,
+);
 
 const surfaceClassName = 'rounded-8 border border-solid-gray-200 bg-white';
 
@@ -331,6 +351,24 @@ const parseJsonObject = (value: string) => {
     throw new Error('JSON object expected');
   }
   return parsed as Record<string, unknown>;
+};
+
+const parseJsonArray = (value: string) => {
+  const parsed: unknown = JSON.parse(value || '[]');
+  if (!Array.isArray(parsed)) {
+    throw new Error('JSON array expected');
+  }
+  return parsed as Array<Record<string, unknown>>;
+};
+
+const downloadJson = (filename: string, value: unknown) => {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 };
 
 const createInitialCreateForm = (): CreateFormState => ({
@@ -575,6 +613,7 @@ const createOrcaSettingForm = (item?: OrcaAdapterSetting | null): OrcaSettingFor
   claimEndpoint: item?.claimEndpoint ?? '/api01rv2/claim',
   healthEndpoint: item?.healthEndpoint ?? '/api01rv2/systeminfv2',
   mode: item?.mode ?? 'mock',
+  responseMappingsText: JSON.stringify(item?.responseMappings ?? [], null, 2),
   note: item?.note ?? '',
 });
 
@@ -673,6 +712,9 @@ export const SettingsWorkspace = ({
   const [selectedClaimRuleId, setSelectedClaimRuleId] = useState('');
   const [orcaSetting, setOrcaSetting] = useState<OrcaAdapterSetting | null>(null);
   const [orcaConnectionTest, setOrcaConnectionTest] = useState<OrcaConnectionTestResult | null>(null);
+  const [orcaResponseSamples, setOrcaResponseSamples] = useState<OrcaResponseSample[]>([]);
+  const [orcaResponseAnalysis, setOrcaResponseAnalysis] = useState<OrcaResponseAnalysis | null>(null);
+  const [orcaResponseMappingDiff, setOrcaResponseMappingDiff] = useState<OrcaResponseMappingDiff | null>(null);
   const [prescriptionCreateForm, setPrescriptionCreateForm] = useState<PrescriptionCreateFormState>(
     createPrescriptionCreateForm([]),
   );
@@ -699,7 +741,11 @@ export const SettingsWorkspace = ({
     createClaimRuleCreateForm([]),
   );
   const [claimRuleEditForm, setClaimRuleEditForm] = useState<ClaimRuleEditFormState | null>(null);
+  const [claimRuleImportText, setClaimRuleImportText] = useState('');
   const [orcaSettingForm, setOrcaSettingForm] = useState<OrcaSettingFormState>(createOrcaSettingForm(null));
+  const [orcaDiagnosticPayloadText, setOrcaDiagnosticPayloadText] = useState(defaultOrcaDiagnosticPayload);
+  const [orcaDiagnosticStatusCode, setOrcaDiagnosticStatusCode] = useState('200');
+  const [orcaDiagnosticSampleName, setOrcaDiagnosticSampleName] = useState('ORCA response sample');
   const [flash, setFlash] = useState<FlashState>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [masterError, setMasterError] = useState<string | null>(null);
@@ -755,13 +801,15 @@ export const SettingsWorkspace = ({
 
     try {
       const nextConfig = await getChartOrderConfig({ includeInactive: true });
-      const [nextClaimRules, nextOrcaSetting] = await Promise.all([
+      const [nextClaimRules, nextOrcaSetting, nextOrcaResponseSamples] = await Promise.all([
         listFacilityClaimRules(),
         getOrcaAdapterSetting(),
+        listOrcaResponseSamples(),
       ]);
       setOrderConfig(nextConfig);
       setClaimRules(nextClaimRules);
       setOrcaSetting(nextOrcaSetting);
+      setOrcaResponseSamples(nextOrcaResponseSamples);
       setPrescriptionCreateForm(createPrescriptionCreateForm(nextConfig.prescriptionCatalog));
       setStandardUsageCreateForm(createStandardUsageCreateForm(nextConfig.standardUsageMasters));
       setPrescriptionSetCreateForm(createPrescriptionSetCreateForm(nextConfig.prescriptionSets));
@@ -1817,9 +1865,89 @@ export const SettingsWorkspace = ({
     }
   };
 
+  const handleExportClaimRules = async () => {
+    setIsMutating(true);
+    try {
+      const payload = await exportFacilityClaimRules();
+      downloadJson(`manta-claim-rules-${new Date().toISOString().slice(0, 10)}.json`, payload);
+      setFlash({ tone: 'success', text: '算定ルールを export しました。' });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({ tone: 'error', text: `算定ルール export に失敗しました: ${error instanceof Error ? formatAdminError(error.message) : '不明なエラー'}` });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleImportClaimRules = async () => {
+    setIsMutating(true);
+    try {
+      const payload = JSON.parse(claimRuleImportText || '{"rules":[]}') as Record<string, unknown>;
+      const imported = await importFacilityClaimRules(payload);
+      await loadMasters();
+      await loadSystemAuditLogs();
+      setClaimRuleImportText('');
+      setFlash({ tone: 'success', text: `算定ルール ${imported.length}件を import しました。` });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({ tone: 'error', text: `算定ルール import に失敗しました: ${error instanceof Error ? formatAdminError(error.message) : '不明なエラー'}` });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const applyClaimRulePreset = (preset: 'sameMonth' | 'exclusive' | 'diagnosis' | 'comment' | 'frequency') => {
+    const presets = {
+      sameMonth: {
+        ruleType: 'same_month_limit',
+        message: '同月内の算定回数確認が必要です。',
+        conditions: { line_types: ['検査'], same_month_count_lte: 1 },
+        actions: { issue_type: 'same_month_frequency_check' },
+      },
+      exclusive: {
+        ruleType: 'exclusive_combination',
+        message: '併算定不可の可能性があります。',
+        conditions: { line_types: ['処置', '検査'], mutually_exclusive_with: [] },
+        actions: { issue_type: 'exclusive_combination_check' },
+      },
+      diagnosis: {
+        ruleType: 'requires_problem',
+        message: '算定に必要な病名の確認が必要です。',
+        conditions: { requires_problem: '病名を入力' },
+        actions: { issue_type: 'diagnosis_requirement_check' },
+      },
+      comment: {
+        ruleType: 'requires_comment',
+        message: '摘要コメントの追加候補があります。',
+        conditions: { receipt_code_required: true },
+        actions: { type: 'comment_suggestion', comment: '摘要コメントを入力' },
+      },
+      frequency: {
+        ruleType: 'frequency_limit',
+        message: '回数制限の確認が必要です。',
+        conditions: { line_types: ['検査'], same_month_count_lte: 2 },
+        actions: { issue_type: 'frequency_limit_check' },
+      },
+    }[preset];
+    setClaimRuleCreateForm((current) => ({
+      ...current,
+      ruleType: presets.ruleType,
+      message: presets.message,
+      conditionsText: JSON.stringify(presets.conditions, null, 2),
+      actionsText: JSON.stringify(presets.actions, null, 2),
+    }));
+  };
+
   const handleUpdateOrcaSetting = async () => {
     setIsMutating(true);
     try {
+      const responseMappings = parseJsonArray(orcaSettingForm.responseMappingsText);
       const updated = await updateOrcaAdapterSetting({
         isActive: orcaSettingForm.isActive,
         baseUrl: orcaSettingForm.baseUrl.trim() || undefined,
@@ -1830,6 +1958,7 @@ export const SettingsWorkspace = ({
         claimEndpoint: orcaSettingForm.claimEndpoint.trim() || '/api01rv2/claim',
         healthEndpoint: orcaSettingForm.healthEndpoint.trim() || '/api01rv2/systeminfv2',
         mode: orcaSettingForm.mode,
+        responseMappings,
         note: orcaSettingForm.note.trim() || undefined,
       });
       setOrcaSetting(updated);
@@ -1866,6 +1995,102 @@ export const SettingsWorkspace = ({
       setFlash({
         tone: 'error',
         text: `ORCA接続テストに失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleAnalyzeOrcaResponse = async (useEditorMappings: boolean) => {
+    setIsMutating(true);
+    try {
+      const payload = parseJsonObject(orcaDiagnosticPayloadText);
+      const statusCode = Number(orcaDiagnosticStatusCode);
+      const responseMappings = useEditorMappings ? parseJsonArray(orcaSettingForm.responseMappingsText) : undefined;
+      const result = useEditorMappings
+        ? await testOrcaResponseMappings({ statusCode, payload, responseMappings: responseMappings ?? [] })
+        : await analyzeOrcaResponse({ statusCode, payload });
+      setOrcaResponseAnalysis(result);
+      setOrcaResponseMappingDiff(null);
+      setFlash({ tone: 'success', text: useEditorMappings ? '編集中マッピングでORCAレスポンスを解析しました。' : '保存済みマッピングでORCAレスポンスを解析しました。' });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `ORCAレスポンス解析に失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleDiffOrcaResponseMappings = async () => {
+    setIsMutating(true);
+    try {
+      const payload = parseJsonObject(orcaDiagnosticPayloadText);
+      const statusCode = Number(orcaDiagnosticStatusCode);
+      const responseMappings = parseJsonArray(orcaSettingForm.responseMappingsText);
+      const diff = await diffOrcaResponseMappings({ statusCode, payload, responseMappings });
+      setOrcaResponseMappingDiff(diff);
+      setOrcaResponseAnalysis(diff.candidate);
+      setFlash({ tone: 'success', text: '保存済みmappingとの差分を作成しました。' });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `ORCA mapping diff に失敗しました: ${
+          error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
+        }`,
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleSaveMappingFromDiagnostic = async () => {
+    await handleUpdateOrcaSetting();
+    setOrcaResponseMappingDiff(null);
+  };
+
+  const handleSaveOrcaResponseSample = async () => {
+    setIsMutating(true);
+    try {
+      const payload = parseJsonObject(orcaDiagnosticPayloadText);
+      const responseMappings = parseJsonArray(orcaSettingForm.responseMappingsText);
+      const sample = await createOrcaResponseSample({
+        name: orcaDiagnosticSampleName.trim() || 'ORCA response sample',
+        statusCode: Number(orcaDiagnosticStatusCode),
+        payload,
+        responseMappings,
+      });
+      setOrcaResponseSamples((current) => [sample, ...current].slice(0, 40));
+      setOrcaResponseAnalysis({
+        statusCode: sample.statusCode,
+        normalized: sample.normalized,
+        reasonCount: Array.isArray(sample.normalized.reasons) ? sample.normalized.reasons.length : 0,
+        mappingCount: Array.isArray(sample.normalized.reasons)
+          ? sample.normalized.reasons.filter((reason) => typeof reason === 'object' && reason !== null && 'category' in reason).length
+          : 0,
+      });
+      setFlash({ tone: 'success', text: 'ORCAレスポンスサンプルを保存しました。' });
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setFlash({
+        tone: 'error',
+        text: `ORCAレスポンスサンプルの保存に失敗しました: ${
           error instanceof Error ? formatAdminError(error.message) : '不明なエラー'
         }`,
       });
@@ -4336,6 +4561,38 @@ export const SettingsWorkspace = ({
                 <>
                   <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
                     <SectionHeader
+                      chip='DSL'
+                      title='算定ルール import / export とプリセット'
+                      tone='blue'
+                      description='同月算定、併算定不可、病名要件、摘要要件、回数制限のひな形を使って rule DSL を育てます。'
+                    />
+                    <div className='mt-4 flex flex-wrap gap-2'>
+                      <Button aria-disabled={isMutating} onClick={handleExportClaimRules} size='sm' type='button' variant='outline'>JSON export</Button>
+                      <Button onClick={() => applyClaimRulePreset('sameMonth')} size='sm' type='button' variant='outline'>同月算定</Button>
+                      <Button onClick={() => applyClaimRulePreset('exclusive')} size='sm' type='button' variant='outline'>併算定不可</Button>
+                      <Button onClick={() => applyClaimRulePreset('diagnosis')} size='sm' type='button' variant='outline'>病名要件</Button>
+                      <Button onClick={() => applyClaimRulePreset('comment')} size='sm' type='button' variant='outline'>摘要要件</Button>
+                      <Button onClick={() => applyClaimRulePreset('frequency')} size='sm' type='button' variant='outline'>回数制限</Button>
+                    </div>
+                    <div className='mt-4'>
+                      <Field label='import JSON'>
+                        <Textarea
+                          className='w-full font-mono'
+                          onChange={(event) => setClaimRuleImportText(event.target.value)}
+                          rows={5}
+                          value={claimRuleImportText}
+                        />
+                      </Field>
+                      <div className='mt-3 flex justify-end'>
+                        <Button aria-disabled={isMutating || !claimRuleImportText.trim()} onClick={handleImportClaimRules} size='sm' type='button' variant='outline'>
+                          JSON import
+                        </Button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
+                    <SectionHeader
                       chip='算定ルール'
                       title='新規算定ルールを追加'
                       tone='blue'
@@ -4491,6 +4748,16 @@ export const SettingsWorkspace = ({
                       </Field>
                     </div>
                     <div className='mt-4'>
+                      <Field label='施設別ORCA応答マッピング JSON'>
+                        <Textarea
+                          className='w-full font-mono text-[12px]'
+                          onChange={(event) => setOrcaSettingForm((current) => ({ ...current, responseMappingsText: event.target.value }))}
+                          rows={6}
+                          value={orcaSettingForm.responseMappingsText}
+                        />
+                      </Field>
+                    </div>
+                    <div className='mt-4'>
                       <Field label='運用メモ'>
                         <Textarea className='w-full' onChange={(event) => setOrcaSettingForm((current) => ({ ...current, note: event.target.value }))} rows={3} value={orcaSettingForm.note} />
                       </Field>
@@ -4509,6 +4776,116 @@ export const SettingsWorkspace = ({
                         {orcaConnectionTest.url ? <p className='mt-2 text-mono-14N-150'>{orcaConnectionTest.url}</p> : null}
                       </div>
                     ) : null}
+                    <div className='mt-6 border-t border-solid-gray-200 pt-5'>
+                      <SectionHeader chip={`${orcaResponseSamples.length} samples`} title='ORCA response 診断' tone='yellow' description='実ORCAなしでレスポンスJSONを貼り付け、施設別マッピングのdry-runとサンプル保存を行います。' />
+                      <div className='mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
+                        <div className='space-y-3'>
+                          <div className='grid gap-3 sm:grid-cols-[8rem_1fr]'>
+                            <Field label='status_code'>
+                              <Input blockSize='md' onChange={(event) => setOrcaDiagnosticStatusCode(event.target.value)} type='number' value={orcaDiagnosticStatusCode} />
+                            </Field>
+                            <Field label='sample name'>
+                              <Input blockSize='md' onChange={(event) => setOrcaDiagnosticSampleName(event.target.value)} value={orcaDiagnosticSampleName} />
+                            </Field>
+                          </div>
+                          <Field label='レスポンスJSON'>
+                            <Textarea
+                              className='w-full font-mono text-[12px]'
+                              onChange={(event) => setOrcaDiagnosticPayloadText(event.target.value)}
+                              rows={10}
+                              value={orcaDiagnosticPayloadText}
+                            />
+                          </Field>
+                          <div className='flex flex-wrap gap-2'>
+                            <Button aria-disabled={isMutating} onClick={() => handleAnalyzeOrcaResponse(false)} size='sm' type='button' variant='outline'>
+                              保存済みmappingで解析
+                            </Button>
+                            <Button aria-disabled={isMutating} onClick={() => handleAnalyzeOrcaResponse(true)} size='sm' type='button' variant='outline'>
+                              編集中mapping dry-run
+                            </Button>
+                            <Button aria-disabled={isMutating} onClick={handleDiffOrcaResponseMappings} size='sm' type='button' variant='outline'>
+                              mapping diff
+                            </Button>
+                            <Button aria-disabled={isMutating || !orcaResponseMappingDiff} onClick={handleSaveMappingFromDiagnostic} size='sm' type='button' variant='outline'>
+                              diff後に保存
+                            </Button>
+                            <Button aria-disabled={isMutating} onClick={handleSaveOrcaResponseSample} size='sm' type='button' variant='solid-fill'>
+                              サンプル保存
+                            </Button>
+                          </div>
+                        </div>
+                        <div className='space-y-3'>
+                          <div className='rounded-8 border border-solid-gray-200 bg-surface-subtle p-3'>
+                            <div className='flex items-center justify-between gap-2'>
+                              <p className='text-[13px] font-bold text-solid-gray-900'>normalized result</p>
+                              <span className='text-[11px] font-bold text-text-tertiary'>
+                                reasons {orcaResponseAnalysis?.reasonCount ?? 0} / mapped {orcaResponseAnalysis?.mappingCount ?? 0}
+                              </span>
+                            </div>
+                            <pre className='mt-2 max-h-72 overflow-auto rounded border border-solid-gray-200 bg-white p-3 text-[11px] leading-normal text-text-secondary'>
+                              {orcaResponseAnalysis ? JSON.stringify(orcaResponseAnalysis.normalized, null, 2) : '解析結果はここに表示されます。'}
+                            </pre>
+                          </div>
+                          {orcaResponseMappingDiff ? (
+                            <div className='rounded-8 border border-blue-100 bg-blue-50 p-3'>
+                              <div className='flex items-center justify-between gap-2'>
+                                <p className='text-[13px] font-bold text-blue-950'>mapping diff</p>
+                                <span className='text-[11px] font-bold text-blue-900'>
+                                  +{orcaResponseMappingDiff.addedReasons.length} / -{orcaResponseMappingDiff.removedReasons.length} / changed {orcaResponseMappingDiff.changedReasons.length}
+                                </span>
+                              </div>
+                              <pre className='mt-2 max-h-56 overflow-auto rounded border border-blue-100 bg-white p-3 text-[11px] leading-normal text-blue-950'>
+                                {JSON.stringify(
+                                  {
+                                    summary: orcaResponseMappingDiff.summary,
+                                    added: orcaResponseMappingDiff.addedReasons,
+                                    removed: orcaResponseMappingDiff.removedReasons,
+                                    changed: orcaResponseMappingDiff.changedReasons,
+                                  },
+                                  null,
+                                  2,
+                                )}
+                              </pre>
+                            </div>
+                          ) : null}
+                          <div className='rounded-8 border border-solid-gray-200 bg-white p-3'>
+                            <p className='text-[13px] font-bold text-solid-gray-900'>保存サンプル</p>
+                            <div className='mt-2 space-y-2'>
+                              {orcaResponseSamples.slice(0, 5).map((sample) => (
+                                <button
+                                  className='block w-full rounded border border-solid-gray-200 bg-surface-subtle px-3 py-2 text-left hover:bg-blue-50'
+                                  key={sample.id}
+                                  onClick={() => {
+                                    setOrcaDiagnosticSampleName(sample.name);
+                                    setOrcaDiagnosticStatusCode(String(sample.statusCode));
+                                    setOrcaDiagnosticPayloadText(JSON.stringify(sample.payload, null, 2));
+                                    setOrcaResponseAnalysis({
+                                      statusCode: sample.statusCode,
+                                      normalized: sample.normalized,
+                                      reasonCount: Array.isArray(sample.normalized.reasons) ? sample.normalized.reasons.length : 0,
+                                      mappingCount: Array.isArray(sample.normalized.reasons)
+                                        ? sample.normalized.reasons.filter((reason) => typeof reason === 'object' && reason !== null && 'category' in reason).length
+                                        : 0,
+                                    });
+                                  }}
+                                  type='button'
+                                >
+                                  <span className='block text-[12px] font-bold text-text-primary'>{sample.name}</span>
+                                  <span className='mt-1 block text-[11px] text-text-tertiary'>
+                                    status {sample.statusCode} / {sample.createdAt} / {sample.createdBy}
+                                  </span>
+                                </button>
+                              ))}
+                              {orcaResponseSamples.length === 0 ? (
+                                <p className='rounded border border-solid-gray-200 bg-surface-subtle px-3 py-2 text-[12px] text-text-tertiary'>
+                                  保存済みサンプルはありません。
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 </>
               ) : null}

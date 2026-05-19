@@ -39,6 +39,8 @@ NNNN-kebab-case-title.md
 | [0001](0001-design-system-digital-cho-and-pivot.md) | デジタル庁デザインシステム参照と離脱の経緯 | Superseded by 0002 | design-system, frontend |
 | [0002](0002-styleseed-adoption.md) | styleseed 採用・Notion skin 単独構成・Tailwind v4 同時移行 | Accepted | design-system, frontend, tailwind |
 | [0003](0003-color-system-apple-hig.md) | Apple HIG (apple.com/jp) 準拠のカラーシステム採用 | Accepted | design-system, frontend, color-tokens, typography |
+| [0004](0004-receipt-gateway-and-ai-claims-assist.md) | Mantaレセコンと AI 算定補助層を採用 | Accepted | rececon, receipt, billing, claims, orca, ai, architecture |
+| [0005](0005-oss-process-economy-and-license.md) | Manta を プロセスエコノミー として OSS 公開、ライセンスは FSL-1.1-Apache-2.0 | Proposed | license, oss, community, marketing, governance |
 
 ## ファイル一覧外（本ディレクトリのメタ）
 

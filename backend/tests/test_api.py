@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from copy import deepcopy
 from uuid import uuid4
 
@@ -16,6 +16,7 @@ from app.modules.inpatient.models import (
     InpatientInstruction,
     InpatientPathwayAssignment,
 )
+from app.modules.gateway.orca.models import OrcaResponseSample
 from app.modules.karte.models import ImagingOrder, LabOrder, Patient, PrescriptionOrder, ProcedureOrder, Reservation
 from app.modules.master_data.models import (
     ChartTemplateMaster,
@@ -33,7 +34,16 @@ from app.modules.master_data.models import (
     ReservationSlotMaster,
     StandardUsageMaster,
 )
-from app.modules.rececon.models import ClaimDraft, ClaimDraftLine, ClaimLineAdjustment, ClaimReviewIssue, FacilityClaimRule
+from app.modules.rececon.models import (
+    ClaimDraft,
+    ClaimDraftLine,
+    ClaimLineAdjustment,
+    ClaimReturnEvent,
+    ClaimReviewIssue,
+    ClaimSlaSetting,
+    FacilityClaimRule,
+    MonthlyClaimClose,
+)
 from app.seed import PATIENT_WORKSPACE_BY_ID, sync_patient_order_tables
 
 
@@ -565,10 +575,13 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     draft_id: int | None = None
     adjustment_id: int | None = None
     pending_lab_order_id: int | None = None
+    sample_id: int | None = None
     comment_code = "820999994"
     base_total = 0
+    close_month = datetime.now(timezone.utc).strftime("%Y-%m")
     with TestClient(app) as client:
         token = login(client, "dr.tanaka", "manta-demo")
+        admin_token = login(client, "admin.sato", "manta-admin")
         with SessionLocal() as db:
             existing_comment = db.get(ReceiptCommentMaster, comment_code)
             if existing_comment is not None:
@@ -655,6 +668,174 @@ def test_create_and_update_inpatient_claim_draft() -> None:
             f"/api/claim-drafts/{draft_id}/transmissions/orca",
             headers={"Authorization": f"Bearer {token}"},
         )
+        dry_run_response = client.get(
+            f"/api/claim-drafts/{draft_id}/transmissions/orca/dry-run",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        list_response = client.get(
+            "/api/claim-drafts?queue=open_issues",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        detail_response = client.get(
+            f"/api/claim-drafts/{draft_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return_events_response = client.get(
+            "/api/claim-return-events?status=open",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        monthly_response = client.get(
+            f"/api/billing/monthly-close?month={close_month}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        close_blocked_response = client.post(
+            f"/api/billing/monthly-close/{close_month}/request-close",
+            json={"force": False},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        request_close_response = client.post(
+            f"/api/billing/monthly-close/{close_month}/request-close",
+            json={"force": True, "note": "テスト承認依頼"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return_analytics_response = client.get(
+            f"/api/claim-return-events/analytics?month={close_month}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return_analytics_compare_response = client.get(
+            f"/api/claim-return-events/analytics/compare?month={close_month}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return_trend_response = client.get(
+            f"/api/claim-return-events/analytics/trend?month={close_month}&months=3",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return_sla_response = client.get(
+            "/api/claim-return-events/sla",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return_sla_alerts_response = client.get(
+            "/api/claim-return-events/sla/alerts",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sla_setting_response = client.get(
+            "/api/claim-return-events/sla/settings",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sla_setting_forbidden_response = client.put(
+            "/api/claim-return-events/sla/settings",
+            json={
+                "due_soon_hours": 24,
+                "include_no_due": True,
+                "escalation_assignee": "佐藤 美紀",
+                "notify_destinations": [],
+                "escalation_rules": [],
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sla_setting_update_response = client.put(
+            "/api/claim-return-events/sla/settings",
+            json={
+                "due_soon_hours": 24,
+                "include_no_due": True,
+                "escalation_assignee": "佐藤 美紀",
+                "notify_destinations": [{"type": "in_app", "target": "billing-admin"}],
+                "escalation_rules": [{"severity": "overdue", "assignee": "佐藤 美紀"}],
+                "note": "pytest SLA",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        sla_notification_dry_run_response = client.post(
+            "/api/claim-return-events/sla/notifications/dry-run",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        transmission_history_response = client.get(
+            f"/api/claim-transmissions?month={close_month}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        transmission_csv_response = client.get(
+            f"/api/claim-transmissions/export.csv?month={close_month}&reclaim_only=true",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        monthly_report_response = client.get(
+            f"/api/billing/monthly-close/{close_month}/report",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        response_analysis_response = client.post(
+            "/api/orca/response/analyze",
+            json={
+                "status_code": 200,
+                "payload": {"messages": ["病名要件の確認が必要です。"]},
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sample_create_response = client.post(
+            "/api/orca/response-samples",
+            json={
+                "name": "pytest ORCA sample",
+                "status_code": 200,
+                "payload": {"messages": ["査定: 施設基準を確認してください。"]},
+                "claim_draft_id": draft_id,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sample_id = sample_create_response.json()["id"] if sample_create_response.status_code == 201 else None
+        sample_event_response = client.post(
+            f"/api/orca/response-samples/{sample_id}/return-event",
+            json={"claim_draft_id": draft_id, "title": "pytest ORCA sample event"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        close_response = client.post(
+            f"/api/billing/monthly-close/{close_month}/approve",
+            json={"note": "テスト承認"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        cancel_close_response = client.post(
+            f"/api/billing/monthly-close/{close_month}/cancel",
+            json={"reason": "テスト取消"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        return_event_payload = next(
+            item for item in return_events_response.json() if item["claim_draft_id"] == draft_id
+        )
+        with SessionLocal() as db:
+            return_event = db.get(ClaimReturnEvent, return_event_payload["id"])
+            assert return_event is not None
+            return_event.due_at = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(hours=2)
+            db.commit()
+        forbidden_assign_response = client.patch(
+            f"/api/claim-return-events/{return_event_payload['id']}/assignee",
+            json={"assignee": "佐藤 美紀"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assign_self_response = client.patch(
+            f"/api/claim-return-events/{return_event_payload['id']}/assignee",
+            json={"assignee": "田中 太郎"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        my_return_events_response = client.get(
+            "/api/claim-return-events?status=all&assignee=mine",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        update_return_event_response = client.patch(
+            f"/api/claim-return-events/{return_event_payload['id']}",
+            json={
+                "status": "in_progress",
+                "assignee": "田中 太郎",
+                "resolution_note": "テスト対応中",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sla_escalation_forbidden_response = client.post(
+            "/api/claim-return-events/sla/escalate",
+            json={"assignee": "佐藤 美紀"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        sla_escalation_response = client.post(
+            "/api/claim-return-events/sla/escalate",
+            json={"assignee": "佐藤 美紀", "note": "テストSLA"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
 
     assert draft["status"] == "draft"
     assert draft["admission_id"] == admission_id
@@ -686,15 +867,100 @@ def test_create_and_update_inpatient_claim_draft() -> None:
     assert transmit_response.status_code == 201
     assert transmit_response.json()["adapter"] == "orca"
     assert transmit_response.json()["status"] == "rejected"
+    assert transmit_response.json()["response_payload"]["normalized"]["status"] == "rejected"
+    assert transmit_response.json()["response_payload"]["normalized"]["reasons"]
     assert transmit_response.json()["request_payload"]["format_version"] == "manta-orca-claim-candidate-v1"
     assert transmit_response.json()["request_payload"]["claim"]["summary"]["unresolved_count"] >= 1
     assert transmit_response.json()["request_payload"]["claim"]["unresolved_items"]
+    assert dry_run_response.status_code == 200
+    assert dry_run_response.json()["dry_run"]["blocking"] is True
+    assert dry_run_response.json()["dry_run"]["line_count"] >= 1
+    assert list_response.status_code == 200
+    listed_draft = next(item for item in list_response.json() if item["id"] == draft_id)
+    assert listed_draft["patient_name"]
+    assert listed_draft["admission_id"] == admission_id
+    assert listed_draft["line_count"] >= 1
+    assert listed_draft["open_issue_count"] >= 1
+    assert listed_draft["unresolved_line_count"] >= 1
+    assert listed_draft["latest_transmission_status"] == "rejected"
+    assert detail_response.status_code == 200
+    assert detail_response.json()["id"] == draft_id
+    assert detail_response.json()["lines"]
+    assert return_events_response.status_code == 200
+    assert return_event_payload["patient_name"]
+    assert return_event_payload["status"] == "open"
+    assert return_event_payload["event_type"] in {"return", "notice"}
+    assert return_event_payload["raw_payload"]["normalized"]["reasons"]
+    assert forbidden_assign_response.status_code == 403
+    assert assign_self_response.status_code == 200
+    assert assign_self_response.json()["assignee"] == "田中 太郎"
+    assert my_return_events_response.status_code == 200
+    assert any(item["id"] == return_event_payload["id"] for item in my_return_events_response.json())
+    assert update_return_event_response.status_code == 200
+    assert update_return_event_response.json()["status"] == "in_progress"
+    assert update_return_event_response.json()["assignee"] == "田中 太郎"
+    assert monthly_response.status_code == 200
+    assert monthly_response.json()["claim_count"] >= 1
+    assert "assignee_buckets" in monthly_response.json()
+    assert close_blocked_response.status_code == 409
+    assert request_close_response.status_code == 200
+    assert request_close_response.json()["status"] == "pending_approval"
+    assert request_close_response.json()["requested_by"]
+    assert request_close_response.json()["approval_note"] == "テスト承認依頼"
+    assert return_analytics_response.status_code == 200
+    assert return_analytics_response.json()["total_count"] >= 1
+    assert return_analytics_response.json()["reason_buckets"]
+    assert return_analytics_compare_response.status_code == 200
+    assert "reason_deltas" in return_analytics_compare_response.json()
+    assert return_trend_response.status_code == 200
+    assert len(return_trend_response.json()) == 3
+    assert return_trend_response.json()[-1]["month"] == close_month
+    assert return_sla_response.status_code == 200
+    assert return_sla_response.json()["open_count"] >= 1
+    assert return_sla_response.json()["assignee_buckets"]
+    assert return_sla_alerts_response.status_code == 200
+    assert any(item["event_id"] == return_event_payload["id"] for item in return_sla_alerts_response.json())
+    assert sla_setting_response.status_code == 200
+    assert sla_setting_response.json()["due_soon_hours"] >= 1
+    assert sla_setting_forbidden_response.status_code == 403
+    assert sla_setting_update_response.status_code == 200
+    assert sla_setting_update_response.json()["due_soon_hours"] == 24
+    assert sla_setting_update_response.json()["notify_destinations"][0]["target"] == "billing-admin"
+    assert sla_notification_dry_run_response.status_code == 200
+    assert sla_notification_dry_run_response.json()["destination_count"] == 1
+    assert sla_escalation_forbidden_response.status_code == 403
+    assert sla_escalation_response.status_code == 200
+    assert return_event_payload["id"] in sla_escalation_response.json()["event_ids"]
+    assert transmission_history_response.status_code == 200
+    assert any(item["claim_draft_id"] == draft_id for item in transmission_history_response.json())
+    assert transmission_csv_response.status_code == 200
+    assert "claim_draft_id" in transmission_csv_response.text
+    assert monthly_report_response.status_code == 200
+    assert monthly_report_response.json()["month"] == close_month
+    assert "transmissions" in monthly_report_response.json()
+    assert response_analysis_response.status_code == 200
+    assert response_analysis_response.json()["reason_count"] >= 1
+    assert sample_create_response.status_code == 201
+    assert sample_create_response.json()["normalized"]["reasons"]
+    assert sample_event_response.status_code == 200
+    assert sample_event_response.json()["claim_draft_id"] == draft_id
+    assert close_response.status_code == 200
+    assert close_response.json()["status"] == "closed"
+    assert close_response.json()["approved_by"]
+    assert close_response.json()["approval_note"] == "テスト承認"
+    assert close_response.json()["snapshot"]["month"] == close_month
+    assert cancel_close_response.status_code == 200
+    assert cancel_close_response.json()["status"] == "cancelled"
+    assert cancel_close_response.json()["cancel_reason"] == "テスト取消"
 
     if draft_id is not None:
         with SessionLocal() as db:
             persisted = db.get(ClaimDraft, draft_id)
             if persisted is not None:
                 db.delete(persisted)
+            monthly_close = db.get(MonthlyClaimClose, close_month)
+            if monthly_close is not None:
+                db.delete(monthly_close)
             comment_master = db.get(ReceiptCommentMaster, comment_code)
             if comment_master is not None:
                 db.delete(comment_master)
@@ -702,6 +968,13 @@ def test_create_and_update_inpatient_claim_draft() -> None:
                 pending_lab_order = db.get(LabOrder, pending_lab_order_id)
                 if pending_lab_order is not None:
                     db.delete(pending_lab_order)
+            if sample_id is not None:
+                sample = db.get(OrcaResponseSample, sample_id)
+                if sample is not None:
+                    db.delete(sample)
+            sla_setting = db.get(ClaimSlaSetting, "default")
+            if sla_setting is not None:
+                db.delete(sla_setting)
             db.commit()
 
 
@@ -844,6 +1117,14 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
                     "claim_endpoint": "/api01rv2/claim",
                     "health_endpoint": "/api01rv2/systeminfv2",
                     "mode": "mock",
+                    "response_mappings": [
+                        {
+                            "pattern": "施設固有返戻",
+                            "reason_code": "facility_return",
+                            "severity": "warning",
+                            "category": "施設固有",
+                        }
+                    ],
                     "note": "test",
                 },
             )
@@ -851,9 +1132,66 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
                 "/api/admin/orca/test-connection",
                 headers={"Authorization": f"Bearer {admin_token}"},
             )
+            mapping_test_response = client.post(
+                "/api/orca/response-mappings/test",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "status_code": 200,
+                    "payload": {"messages": ["施設固有返戻があります。"]},
+                    "response_mappings": [
+                        {
+                            "pattern": "施設固有返戻",
+                            "reason_code": "facility_return",
+                            "severity": "warning",
+                            "category": "施設固有",
+                        }
+                    ],
+                },
+            )
+            mapping_diff_response = client.post(
+                "/api/orca/response-mappings/diff",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "status_code": 200,
+                    "payload": {"messages": ["施設固有返戻があります。"]},
+                    "response_mappings": [
+                        {
+                            "pattern": "施設固有返戻",
+                            "reason_code": "facility_return_v2",
+                            "severity": "error",
+                            "category": "施設固有更新",
+                        }
+                    ],
+                },
+            )
             list_response = client.get(
                 "/api/admin/claim-rules",
                 headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            export_response = client.get(
+                "/api/admin/claim-rules/export",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            import_response = client.post(
+                "/api/admin/claim-rules/import",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "rules": [
+                        {
+                            "id": rule_id,
+                            "sort_order": 997,
+                            "is_active": True,
+                            "category": "検査",
+                            "target_category": "検査",
+                            "rule_type": "frequency_limit",
+                            "severity": "warning",
+                            "message": "import更新",
+                            "evidence_hint": "import",
+                            "conditions": {"same_month_count_lte": 2},
+                            "actions": {"issue_type": "frequency_limit_check"},
+                        }
+                    ]
+                },
             )
     finally:
         with SessionLocal() as db:
@@ -872,9 +1210,20 @@ def test_admin_can_manage_facility_claim_rules_and_orca_setting() -> None:
     assert setting_response.status_code == 200
     assert setting_response.json()["base_url"] == "https://orca.example.test"
     assert setting_response.json()["has_password"] is True
+    assert setting_response.json()["response_mappings"][0]["reason_code"] == "facility_return"
     assert test_response.status_code == 200
     assert test_response.json()["ok"] is True
+    assert mapping_test_response.status_code == 200
+    assert mapping_test_response.json()["mapping_count"] == 1
+    assert mapping_test_response.json()["normalized"]["reasons"][0]["reason_code"] == "facility_return"
+    assert mapping_diff_response.status_code == 200
+    assert mapping_diff_response.json()["summary"]["mapping_count_delta"] == 0
+    assert mapping_diff_response.json()["changed_reasons"]
     assert any(item["id"] == rule_id for item in list_response.json())
+    assert export_response.status_code == 200
+    assert export_response.json()["format"] == "manta-facility-claim-rules-v1"
+    assert import_response.status_code == 200
+    assert import_response.json()[0]["rule_type"] == "frequency_limit"
 
 
 def test_reject_patients_without_token() -> None:
