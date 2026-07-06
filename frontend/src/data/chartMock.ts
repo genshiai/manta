@@ -50,7 +50,7 @@ export type LabResult = {
   result: string;
   baseline: string;
   previous: string;
-  flag: 'high' | 'normal';
+  flag: 'high' | 'low' | 'normal';
 };
 
 export type Prescription = {

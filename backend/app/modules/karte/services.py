@@ -702,7 +702,12 @@ def _lab_numeric_value(row: Observation) -> float | None:
 
 
 def _lab_flag(row: Observation) -> str:
-    return "high" if row.interpretation_code in {"H", "HH", "A"} else "normal"
+    code = row.interpretation_code
+    if code in {"L", "LL"}:
+        return "low"
+    if code in {"H", "HH", "A"}:
+        return "high"
+    return "normal"
 
 
 def _delta_label(delta: float | None) -> str:
@@ -758,7 +763,7 @@ def build_lab_long_trends(rows: list[Observation]) -> list[LabLongTrendItem]:
                 latest_date=latest.date if latest else None,
                 delta=delta,
                 delta_label=_delta_label(delta),
-                abnormal_count=sum(1 for point in points if point.flag == "high"),
+                abnormal_count=sum(1 for point in points if point.flag != "normal"),
                 point_count=len(points),
                 points=points,
             )

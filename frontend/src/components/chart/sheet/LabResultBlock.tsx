@@ -5,7 +5,7 @@ import type { LabBlock } from './streamModel';
 
 function severity(result: LabResultEntry): 'high' | 'low' | 'normal' {
   if (result.flag === 'high') return 'high';
-  if (/[↓]|低/.test(result.result)) return 'low';
+  if (result.flag === 'low' || /[↓]|低/.test(result.result)) return 'low';
   return 'normal';
 }
 

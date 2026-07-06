@@ -223,7 +223,7 @@ type ApiLabLongTrendItem = {
     value: string;
     numeric_value: number | null;
     unit: string | null;
-    flag: 'high' | 'normal';
+    flag: 'high' | 'low' | 'normal';
     observation_id: string;
   }>;
 };
@@ -267,12 +267,12 @@ type ApiChartWorkspace = {
     result: string;
     baseline: string;
     previous: string;
-    flag: 'high' | 'normal';
+    flag: 'high' | 'low' | 'normal';
     reported_at?: string | null;
     history?: Array<{
       date: string;
       value: string;
-      flag: 'high' | 'normal';
+      flag: 'high' | 'low' | 'normal';
     }>;
   }>;
   chart_history: Array<{ date: string; department: string; title: string; summary: string }>;
@@ -1266,12 +1266,12 @@ const mapLabResults = (
     result: string;
     baseline: string;
     previous: string;
-    flag: 'high' | 'normal';
+    flag: 'high' | 'low' | 'normal';
     reported_at?: string | null;
     history?: Array<{
       date: string;
       value: string;
-      flag: 'high' | 'normal';
+      flag: 'high' | 'low' | 'normal';
     }>;
   }>,
 ): LabResultEntry[] =>

@@ -110,7 +110,9 @@ export function LabsMatrix({ open, onClose, trends }: LabsMatrixProps) {
                             className={cn(
                               'border-b border-r border-border px-3 py-1.5 text-right',
                               point?.flag === 'high' && 'font-semibold text-lab-high',
-                              point && point.flag !== 'high' && /[↓]/.test(point.value) && 'font-semibold text-lab-low',
+                              point &&
+                                (point.flag === 'low' || (point.flag !== 'high' && /[↓]/.test(point.value))) &&
+                                'font-semibold text-lab-low',
                             )}
                           >
                             {point ? point.value : ''}

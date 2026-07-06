@@ -56,7 +56,7 @@ function activeProblemPhrase(problems: ProblemListItem[]): string {
 }
 
 function changePhrase(labResults: LabResultEntry[]): { text: string; evidence?: SummaryEvidence } {
-  const abnormal = labResults.find((r) => r.flag === 'high' && r.previous);
+  const abnormal = labResults.find((r) => r.flag !== 'normal' && r.previous);
   if (abnormal) {
     const arrow = abnormal.previous ? `${abnormal.previous}→${abnormal.result}` : abnormal.result;
     return {

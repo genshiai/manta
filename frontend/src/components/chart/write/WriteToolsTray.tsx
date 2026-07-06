@@ -41,7 +41,7 @@ export function WriteToolsTray({
   }, [recording]);
 
   const abnormalText = labResults
-    .filter((r) => r.flag === 'high')
+    .filter((r) => r.flag !== 'normal')
     .map((r) => `${r.item} ${r.result}`)
     .join('、');
   const vitalsText = vitals.map((v) => `${v.label} ${v.value}${v.unit}`).join(' / ');

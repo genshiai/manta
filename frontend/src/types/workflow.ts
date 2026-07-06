@@ -64,7 +64,7 @@ export type LabResultEntry = {
   result: string;
   baseline: string;
   previous: string;
-  flag: 'high' | 'normal';
+  flag: 'high' | 'low' | 'normal';
   reportedAt?: string;
   history: LabResultTrendPoint[];
 };
@@ -72,7 +72,7 @@ export type LabResultEntry = {
 export type LabResultTrendPoint = {
   date: string;
   value: string;
-  flag: 'high' | 'normal';
+  flag: 'high' | 'low' | 'normal';
 };
 
 export type LabLongTrendPoint = LabResultTrendPoint & {

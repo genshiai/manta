@@ -48,7 +48,7 @@ class VitalItem(BaseModel):
 class LabTrendPoint(BaseModel):
     date: str
     value: str
-    flag: Literal["high", "normal"] = "normal"
+    flag: Literal["high", "low", "normal"] = "normal"
 
 
 class LabResultItem(BaseModel):
@@ -56,7 +56,7 @@ class LabResultItem(BaseModel):
     result: str
     baseline: str
     previous: str
-    flag: Literal["high", "normal"]
+    flag: Literal["high", "low", "normal"]
     reported_at: str | None = None
     history: list[LabTrendPoint] = []
 
@@ -66,7 +66,7 @@ class LabLongTrendPoint(BaseModel):
     value: str
     numeric_value: float | None = None
     unit: str | None = None
-    flag: Literal["high", "normal"] = "normal"
+    flag: Literal["high", "low", "normal"] = "normal"
     observation_id: str
 
 
