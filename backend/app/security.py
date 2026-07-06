@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from cryptography.fernet import Fernet, InvalidToken
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,6 +21,34 @@ from .modules.auth.models import User
 
 password_hash = PasswordHasher()
 bearer_scheme = HTTPBearer(auto_error=False)
+
+# 外部連携シークレット（ORCA 接続パスワード等）を保存時に暗号化する。
+# 鍵は JWT シークレットから導出するため追加の環境変数は不要。
+# jwt_secret_key を変更すると既存の暗号値は復号できなくなる（要再入力）。
+_ENCRYPTED_SECRET_PREFIX = "enc:v1:"
+
+
+def _secret_fernet() -> Fernet:
+    digest = hashlib.sha256(get_settings().jwt_secret_key.encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def encrypt_secret(plain: str) -> str:
+    token = _secret_fernet().encrypt(plain.encode()).decode()
+    return f"{_ENCRYPTED_SECRET_PREFIX}{token}"
+
+
+def decrypt_secret(stored: str | None) -> str | None:
+    if not stored:
+        return stored
+    if not stored.startswith(_ENCRYPTED_SECRET_PREFIX):
+        # レガシー（平文で保存された値）はそのまま返す。
+        return stored
+    token = stored[len(_ENCRYPTED_SECRET_PREFIX):]
+    try:
+        return _secret_fernet().decrypt(token.encode()).decode()
+    except InvalidToken:
+        return None
 
 
 @dataclass

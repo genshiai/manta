@@ -5,6 +5,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ....security import decrypt_secret
 from ...auth.models import User
 from ...karte.models import Patient
 from ...rececon.models import ClaimDraft, ClaimDraftLine, ClaimReviewIssue, ClaimTransmission
@@ -44,7 +45,10 @@ def orca_auth(setting: OrcaAdapterSetting) -> httpx.BasicAuth | None:
         return None
     if not setting.username or not setting.password_secret:
         raise ValueError("basic auth requires username and password")
-    return httpx.BasicAuth(setting.username, setting.password_secret)
+    password = decrypt_secret(setting.password_secret)
+    if not password:
+        raise ValueError("basic auth requires username and password")
+    return httpx.BasicAuth(setting.username, password)
 
 
 def _flatten_orca_messages(value: object) -> list[str]:

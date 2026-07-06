@@ -17,7 +17,7 @@ from ..master_data.models import (
     StandardUsageMaster,
 )
 from ..rececon.models import FacilityClaimRule
-from ...security import hash_password, require_role
+from ...security import encrypt_secret, hash_password, require_role
 from ..auth.schemas import UserSummaryRead
 from ..auth.services import get_user_or_404, user_to_summary
 from ..common.audit import log_audit
@@ -186,10 +186,18 @@ def get_orca_adapter_setting(
 ) -> OrcaAdapterSettingRead:
     setting = db.get(OrcaAdapterSetting, "default")
     if setting is None:
-        setting = OrcaAdapterSetting(id="default", mode="mock", claim_endpoint="/api01rv2/claim")
-        db.add(setting)
-        db.commit()
-        db.refresh(setting)
+        # GET は副作用を持たない。未作成時は永続化せず既定値を返す（PUT で作成される）。
+        # transient オブジェクトには列 default が適用されないため明示的に埋める。
+        setting = OrcaAdapterSetting(
+            id="default",
+            is_active=False,
+            auth_type="none",
+            claim_endpoint="/api01rv2/claim",
+            health_endpoint="/api01rv2/systeminfv2",
+            mode="mock",
+            response_mappings=[],
+            updated_at=utcnow(),
+        )
     return orca_setting_to_read(setting)
 
 
@@ -208,7 +216,7 @@ def update_orca_adapter_setting(
     for key, value in values.items():
         setattr(setting, key, value)
     if password is not None:
-        setting.password_secret = password or None
+        setting.password_secret = encrypt_secret(password) if password else None
     setting.updated_by = current_user.display_name
     setting.updated_at = utcnow()
     log_audit(
