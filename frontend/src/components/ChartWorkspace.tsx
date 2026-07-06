@@ -36,7 +36,6 @@ import type {
   ProblemListItem,
   ProcedureOrderEntry,
   ReservationSlot,
-  ScheduledVisit,
   UserSession,
   VitalEntry,
 } from '../types/workflow';
@@ -71,6 +70,7 @@ import { usePins } from './chart/hooks/usePins';
 import { InlineEditor } from './chart/write/InlineEditor';
 import { WriteToolsTray } from './chart/write/WriteToolsTray';
 import type { RecentEntry } from './chart/write/slashModel';
+import { toast, toastError } from './ui/toast';
 
 type SoapDraft = SoapText;
 
@@ -220,8 +220,10 @@ export function ChartWorkspace({
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  // オーダー系ハンドラの結果メッセージ（UI 未接続。将来トーストに接続）
-  const [, setOrderMessage] = useState('オーダを追加・確認できます');
+  // オーダー系ハンドラの結果メッセージはトーストで通知する（成否をメッセージ内容から判定）。
+  const setOrderMessage = useCallback((message: string) => {
+    toast(message, /失敗|エラー/.test(message) ? 'error' : 'success');
+  }, []);
 
   // モーダル
   const [labsMatrixOpen, setLabsMatrixOpen] = useState(false);
@@ -229,7 +231,6 @@ export function ChartWorkspace({
   const [composerOpen, setComposerOpen] = useState(false);
   const [reservationDialogOpen, setReservationDialogOpen] = useState(false);
   const [reservationSlots, setReservationSlots] = useState<ReservationSlot[]>([]);
-  const [, setScheduledVisit] = useState<ScheduledVisit | null>(null);
 
   const initializedPatientIdRef = useRef<string | null>(null);
 
@@ -326,7 +327,6 @@ export function ChartWorkspace({
       setProcedureOrders(workspace.procedureOrders);
       setPrescriptions(workspace.prescriptions);
       setPrescriptionTimeline(timeline);
-      setScheduledVisit(workspace.reservation);
 
       const latest = workspace.latestNote;
       const nextDraft: SoapDraft = latest
@@ -342,7 +342,6 @@ export function ChartWorkspace({
       setVersion(latest?.version ?? 1);
       setLastSavedAt(latest?.savedAt ?? null);
       setSaveMessage(latest ? '保存済みカルテを読み込みました' : 'カルテはまだ保存されていません');
-      setOrderMessage('オーダを追加・確認できます');
     } catch (error) {
       if (isUnauthorizedError(error)) {
         onAuthExpired();
@@ -410,11 +409,11 @@ export function ChartWorkspace({
         onAuthExpired();
         return;
       }
-      setSaveMessage(
-        `保存に失敗しました: ${
-          error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'
-        }`,
-      );
+      const message = `保存に失敗しました: ${
+        error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'
+      }`;
+      setSaveMessage(message);
+      toastError(message);
     } finally {
       setIsMutating(false);
     }
@@ -646,6 +645,7 @@ export function ChartWorkspace({
   const handleFinishVisit = () => {
     if (isDirty) {
       setSaveMessage('保存してから診察終了してください');
+      toast('保存してから診察終了してください', 'info');
       return;
     }
     if (isInpatientChart) {
@@ -673,11 +673,11 @@ export function ChartWorkspace({
         onAuthExpired();
         return;
       }
-      setSaveMessage(
-        `診察終了の更新に失敗しました: ${
-          error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'
-        }`,
-      );
+      const message = `診察終了の更新に失敗しました: ${
+        error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'
+      }`;
+      setSaveMessage(message);
+      toastError(message);
     } finally {
       setIsMutating(false);
     }
@@ -707,22 +707,16 @@ export function ChartWorkspace({
         note: reservationNote,
         actor: currentUser.displayName,
       });
-      setScheduledVisit({
-        slotId: saved.slot_id ?? undefined,
-        date: saved.scheduled_for,
-        department: `${saved.department} - ${saved.doctor}`,
-        doctor: saved.doctor,
-        note: saved.note,
-      });
+      toast(`次回予約を保存しました: ${saved.scheduled_for}`, 'success');
       onDataChanged();
     } catch (error) {
       if (isUnauthorizedError(error)) {
         onAuthExpired();
         return;
       }
-      setSaveMessage(
-        `予約に失敗しました: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`,
-      );
+      const message = `予約に失敗しました: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`;
+      setSaveMessage(message);
+      toastError(message);
       setIsMutating(false);
       return;
     }
