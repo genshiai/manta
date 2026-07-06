@@ -201,10 +201,6 @@ function App() {
         setPatients(nextPatients);
         setInpatientAdmissions(nextInpatientAdmissions);
         setLastRefreshedAt(formatTimestamp());
-
-        if (nextPatients.length === 0) {
-          return;
-        }
       } catch (error) {
         if (cancelled) {
           return;
