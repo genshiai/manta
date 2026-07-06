@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import re
 import unicodedata
 
@@ -2153,13 +2153,29 @@ def backfill_patient_fhir_columns(db: Session) -> bool:
     return updated
 
 
+# デモ用アカウント（本番では MANTA_SEED_DEMO=false で無効化する想定）。
+# パスワード期限は起動日からの相対にし、clone 直後に期限切れでログインできない事故を防ぐ。
+DEMO_USER_IDS = frozenset({"dr.tanaka", "admin.sato"})
+DEMO_PASSWORD_VALID_DAYS = 365
+DEMO_PASSWORD_RENEW_THRESHOLD_DAYS = 30
+
+
+def _demo_password_expiry() -> date:
+    return date.today() + timedelta(days=DEMO_PASSWORD_VALID_DAYS)
+
+
 def seed_demo_data(db: Session) -> None:
     existing_users = db.scalars(select(User)).all()
     if existing_users:
         updated = False
+        renew_threshold = date.today() + timedelta(days=DEMO_PASSWORD_RENEW_THRESHOLD_DAYS)
         for user in existing_users:
             if password_needs_upgrade(user.password):
                 user.password = hash_password(user.password)
+                updated = True
+            # 期限切れ間近のデモアカウントは再度有効化する（デモ体験を壊さないため）。
+            if user.id in DEMO_USER_IDS and user.password_expires_at <= renew_threshold:
+                user.password_expires_at = _demo_password_expiry()
                 updated = True
 
         if backfill_patient_workspace(db):
@@ -2213,7 +2229,7 @@ def seed_demo_data(db: Session) -> None:
                 display_name="田中 太郎",
                 department="内科",
                 role="医師",
-                password_expires_at=date(2026, 6, 30),
+                password_expires_at=_demo_password_expiry(),
             ),
             User(
                 id="admin.sato",
@@ -2221,7 +2237,7 @@ def seed_demo_data(db: Session) -> None:
                 display_name="佐藤 美紀",
                 department="医事課",
                 role="管理者",
-                password_expires_at=date(2026, 12, 31),
+                password_expires_at=_demo_password_expiry(),
             ),
         ]
     )
