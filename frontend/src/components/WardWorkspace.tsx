@@ -1592,7 +1592,7 @@ export const WardWorkspace = ({
                   <ListChecks size={17} className='text-brand' />
                   <div>
                     <h2 className='text-[16px] font-bold text-text-primary'>クリティカルパス運用</h2>
-                    <p className='mt-1 text-[12px] text-text-tertiary'>職種別フィルタと改訂履歴の入口を追加しました。</p>
+                    <p className='mt-1 text-[12px] text-text-tertiary'>職種別フィルタと改訂履歴を確認できます。</p>
                   </div>
                 </div>
                 <div className='flex flex-wrap items-center gap-2'>
@@ -1894,7 +1894,7 @@ export const WardWorkspace = ({
                 <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
                   <div className='flex items-center gap-2'>
                     <BadgeCheck size={17} className='text-brand' />
-                    <h2 className='text-[16px] font-bold text-text-primary'>看護必要度サマリ</h2>
+                    <h2 className='text-[16px] font-bold text-text-primary'>病棟タスク負荷サマリ</h2>
                   </div>
                   <span className={cn('rounded-md border px-2 py-1 text-[12px] font-bold', nursingNecessityLevel === '高' ? 'border-red-200 bg-red-50 text-red-1000' : nursingNecessityLevel === '中' ? 'border-yellow-200 bg-yellow-50 text-yellow-1100' : 'border-green-200 bg-green-50 text-green-900')}>
                     {nursingNecessityLevel}

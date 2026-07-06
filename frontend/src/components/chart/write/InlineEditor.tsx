@@ -21,11 +21,12 @@ const FIELDS: Array<{ key: FieldKey; label: string }> = [
   { key: 'plan', label: 'P' },
 ];
 
+// 定型の下書き例（デモ）。患者データに依存しない固定文のため、内容は中立にする。
 const AI_DRAFTS: Record<FieldKey, string> = {
-  subjective: '【下書き】主訴の経過を整理（AI生成・要確認）。',
-  objective: '【下書き】身体所見の要約（AI生成・要確認）。',
-  assessment: '【下書き】各プロブレムの評価（AI生成・要確認）。',
-  plan: '【下書き】HbA1c上昇に対し食事・運動療法を再指導し、次回に血糖再検を計画（AI生成・要確認）。',
+  subjective: '【下書き例】主訴の経過を整理（デモ生成・要確認）。',
+  objective: '【下書き例】身体所見の要約（デモ生成・要確認）。',
+  assessment: '【下書き例】各プロブレムの評価（デモ生成・要確認）。',
+  plan: '【下書き例】治療方針・次回検査予定の定型文（デモ生成・要確認）。',
 };
 
 type InlineEditorProps = {

@@ -49,8 +49,8 @@ export function WriteToolsTray({
   const stopAndDraft = () => {
     setRecording(false);
     setSeconds(0);
-    onInsert('subjective', '【下書き】録音からの主訴（AI生成・要確認）。');
-    onInsert('objective', '【下書き】録音からの所見（AI生成・要確認）。');
+    onInsert('subjective', '【下書き例】主訴のサンプル（デモ生成・要確認）。');
+    onInsert('objective', '【下書き例】所見のサンプル（デモ生成・要確認）。');
   };
 
   return (
@@ -74,7 +74,7 @@ export function WriteToolsTray({
             ) : (
               <Mic size={13} strokeWidth={1.8} className="text-text-tertiary" />
             )}
-            {recording ? '診察を録音中' : 'スクライブ（音声→下書き）'}
+            {recording ? 'デモ生成中（音声認識は未接続）' : 'スクライブ（音声→下書き・デモ）'}
             {recording ? (
               <span className="ms-auto text-text-tertiary tabular-nums">
                 {pad(Math.floor(seconds / 60))}:{pad(seconds % 60)}
@@ -82,7 +82,7 @@ export function WriteToolsTray({
             ) : null}
           </div>
           <p className="text-[11px] leading-[1.55] text-text-secondary">
-            停止すると会話から S / O の下書きを生成します（レビュー必須・自動確定しません）。
+            音声認識は未接続のデモです。停止するとサンプルの下書きを S / O に挿入します（要確認・自動確定しません）。
           </p>
           <div className="flex flex-wrap gap-1">
             {recording ? (
@@ -111,7 +111,7 @@ export function WriteToolsTray({
                 onClick={() => setRecording(true)}
                 className="inline-flex h-6 items-center rounded-[7px] border border-border bg-card px-2.5 text-[11px] font-semibold text-text-primary"
               >
-                録音を開始
+                デモを開始
               </button>
             )}
           </div>
@@ -161,7 +161,7 @@ export function WriteToolsTray({
           <p className="text-[11px] leading-[1.55] text-text-secondary">
             {missingDxCount > 0 ? (
               <>
-                病名 <b className="text-text-primary">{missingDxCount}件未対応</b>。書き終える前に解消を提案します。
+                病名 <b className="text-text-primary">{missingDxCount}件未対応</b>。確定前に確認してください。
               </>
             ) : (
               '病名の対応漏れはありません。'
@@ -176,12 +176,12 @@ export function WriteToolsTray({
             <span className="ms-1 rounded bg-muted px-1.5 text-[9.5px] font-bold text-text-tertiary">下書き</span>
           </div>
           <p className="text-[11px] leading-[1.55] text-text-secondary">
-            HbA1c 上昇に触れる療養指導文（AI生成・要確認）。
+            療養指導・次回検査の定型文の下書き例（デモ・要確認）。
           </p>
           <button
             type="button"
             onClick={() =>
-              onInsert('plan', '【下書き】HbA1c上昇に対し食事内容を再確認し、運動療法を継続。次回に血糖・HbA1cを再検（AI生成・要確認）。')
+              onInsert('plan', '【下書き例】療養指導と次回検査予定の定型文（デモ生成・要確認）。')
             }
             className="inline-flex h-6 w-fit items-center rounded-[7px] border border-border bg-card px-2.5 text-[11px] font-semibold text-brand"
           >

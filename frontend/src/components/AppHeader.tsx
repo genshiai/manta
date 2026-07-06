@@ -1,4 +1,4 @@
-import { Bed, Command, House, ReceiptText, Search, Settings, Sparkles } from 'lucide-react';
+import { Bed, Command, House, ReceiptText, Search, Settings } from 'lucide-react';
 import type { PatientRecord } from '../data/chartMock';
 import type { UserSession } from '../types/workflow';
 import { Button } from './ui/button';
@@ -103,10 +103,6 @@ export const AppHeader = ({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="hidden items-center gap-1.5 rounded-full bg-brand-tint px-3 py-1.5 text-[12px] font-medium text-brand lg:inline-flex">
-          <Sparkles size={14} />
-          AI ready
-        </div>
         <Button
           type="button"
           variant="ghost"

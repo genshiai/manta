@@ -106,19 +106,19 @@ export function searchOrders(query: string, config: ChartOrderConfig, limit = 8)
     }
   }
 
-  // 画像
+  // 画像（クエリが画像系のときに、テキスト一致するプリセットのみ。q が空なら includes('') で全件）
   if (IMAGING_HINT.test(query)) {
     for (const category of IMAGING_PRESETS) {
-      if (normalize(category).includes(q) || IMAGING_HINT.test(query)) {
+      if (normalize(category).includes(q)) {
         hits.push({ kind: 'imaging', id: `img-${category}`, label: category, meta: '画像オーダー', category });
       }
     }
   }
 
-  // 処置
+  // 処置（同上）
   if (PROC_HINT.test(query)) {
     for (const title of PROCEDURE_PRESETS) {
-      if (normalize(title).includes(q) || PROC_HINT.test(query)) {
+      if (normalize(title).includes(q)) {
         hits.push({ kind: 'procedure', id: `proc-${title}`, label: title, meta: '処置', title });
       }
     }
