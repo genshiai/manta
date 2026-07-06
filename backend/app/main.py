@@ -21,9 +21,16 @@ from .seed import seed_demo_data
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings = get_settings()
+    if settings.is_production and settings.uses_default_jwt_secret:
+        raise RuntimeError(
+            "MANTA_ENV=production ではデフォルトの MANTA_JWT_SECRET_KEY を使用できません。"
+            "十分に長いランダム値を MANTA_JWT_SECRET_KEY に設定してください。"
+        )
     run_migrations()
-    with SessionLocal() as db:
-        seed_demo_data(db)
+    if settings.should_seed_demo:
+        with SessionLocal() as db:
+            seed_demo_data(db)
     yield
 
 
