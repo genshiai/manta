@@ -773,7 +773,8 @@ def get_reservation_slot_counts(db: Session, slot_ids: list[str]) -> dict[str, i
 
 
 def reservation_slot_to_read(slot: ReservationSlotMaster, *, booked_count: int = 0) -> ReservationSlotRead:
-    capacity = max(slot.capacity or 1, 0)
+    # capacity=0（受付停止）を 1 に化けさせないため or を使わない。
+    capacity = slot.capacity if slot.capacity is not None else 1
     remaining_count = max(capacity - booked_count, 0)
     return ReservationSlotRead(
         id=slot.id,

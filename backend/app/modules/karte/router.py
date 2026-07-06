@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import Integer, cast, desc, func, select
 from sqlalchemy.orm import Session
 
 from ...db import get_db
@@ -112,8 +112,11 @@ def list_patients(
             | Patient.status.ilike(like)
         )
 
+    # elapsed は "34分" のような文字列。非数字を除去し整数として降順ソートする
+    # （旧実装は r"\\D" で正規表現が no-op になり、かつ文字列ソートで "9">"10" だった）。
+    elapsed_minutes = func.nullif(func.regexp_replace(Patient.elapsed, r"\D", "", "g"), "")
     sort_column = {
-        "elapsed": desc(func.regexp_replace(Patient.elapsed, r"\\D", "", "g")),
+        "elapsed": desc(cast(elapsed_minutes, Integer)).nullslast(),
         "reservationTime": Patient.reservation_time,
         "receptionNumber": Patient.reception_number,
     }.get(sort, Patient.reception_number)
@@ -535,7 +538,13 @@ def create_lab_order(
     db: Session = Depends(get_db),
 ) -> LabOrderRead:
     patient = get_patient_or_404(db, patient_id)
-    existing_orders = db.scalars(select(LabOrder).where(LabOrder.patient_id == patient_id)).all()
+    # 取消済みオーダーは重複判定から除外する（取り消した検査を再オーダーできるように）。
+    existing_orders = db.scalars(
+        select(LabOrder).where(
+            LabOrder.patient_id == patient_id,
+            LabOrder.status != "cancelled",
+        )
+    ).all()
     if any(any(item in order.items for item in payload.items) for order in existing_orders):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate lab order")
 
@@ -890,7 +899,8 @@ def upsert_reservation(
                 Reservation.patient_id != patient_id,
             )
         )
-        if int(booked_count or 0) >= max(slot.capacity or 1, 0):
+        slot_capacity = slot.capacity if slot.capacity is not None else 1
+        if int(booked_count or 0) >= slot_capacity:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reservation slot full")
     if reservation is None:
         reservation = Reservation(
