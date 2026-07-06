@@ -67,6 +67,8 @@ import { AgentTray } from './chart/panels/AgentTray';
 import { StoryboardPanel } from './chart/panels/StoryboardPanel';
 import { buildProposals, type ProposalAction } from './chart/panels/agentModel';
 import { usePins } from './chart/hooks/usePins';
+import { useAutosave } from './chart/hooks/useAutosave';
+import { readStorage, writeStorage, removeStorage } from '../lib/storage';
 import { InlineEditor } from './chart/write/InlineEditor';
 import { WriteToolsTray } from './chart/write/WriteToolsTray';
 import type { RecentEntry } from './chart/write/slashModel';
@@ -108,6 +110,15 @@ type LabOrderRow = {
 type IdEntry<T> = T & { id: string };
 
 const emptyDraft: SoapDraft = { subjective: '', objective: '', assessment: '', plan: '' };
+
+// 未保存の下書きを端末に退避するキー（LOSS-1）。版確定でクリアする。
+const draftStorageKey = (patientId: string) => `manta-chart-draft:${patientId}`;
+type StoredDraft = { draft: SoapDraft; baseVersion: number };
+const draftsEqual = (a: SoapDraft, b: SoapDraft) =>
+  a.subjective === b.subjective &&
+  a.objective === b.objective &&
+  a.assessment === b.assessment &&
+  a.plan === b.plan;
 
 const emptyOrderConfig: ChartOrderConfig = {
   prescriptionCatalog: [],
@@ -240,6 +251,17 @@ export function ChartWorkspace({
     draft.assessment !== savedDraft.assessment ||
     draft.plan !== savedDraft.plan;
 
+  // LOSS-1: 未保存の下書きを 3 秒アイドルで端末に退避する（タブを閉じても消えないように）。
+  // 未編集に戻ったら退避を消す。版確定時は handleSave で明示的にクリアする。
+  useAutosave(JSON.stringify(draft), () => {
+    const key = draftStorageKey(patient.id);
+    if (isDirty) {
+      writeStorage<StoredDraft>(key, { draft, baseVersion: version });
+    } else {
+      removeStorage(key);
+    }
+  });
+
   const pendingLabOrders = useMemo(
     () => labOrders.filter((order) => order.status === 'pending'),
     [labOrders],
@@ -337,11 +359,19 @@ export function ChartWorkspace({
             plan: latest.plan,
           }
         : emptyDraft;
-      setDraft(nextDraft);
+      // LOSS-1: 同じ版に対する未保存の下書きが端末に残っていれば復元する。
+      const baseVersion = latest?.version ?? 0;
+      const stored = readStorage<StoredDraft | null>(draftStorageKey(patient.id), null);
+      const restorable =
+        stored != null && stored.baseVersion === baseVersion && !draftsEqual(stored.draft, nextDraft);
+      setDraft(restorable ? stored.draft : nextDraft);
       setSavedDraft(nextDraft);
       setVersion(latest?.version ?? 1);
       setLastSavedAt(latest?.savedAt ?? null);
       setSaveMessage(latest ? '保存済みカルテを読み込みました' : 'カルテはまだ保存されていません');
+      if (restorable) {
+        toast('未保存の下書きを復元しました', 'info');
+      }
     } catch (error) {
       if (isUnauthorizedError(error)) {
         onAuthExpired();
@@ -402,6 +432,7 @@ export function ChartWorkspace({
       setVersion(result.version);
       setLastSavedAt(result.saved_at);
       setSavedDraft(draft);
+      removeStorage(draftStorageKey(patient.id));
       setSaveMessage('保存しました');
       onDataChanged();
     } catch (error) {
@@ -978,7 +1009,7 @@ export function ChartWorkspace({
     void finishWriting();
   };
 
-  const autosaveLabel = `自動保存 · v${version} · ${lastSavedAt ? formatClock(lastSavedAt) : '—'}`;
+  const autosaveLabel = `下書き保存（この端末）· v${version} · ${lastSavedAt ? formatClock(lastSavedAt) : '—'}`;
   const todayBlockForEdit = streamBlocks.find((b) => b.kind === 'today') ?? null;
 
   const commandActions: CommandAction[] = [
