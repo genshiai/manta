@@ -69,8 +69,8 @@ Manta の主役は、**AI エージェントが動く電子カルテ** です。
 
 **まだ途中です。** Manta は現在 **Pre-Alpha**（公開によって一緒に育てていく段階）です。
 
-- ✅ デモデータで **一通り動きます**：ログイン（JWT）、外来カルテ（SOAP 保存・患者コンテキスト・各種オーダ・処方コピー + 医薬品相互作用の警告・次回予約）、受付ボード、病棟ワークフロー（ベッドボード・入退院・退院サマリ・クリニカルパス）、レセプト（claim draft・施設別ルール DSL・点数調整・返戻イベント・月次クローズ・ORCA レスポンスのプレビュー）、設定（利用者 / マスタ CRUD・ORCA アダプタ設定・監査ログ）、FHIR R4B / JP Core エンドポイント。
-- 🚧 **これから**：AI 算定補助・AI カルテ下書きの本実装、ORCA への実送信、カルテ画面の再設計（[`ChartWorkspace.tsx`](frontend/src/components/ChartWorkspace.tsx) はまだ巨大）、テスト・セキュリティ・ドキュメントの整備。
+- ✅ デモデータで **一通り動きます**：ログイン（JWT）、外来カルテ（ドキュメント型 UI・SOAP 保存・下書き自動退避・患者コンテキスト・各種オーダ・処方コピー + 医薬品相互作用の警告・次回予約）、受付ボード、病棟ワークフロー（ベッドボード・転棟・退院サマリ・クリニカルパス）、レセプト（入院 claim draft・施設別ルール DSL・点数調整・返戻イベント・月次クローズ・ORCA レスポンスのプレビュー）、設定（利用者 / マスタ CRUD・ORCA アダプタ設定・監査ログ）、FHIR R4B / JP Core エンドポイント（要 JWT 認証）。
+- 🚧 **これから**：AI 算定補助・AI カルテ下書きの本実装（現状はルール生成・定型文のデモ）、ORCA への実送信、外来レセプト（点数計算・レセ電ファイル生成）、入退院の状態遷移 UI、フロントエンドのテスト整備。
 - 🛑 **実患者データを入れないでください。** デモ／検証用です。本番の診療・請求にはまだ使えません。
 
 > 細かいロードマップ：[`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)・[`docs/PHASE3_PROGRESS.md`](docs/PHASE3_PROGRESS.md)・[`docs/PUBLIC_RELEASE_CHECKLIST.md`](docs/PUBLIC_RELEASE_CHECKLIST.md)
@@ -91,7 +91,7 @@ Manta は **モノレポ** + **モジュラーモノリス** です。最初か�
 
 ```
 manta/
-├─ frontend/      React 18 + Vite + Tailwind v4 + Radix（StyleSeed / Notion skin）
+├─ frontend/      React 18 + Vite + Tailwind v4 + Radix（StyleSeed / Apple HIG skin）
 ├─ backend/       FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL
 ├─ docs/          設計ドキュメント・ADR（意思決定の記録）
 └─ compose.yaml   db + api + web を一発で起動
@@ -144,13 +144,13 @@ manta/
 
 | 領域 | 採用技術 |
 |---|---|
-| フロントエンド | React 18・TypeScript・Vite・**Tailwind CSS v4**・Radix UI・class-variance-authority・Lucide。設計基盤は **StyleSeed（Notion skin）** |
+| フロントエンド | React 18・TypeScript・Vite・**Tailwind CSS v4**・Radix UI・class-variance-authority・Lucide。設計基盤は **StyleSeed（Apple HIG skin）** |
 | バックエンド | Python・**FastAPI**・SQLAlchemy 2・Alembic・**PostgreSQL 16**。認証は JWT + Argon2 |
 | 相互運用 | **FHIR R4B / JP Core**（`fhir.resources`）、**ORCA 日レセ API** アダプタ |
 | 設計の規律 | **import-linter** によるレイヤー強制、**ADR** による意思決定記録、Conventional Commits + DCO |
 | 開発・実行 | Docker Compose、**uv**（Python）、**Biome**（JS/TS の lint / format） |
 
-> **なぜこの構成を選んだのか**（モジュラーモノリス、FHIR をゲートウェイに置く理由、デジタル庁デザインシステムから StyleSeed / Notion skin へ乗り換えた経緯、Apache 2.0 を選んだ理由…）は **[docs/why-manta.md](docs/why-manta.md)** にまとめています。
+> **なぜこの構成を選んだのか**（モジュラーモノリス、FHIR をゲートウェイに置く理由、デジタル庁デザインシステムから StyleSeed / Apple HIG skin へ乗り換えた経緯、Apache 2.0 を選んだ理由…）は **[docs/why-manta.md](docs/why-manta.md)** にまとめています。
 
 ---
 
