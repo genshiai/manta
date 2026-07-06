@@ -398,13 +398,35 @@ function App() {
     );
   }
 
-  // chart 画面はアプリシェル型 (h-screen overflow-hidden)
-  // それ以外 (reception/settings) は従来の min-h-screen
+  // カルテ画面は ClinicalShell が 56px レール込みでビューポート全体を占有する
+  // （AppHeader / StatusFooter は出さない。KARTE_UI_SPEC §3）。
   const isChartScreen = screen === 'chart' && Boolean(selectedPatient);
-  const rootClassName = isChartScreen
-    ? 'flex h-screen flex-col overflow-hidden bg-surface-page text-text-primary'
-    : 'min-h-screen bg-surface-page text-text-primary';
-  const mainSlotClassName = isChartScreen ? 'min-h-0 flex-1 overflow-hidden' : '';
+
+  if (isChartScreen && selectedPatient) {
+    return (
+      <div className="h-screen overflow-hidden bg-surface-page text-text-primary">
+        <ChartWorkspace
+          availablePatients={patients}
+          currentUser={session}
+          onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+          onDataChanged={() => setRefreshToken((current) => current + 1)}
+          onMetaChange={setChartMeta}
+          onNavigate={setScreen}
+          onOpenPatient={handleOpenPatient}
+          onPatientStatusChange={handlePatientStatusChange}
+          onReturnReception={() => setScreen(chartReturnScreen)}
+          patient={selectedPatient}
+          currentAdmission={inpatientAdmissions.find(
+            (admission) => admission.patientId === selectedPatient.id && admission.status === 'active',
+          )}
+          recentPatients={recentChartPatients}
+        />
+      </div>
+    );
+  }
+
+  const rootClassName = 'min-h-screen bg-surface-page text-text-primary';
+  const mainSlotClassName = '';
 
   return (
     <div className={rootClassName}>
@@ -460,20 +482,6 @@ function App() {
             searchQuery={searchQuery}
             sortKey={sortKey}
             statusFilter={statusFilter}
-          />
-        ) : selectedPatient ? (
-          <ChartWorkspace
-            availablePatients={patients}
-            currentUser={session}
-            onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
-            onDataChanged={() => setRefreshToken((current) => current + 1)}
-            onMetaChange={setChartMeta}
-            onOpenPatient={handleOpenPatient}
-            onPatientStatusChange={handlePatientStatusChange}
-            onReturnReception={() => setScreen(chartReturnScreen)}
-            patient={selectedPatient}
-            currentAdmission={inpatientAdmissions.find((admission) => admission.patientId === selectedPatient.id && admission.status === 'active')}
-            recentPatients={recentChartPatients}
           />
         ) : (
           <main className='mx-auto max-w-[1600px] px-4 py-8 lg:px-6'>

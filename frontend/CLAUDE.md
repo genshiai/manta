@@ -11,13 +11,23 @@ This file is auto-loaded by Claude Code when working in `frontend/`. It combines
 
 ### Project Context
 
-Manta は外来クリニック向け EMR SaaS。**カルテ画面は [`src/components/ChartWorkspace.tsx`](src/components/ChartWorkspace.tsx) に集約されている**（現状 3791 行・分割予定）。**モダン SaaS 水準（Notion / Linear / Vercel / Stripe）を目指し、レガシー EMR の多色・高密度パターンは採用しない**（[`../docs/DESIGN_GUIDELINES.md`](../docs/DESIGN_GUIDELINES.md) のセクション 0「絶対原則」）。
+Manta は外来クリニック向け EMR SaaS。**カルテ画面のオーケストレータは [`src/components/ChartWorkspace.tsx`](src/components/ChartWorkspace.tsx)**（データ取得・状態管理を集約）、描画は [`src/components/chart/`](src/components/chart/) 以下に分割済み。**モダン SaaS 水準（Apple HIG / Linear / Vercel / Stripe）を目指し、レガシー EMR の多色・高密度パターンは採用しない**（[`../docs/DESIGN_GUIDELINES.md`](../docs/DESIGN_GUIDELINES.md) のセクション 0「絶対原則」）。
 
-### Design System Status (2026-04-29 時点)
+> **カルテ UI は「読む・書く・作業する」ドキュメント型に転換済み。** 新規実装の正本は [`../docs/KARTE_UI_SPEC.md`](../docs/KARTE_UI_SPEC.md)（[ADR 0006](../docs/decisions/0006-karte-document-ui.md)）、ビジュアル正本は [`../docs/mock-html/karte-b.html`](../docs/mock-html/karte-b.html)。[`CHART-DESIGN.md`](CHART-DESIGN.md)（3ペイン+8タブ前提）は旧方針（Superseded）。
 
-- **採用**: StyleSeed + Notion skin（[`../docs/decisions/0002-styleseed-adoption.md`](../docs/decisions/0002-styleseed-adoption.md)）
-- **離脱**: デジタル庁デザインシステム参照（[`../docs/decisions/0001-design-system-digital-cho-and-pivot.md`](../docs/decisions/0001-design-system-digital-cho-and-pivot.md)）
+### Design System Status (2026-07-05 時点)
+
+- **採用**: StyleSeed エンジン + **Apple HIG skin**（`--brand #0071e3` / theme.css が正本 / [ADR 0003](../docs/decisions/0003-color-system-apple-hig.md)）。旧「Notion skin」記述は陳腐化。
+- **離脱**: デジタル庁デザインシステム参照（[ADR 0001](../docs/decisions/0001-design-system-digital-cho-and-pivot.md)）
 - **方針転換は必ず ADR に記録**: `docs/decisions/template.md` をコピーして起票
+
+### レガシートークン禁止（§2-6 ガードレール）
+
+新規コードで以下を使わない（既存コードはファイル単位で別 PR 置換）:
+
+- クラス: `solid-gray-*` / `text-mono-*` / `text-std-*` / `text-oln-*`（旧デジタル庁トークン）
+- インポート: `@/vendor/dads` / `../lib/cn`（新規は `@/components/ui/utils` の `cn`）
+- 臨床画面（カルテ・温度板）に `.dark` を伝播させない。ルートに `.clinical` を付与しライト固定（[KARTE_UI_SPEC §9.1](../docs/KARTE_UI_SPEC.md)）
 
 ### 既存トークンとのマイグレーション境界
 
@@ -39,6 +49,8 @@ text-oln-16B-100      → 16px Bold lh100% （旧）
 
 ### 必読 ADR / ドキュメント
 
+- [`../docs/KARTE_UI_SPEC.md`](../docs/KARTE_UI_SPEC.md) — **カルテ UI 実装の正本**（読む・書く・作業する / 寸法・トークン・API・フェーズ・受け入れ基準）
+- [ADR 0006](../docs/decisions/0006-karte-document-ui.md) — カルテのドキュメント型転換（決定と経緯）
 - [`../docs/DESIGN_GUIDELINES.md`](../docs/DESIGN_GUIDELINES.md) セクション 0「絶対原則」 — モダン SaaS 志向 / 多色禁止 / プライマリ 1 色等
 - [`../docs/decisions/`](../docs/decisions/) — 主要意思決定の経緯（ADR）
 - [`DESIGN-LANGUAGE.md`](DESIGN-LANGUAGE.md) — StyleSeed の 69 視覚設計ルール（新規 UI 着手前に Table of Contents → rules 14, 18, 19, 61-63 を読む）

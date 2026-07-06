@@ -40,7 +40,8 @@ NNNN-kebab-case-title.md
 | [0002](0002-styleseed-adoption.md) | styleseed 採用・Notion skin 単独構成・Tailwind v4 同時移行 | Accepted | design-system, frontend, tailwind |
 | [0003](0003-color-system-apple-hig.md) | Apple HIG (apple.com/jp) 準拠のカラーシステム採用 | Accepted | design-system, frontend, color-tokens, typography |
 | [0004](0004-receipt-gateway-and-ai-claims-assist.md) | Mantaレセコンと AI 算定補助層を採用 | Accepted | rececon, receipt, billing, claims, orca, ai, architecture |
-| [0005](0005-oss-process-economy-and-license.md) | Manta を プロセスエコノミー として OSS 公開、ライセンスは FSL-1.1-Apache-2.0 | Proposed | license, oss, community, marketing, governance |
+| [0005](0005-oss-process-economy-and-license.md) | Manta を プロセスエコノミー として OSS 公開、ライセンスは Apache 2.0 統一 | Proposed | license, oss, community, marketing, governance |
+| [0006](0006-karte-document-ui.md) | カルテUIをドキュメント型「読む・書く・作業する」に転換 | Accepted | design-system, frontend, karte, ux, ai |
 
 ## ファイル一覧外（本ディレクトリのメタ）
 

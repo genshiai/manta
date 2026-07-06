@@ -1,5 +1,9 @@
 # Manta カルテ画面 設計指針 (CHART-DESIGN.md)
 
+> ## ⚠️ Superseded（2026-07-05）
+> 本文書の **3ペイン + 上部タブ前提の記述は旧方針** です。カルテUIは [ADR 0006](../docs/decisions/0006-karte-document-ui.md) により**ドキュメント型「読む・書く・作業する」**（シート=1本のスクロール・1カラム既定+ピン留め・⌘Oコンポーザ・温度板継承・臨床画面ライト固定）へ転換しました。
+> **新規実装は [`docs/KARTE_UI_SPEC.md`](../docs/KARTE_UI_SPEC.md) を正**とし、ビジュアルは [`docs/mock-html/karte-b.html`](../docs/mock-html/karte-b.html) を参照してください。以下で今も有効なのは §0 上位原則・§3 スクロールvsタブの使い分け・§7 アクセシビリティのみ。
+
 このファイルはカルテ画面（[`src/components/chart/`](src/components/chart/)）の設計言語を明文化したもの。Claude Code は新規 UI 着手前に必ず読む。上位の設計ルールは [`CLAUDE.md`](CLAUDE.md) と [`DESIGN-LANGUAGE.md`](DESIGN-LANGUAGE.md) を参照。
 
 ---

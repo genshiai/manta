@@ -105,6 +105,15 @@
   --sidebar-accent-foreground: #1d1d1f;
   --sidebar-border: #d2d2d7;
   --sidebar-ring: #0071e3;
+
+  /* === カルテ / 温度板トークン (KARTE_UI_SPEC §9.2) === */
+  --vt-temp: #1d4ed8;   /* 温度板 体温 = 青（標準・変更禁止） */
+  --vt-pulse: #d70015;  /* 温度板 脈拍 = 赤（標準・変更禁止） */
+  --vt-bp: #5e8468;     /* 温度板 血圧 ∨∧ */
+  --lab-high: #d70015;  /* 検査高値（destructive と同値だが意味を分離） */
+  --lab-low: #0a5dc2;   /* 検査低値 */
+  --dim: rgba(29, 29, 31, 0.34); /* コンポーザ背景の減光 */
+  --shadow-popover: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.1);
 }
 
 .dark {
@@ -178,7 +187,70 @@
   --sidebar-ring: #62aef0;
 }
 
+/* === 臨床画面ライト固定 (KARTE_UI_SPEC §9.1) ===
+ * カルテ・温度板コンテナに .clinical を付与する。祖先に .dark があっても
+ * 下記でライト値を再宣言することで臨床画面は常に白基調になる（モック karte-b.html の .mk と同思想）。 */
+.clinical {
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --primary: #1d1d1f;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f7;
+  --secondary-foreground: #1d1d1f;
+  --muted: #e8e5e1;
+  --muted-foreground: rgba(29, 29, 31, 0.72);
+  --accent: #f5f5f7;
+  --accent-foreground: #1d1d1f;
+  --destructive: #ff3b30;
+  --destructive-foreground: #ffffff;
+  --success: #34c759;
+  --success-foreground: #ffffff;
+  --warning: #ff9500;
+  --warning-foreground: #ffffff;
+  --info: #0071e3;
+  --info-foreground: #ffffff;
+  --text-primary: #1d1d1f;
+  --text-secondary: rgba(29, 29, 31, 0.72);
+  --text-tertiary: #6e6e73;
+  --text-disabled: #c4c0bb;
+  --icon-default: rgba(29, 29, 31, 0.72);
+  --surface-page: #f5f5f7;
+  --surface-subtle: #f5f5f7;
+  --surface-muted: #e8e5e1;
+  --brand: #0071e3;
+  --brand-tint: #e8f1fc;
+  --brand-hover: #0066cc;
+  --border-strong: #bcbcc2;
+  --warning-bg: #fff4e5;
+  --destructive-bg: #ffe5e3;
+  --success-bg: #e5f8ea;
+  --alert-badge: #ff3b30;
+  --border: #d2d2d7;
+  --input: transparent;
+  --input-background: #f5f5f7;
+  --switch-background: #c4c0bb;
+  --ring: #0071e3;
+  --vt-temp: #1d4ed8;
+  --vt-pulse: #d70015;
+  --vt-bp: #5e8468;
+  --lab-high: #d70015;
+  --lab-low: #0a5dc2;
+  --dim: rgba(29, 29, 31, 0.34);
+  --shadow-card: rgba(0, 0, 0, 0.04) 0px 4px 18px, rgba(0, 0, 0, 0.02) 0px 0.8px 2.93px;
+  color: var(--foreground);
+}
+
 @theme inline {
+  --color-vt-temp: var(--vt-temp);
+  --color-vt-pulse: var(--vt-pulse);
+  --color-vt-bp: var(--vt-bp);
+  --color-lab-high: var(--lab-high);
+  --color-lab-low: var(--lab-low);
+  --color-dim: var(--dim);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

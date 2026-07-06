@@ -1,25 +1,21 @@
+import { Calendar, Sparkles, TriangleAlert, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addImagingOrder,
   addLabOrder,
   addPrescription,
   addProcedureOrder,
-  cancelImagingOrder,
-  cancelLabOrder,
-  cancelProcedureOrder,
-  cancelReservation,
   copyLastPrescriptions,
   getChartOrderConfig,
   getChartWorkspace,
+  getInpatientProgress,
+  getInpatientSummaryDraft,
   getLabLongTrends,
   getPrescriptionTimeline,
   isUnauthorizedError,
   saveChart,
   savePatientContext,
   saveReservation,
-  updateImagingOrder,
-  updateLabOrder,
-  updateProcedureOrder,
 } from '../lib/api';
 import type { PatientRecord, ReceptionStatus } from '../data/chartMock';
 import type {
@@ -27,9 +23,10 @@ import type {
   ChartMeta,
   ChartOrderConfig,
   ChartTemplate,
-  ChartVersion,
   ImagingOrderEntry,
   InpatientAdmission,
+  InpatientProgress,
+  InpatientSummaryDraft,
   LabLongTrendItem,
   LabResultEntry,
   PatientProfileEntry,
@@ -41,38 +38,43 @@ import type {
   ReservationSlot,
   ScheduledVisit,
   UserSession,
-  VisitHistoryEntry,
   VitalEntry,
 } from '../types/workflow';
-import { ChartShell } from './chart/ChartShell';
-import { ChartTopBar } from './chart/ChartTopBar';
-import { LabsSheet } from './chart/LabsSheet';
 import { NextVisitDialog } from './chart/NextVisitDialog';
-import { OrderPane, type OrderTab } from './chart/OrderPane';
-import { PatientPane } from './chart/PatientPane';
-import { RecordPane } from './chart/RecordPane';
-import type { SoapDraft } from './chart/SoapEditor';
+import { CommandPalette, type CommandAction } from './chart/panels/CommandPalette';
+import { LabsMatrix } from './chart/panels/LabsMatrix';
+import { AiStrip } from './chart/shell/AiStrip';
+import { ClinicalShell } from './chart/shell/ClinicalShell';
+import { PatientBar } from './chart/shell/PatientBar';
+import { TopBar } from './chart/shell/TopBar';
+import { Sheet } from './chart/sheet/Sheet';
+import {
+  type AdmissionBlockData,
+  buildLabBlock,
+  buildTodayBlock,
+  buildVisitBlocks,
+  computeBillingPreview,
+  filterByLens,
+  formatDayHeader,
+  type Lens,
+  type SoapText,
+  type StreamBlock,
+} from './chart/sheet/streamModel';
+import { buildVitalDays } from './chart/sheet/vitalsModel';
+import { OrderComposer } from './chart/work/OrderComposer';
+import { AiSummaryCard } from './chart/summary/AiSummaryCard';
+import { buildSummary } from './chart/summary/summaryModel';
+import { AgentTray } from './chart/panels/AgentTray';
+import { StoryboardPanel } from './chart/panels/StoryboardPanel';
+import { buildProposals, type ProposalAction } from './chart/panels/agentModel';
+import { usePins } from './chart/hooks/usePins';
+import { InlineEditor } from './chart/write/InlineEditor';
+import { WriteToolsTray } from './chart/write/WriteToolsTray';
+import type { RecentEntry } from './chart/write/slashModel';
 
-type ChartView =
-  | 'chart'
-  | 'history'
-  | 'calendar'
-  | 'labs'
-  | 'imaging'
-  | 'documents'
-  | 'reservations'
-  | 'search';
+type SoapDraft = SoapText;
 
-const chartTabs: Array<{ value: ChartView; label: string }> = [
-  { value: 'chart', label: '診療録' },
-  { value: 'history', label: '履歴' },
-  { value: 'calendar', label: 'カレンダー' },
-  { value: 'labs', label: '検査' },
-  { value: 'imaging', label: '画像' },
-  { value: 'documents', label: '文書' },
-  { value: 'reservations', label: '予約' },
-  { value: 'search', label: '検索' },
-];
+type RailTarget = 'reception' | 'ward' | 'billing' | 'settings';
 
 type ChartWorkspaceProps = {
   patient: PatientRecord;
@@ -84,6 +86,7 @@ type ChartWorkspaceProps = {
   onDataChanged: () => void;
   onOpenPatient: (patient: PatientRecord) => void;
   onReturnReception: () => void;
+  onNavigate: (screen: RailTarget) => void;
   onMetaChange: (meta: ChartMeta) => void;
   onPatientStatusChange: (
     patientId: string,
@@ -127,6 +130,15 @@ const draftFromTemplate = (template: ChartTemplate): SoapDraft => ({
   plan: template.plan,
 });
 
+/** ISO/日付文字列から HH:MM を取り出す。失敗時は原文。 */
+const formatClock = (raw: string | null): string => {
+  if (!raw) return '—';
+  const match = raw.match(/(\d{1,2}):(\d{2})/);
+  if (match) return `${match[1].padStart(2, '0')}:${match[2]}`;
+  return raw;
+};
+
+
 /**
  * カルテ画面のオーケストレーター。
  * - データ取得・状態管理・API 呼び出しを集約
@@ -144,6 +156,7 @@ export function ChartWorkspace({
   onDataChanged,
   onOpenPatient,
   onReturnReception,
+  onNavigate,
   onMetaChange,
   onPatientStatusChange,
 }: ChartWorkspaceProps) {
@@ -151,9 +164,7 @@ export function ChartWorkspace({
   const [orderConfig, setOrderConfig] = useState<ChartOrderConfig>(emptyOrderConfig);
   const [profile, setProfile] = useState<IdEntry<PatientProfileEntry>[]>([]);
   const [problems, setProblems] = useState<IdEntry<ProblemListItem>[]>([]);
-  const [visitHistory, setVisitHistory] = useState<VisitHistoryEntry[]>([]);
   const [chartHistory, setChartHistory] = useState<ChartHistoryEntry[]>([]);
-  const [versions, setVersions] = useState<ChartVersion[]>([]);
   const [vitals, setVitals] = useState<VitalEntry[]>([]);
   const [labResults, setLabResults] = useState<LabResultEntry[]>([]);
   const [labLongTrends, setLabLongTrends] = useState<LabLongTrendItem[]>([]);
@@ -164,7 +175,38 @@ export function ChartWorkspace({
   const [prescriptionTimeline, setPrescriptionTimeline] = useState<PrescriptionTimelineGroup[]>(
     [],
   );
-  const [activeView, setActiveView] = useState<ChartView>('chart');
+  // シート表示状態
+  const [activeLens, setActiveLens] = useState<Lens>('all');
+  const [expandedVisits, setExpandedVisits] = useState<Set<string>>(() => new Set());
+  // 今セッションで追加した行為名（新規 chip 判定）
+  const [sessionAddedNames, setSessionAddedNames] = useState<Set<string>>(() => new Set());
+  const markNew = useCallback((name: string) => {
+    setSessionAddedNames((prev) => {
+      const next = new Set(prev);
+      next.add(name);
+      return next;
+    });
+  }, []);
+
+  // AIサマリー / ピン / 提案（Phase 4）
+  const [summaryExpanded, setSummaryExpanded] = useState(true);
+  const [summaryFormat, setSummaryFormat] = useState<'prose' | 'briefing'>('prose');
+  const [acceptedProposalIds, setAcceptedProposalIds] = useState<Set<string>>(() => new Set());
+  const [dismissedProposalIds, setDismissedProposalIds] = useState<Set<string>>(() => new Set());
+  const { pins, toggleLeft, toggleRight } = usePins(currentUser.userId, currentUser.role);
+  const sheetScrollRef = useRef<HTMLDivElement>(null);
+  // 入院（温度板）データ
+  const [admissionProgress, setAdmissionProgress] = useState<InpatientProgress | null>(null);
+  const [admissionSummary, setAdmissionSummary] = useState<InpatientSummaryDraft | null>(null);
+  // Write モード（その場展開）
+  const [writeMode, setWriteMode] = useState(false);
+  // キーマップ用の最新値参照（stale closure 回避）
+  const writeModeRef = useRef(writeMode);
+  writeModeRef.current = writeMode;
+  const keyActionsRef = useRef<{ finishVisit: () => void; finishWriting: () => void }>({
+    finishVisit: () => {},
+    finishWriting: () => {},
+  });
 
   // SOAP & 保存状態
   const [draft, setDraft] = useState<SoapDraft>(emptyDraft);
@@ -178,14 +220,16 @@ export function ChartWorkspace({
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [orderMessage, setOrderMessage] = useState('オーダを追加・確認できます');
+  // オーダー系ハンドラの結果メッセージ（UI 未接続。将来トーストに接続）
+  const [, setOrderMessage] = useState('オーダを追加・確認できます');
 
   // モーダル
-  const [labsSheetOpen, setLabsSheetOpen] = useState(false);
+  const [labsMatrixOpen, setLabsMatrixOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [reservationDialogOpen, setReservationDialogOpen] = useState(false);
-  const [orderDialogTab, setOrderDialogTab] = useState<OrderTab | null>(null);
   const [reservationSlots, setReservationSlots] = useState<ReservationSlot[]>([]);
-  const [scheduledVisit, setScheduledVisit] = useState<ScheduledVisit | null>(null);
+  const [, setScheduledVisit] = useState<ScheduledVisit | null>(null);
 
   const initializedPatientIdRef = useRef<string | null>(null);
 
@@ -204,21 +248,57 @@ export function ChartWorkspace({
     () => problems.filter((problem) => problem.status !== 'resolved').map((problem) => problem.name),
     [problems],
   );
-  const prioritizedChartTemplates = useMemo(() => {
-    return [...orderConfig.chartTemplates].sort((a, b) => {
-      const score = (template: ChartTemplate) => {
-        const haystack = [template.label, template.subjective, template.objective, template.assessment, template.plan].join(' ');
-        const problemMatched = activeProblemNames.some((problem) => problem && haystack.includes(problem));
-        return (problemMatched ? 20 : 0) + (template.department === patient.department ? 10 : 0) + (template.department === '共通' ? 4 : 0);
-      };
-      return score(b) - score(a) || a.label.localeCompare(b.label, 'ja-JP');
-    });
-  }, [activeProblemNames, orderConfig.chartTemplates, patient.department]);
 
   // 親コンポーネントへのメタ通知
   useEffect(() => {
     onMetaChange({ isDirty, lastSavedAt, version, pendingWarnings: 0 });
   }, [isDirty, lastSavedAt, onMetaChange, version]);
+
+  // キーボードマップ（KARTE_UI_SPEC §10）。⌘K は Phase 7 で追加。
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inField =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      const meta = event.metaKey || event.ctrlKey;
+
+      if (meta && event.key === 'Enter') {
+        event.preventDefault();
+        if (writeModeRef.current) keyActionsRef.current.finishWriting();
+        else keyActionsRef.current.finishVisit();
+        return;
+      }
+      if (meta) {
+        const key = event.key.toLowerCase();
+        if (key === 'o') {
+          event.preventDefault();
+          setComposerOpen(true);
+        } else if (key === 'l') {
+          event.preventDefault();
+          setLabsMatrixOpen(true);
+        } else if (key === 'k') {
+          event.preventDefault();
+          setCommandOpen(true);
+        } else if (key === 'j') {
+          event.preventDefault();
+          toggleRight();
+        } else if (event.key === '\\') {
+          event.preventDefault();
+          toggleLeft();
+        }
+        return;
+      }
+      if (!inField && (event.key === 'e' || event.key === 'E')) {
+        event.preventDefault();
+        setWriteMode(true);
+      } else if (event.key === 'Escape' && writeModeRef.current) {
+        setWriteMode(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toggleLeft, toggleRight]);
 
   const loadWorkspace = useCallback(async () => {
     setIsLoading(true);
@@ -238,9 +318,7 @@ export function ChartWorkspace({
       setSelectedTemplateId(nextOrderConfig.chartTemplates[0]?.id ?? '');
       setProfile(withId(workspace.patientProfile));
       setProblems(withId(workspace.problems));
-      setVisitHistory(workspace.visitHistory);
       setChartHistory(workspace.chartHistory);
-      setVersions(workspace.versions);
       setVitals(workspace.vitals);
       setLabResults(workspace.labResults);
       setLabOrders(workspace.labOrders);
@@ -285,6 +363,33 @@ export function ChartWorkspace({
     initializedPatientIdRef.current = patient.id;
     loadWorkspace();
   }, [loadWorkspace, patient.id]);
+
+  // 入院チャートなら温度板データ（経過・退院サマリー下書き）を取得
+  useEffect(() => {
+    if (!currentAdmission) {
+      setAdmissionProgress(null);
+      setAdmissionSummary(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [progress, summaryDraft] = await Promise.all([
+          getInpatientProgress(currentAdmission.id),
+          getInpatientSummaryDraft(currentAdmission.id).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setAdmissionProgress(progress);
+          setAdmissionSummary(summaryDraft);
+        }
+      } catch (error) {
+        if (isUnauthorizedError(error)) onAuthExpired();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentAdmission, onAuthExpired]);
 
   // === ハンドラ ===
 
@@ -499,127 +604,6 @@ export function ChartWorkspace({
     }
   };
 
-  const handleUpdateLab = async (
-    order: LabOrderRow,
-    payload: { category?: string; urgency?: '通常' | '至急' | null; items?: string[]; status?: LabOrderRow['status'] },
-  ) => {
-    setIsMutating(true);
-    try {
-      await updateLabOrder(order.id, payload);
-      const refreshed = await getChartWorkspace(patient.id);
-      setLabOrders(refreshed.labOrders);
-      setOrderMessage(`検査オーダを更新しました: ${payload.category ?? order.category}`);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setOrderMessage(`検査更新に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const handleCancelLab = async (order: LabOrderRow) => {
-    setIsMutating(true);
-    try {
-      await cancelLabOrder(order.id);
-      const refreshed = await getChartWorkspace(patient.id);
-      setLabOrders(refreshed.labOrders);
-      setOrderMessage(`検査オーダを取消しました: ${order.category}`);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setOrderMessage(`検査取消に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const handleUpdateImaging = async (index: number, entry: ImagingOrderEntry) => {
-    const orderRef = entry.id ?? index;
-    setIsMutating(true);
-    try {
-      await updateImagingOrder(patient.id, orderRef, entry);
-      const refreshed = await getChartWorkspace(patient.id);
-      setImagingOrders(refreshed.imagingOrders);
-      setOrderMessage(`画像オーダを更新しました: ${entry.category}`);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setOrderMessage(`画像更新に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const handleCancelImaging = async (index: number, entry: ImagingOrderEntry) => {
-    const orderRef = entry.id ?? index;
-    setIsMutating(true);
-    try {
-      await cancelImagingOrder(patient.id, orderRef);
-      const refreshed = await getChartWorkspace(patient.id);
-      setImagingOrders(refreshed.imagingOrders);
-      setOrderMessage(`画像オーダを取消しました: ${entry.category}`);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setOrderMessage(`画像取消に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const handleUpdateProcedure = async (index: number, entry: ProcedureOrderEntry) => {
-    const orderRef = entry.id ?? index;
-    setIsMutating(true);
-    try {
-      await updateProcedureOrder(patient.id, orderRef, entry);
-      const refreshed = await getChartWorkspace(patient.id);
-      setProcedureOrders(refreshed.procedureOrders);
-      setOrderMessage(`処置を更新しました: ${entry.title}`);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setOrderMessage(`処置更新に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const handleCancelProcedure = async (index: number, entry: ProcedureOrderEntry) => {
-    const orderRef = entry.id ?? index;
-    setIsMutating(true);
-    try {
-      await cancelProcedureOrder(patient.id, orderRef);
-      const refreshed = await getChartWorkspace(patient.id);
-      setProcedureOrders(refreshed.procedureOrders);
-      setOrderMessage(`処置を取消しました: ${entry.title}`);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setOrderMessage(`処置取消に失敗: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
   const handleSaveContext = async (
     nextProfile: IdEntry<PatientProfileEntry>[],
     nextProblems: IdEntry<ProblemListItem>[],
@@ -645,6 +629,18 @@ export function ChartWorkspace({
     } finally {
       setIsMutating(false);
     }
+  };
+
+  const handleAddDiagnosis = async (name: string, icd10?: string) => {
+    if (problems.some((p) => p.name === name)) return;
+    const nextProblem: IdEntry<ProblemListItem> = {
+      id: `dx-${Date.now()}`,
+      name,
+      since: new Date().toISOString().slice(0, 10),
+      status: 'active',
+      icd10Code: icd10,
+    };
+    await handleSaveContext(profile, [...problems, nextProblem]);
   };
 
   const handleFinishVisit = () => {
@@ -733,154 +729,464 @@ export function ChartWorkspace({
     await finalizeFinishVisit();
   };
 
-  const handleCancelReservation = async () => {
-    if (!scheduledVisit) {
-      return;
+  // === シート構築（既存データ → 時系列ブロック列） ===
+  const streamBlocks = useMemo<StreamBlock[]>(() => {
+    const today = buildTodayBlock({
+      patientDepartment: patient.department,
+      doctor: currentUser.displayName,
+      soap: draft,
+      version,
+      savedAt: lastSavedAt,
+      vitals,
+      prescriptions,
+      labOrders,
+      imagingOrders,
+      procedureOrders,
+      billing: computeBillingPreview({
+        hasVisit: true,
+        prescriptionCount: prescriptions.length,
+        managedProblemCount: activeProblemNames.length,
+      }),
+      reason: patient.comment || undefined,
+      newlyAddedNames: sessionAddedNames,
+    });
+    const lab = buildLabBlock(labResults);
+    const visits = buildVisitBlocks(chartHistory, prescriptionTimeline);
+
+    let admission: AdmissionBlockData | null = null;
+    if (currentAdmission && admissionProgress) {
+      const days = buildVitalDays(admissionProgress);
+      const nursingCount = admissionProgress.rows.reduce((sum, r) => sum + r.nursingNotes.length, 0);
+      const instrCount = admissionProgress.rows.reduce((sum, r) => sum + r.instructions.length, 0);
+      const admitLabel = formatDayHeader(currentAdmission.admittedAt ?? '').label;
+      const loc = [currentAdmission.floor, currentAdmission.bedLabel, `主治医 ${currentAdmission.attendingDoctor}`]
+        .filter(Boolean)
+        .join(' · ');
+      admission = {
+        kind: 'admission',
+        id: `admission-${currentAdmission.id}`,
+        dateKey: currentAdmission.admittedAt ?? 'admission',
+        dateLabel: admitLabel,
+        meta: currentAdmission.primaryDiagnosis ?? '入院',
+        categories: ['exam'],
+        headerRange: `入院 ${admitLabel}〜（${currentAdmission.stayDays}日目）`,
+        diagnosis: `${currentAdmission.primaryDiagnosis ?? '入院'} · ${currentAdmission.stayDays}日間`,
+        location: loc,
+        days,
+        rangeLabel: admitLabel,
+        rangeSubLabel: `入院 ${currentAdmission.stayDays}日目 · 横スクロールでも移動`,
+        abstract: admissionSummary?.body ?? currentAdmission.latestNursingAssessment ?? '入院経過を記録中。',
+        documents: [
+          {
+            name: '退院サマリー',
+            status: admissionSummary ? 'AI下書きあり（要承認）' : '未作成',
+            ok: false,
+          },
+          { name: '入院診療計画書', status: '署名済み', ok: true },
+        ],
+        billingLabel: 'ドラフト ›',
+        foldLabel: `看護記録 ${nursingCount}件 · 指示履歴 ${instrCount}件 — 展開して読む`,
+      };
     }
 
-    setIsMutating(true);
-    try {
-      await cancelReservation(patient.id);
-      setScheduledVisit(null);
-      onDataChanged();
-    } catch (error) {
-      if (isUnauthorizedError(error)) {
-        onAuthExpired();
-        return;
-      }
-      setSaveMessage(
-        `予約取消に失敗しました: ${error instanceof Error ? formatApiMessage(error.message) : '不明なエラー'}`,
-      );
-    } finally {
-      setIsMutating(false);
+    return [...(admission ? [admission] : []), today, ...(lab ? [lab] : []), ...visits];
+  }, [
+    patient.department,
+    patient.comment,
+    currentUser.displayName,
+    draft,
+    version,
+    lastSavedAt,
+    vitals,
+    prescriptions,
+    labOrders,
+    imagingOrders,
+    procedureOrders,
+    activeProblemNames.length,
+    labResults,
+    chartHistory,
+    prescriptionTimeline,
+    sessionAddedNames,
+    currentAdmission,
+    admissionProgress,
+    admissionSummary,
+  ]);
+
+  const filteredBlocks = useMemo(
+    () => filterByLens(streamBlocks, activeLens),
+    [streamBlocks, activeLens],
+  );
+
+  const toggleVisit = useCallback((id: string) => {
+    setExpandedVisits((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const insuranceMeta = profile.find((d) => d.label.includes('保険'))?.value;
+  const patientMeta = [
+    `${patient.age}${patient.age.includes('歳') ? '' : '歳'} ${patient.sex}`,
+    patient.id,
+    insuranceMeta,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const saveDot: 'ok' | 'warn' | 'bad' = isDirty ? 'warn' : 'ok';
+  const saveText = isDirty
+    ? '未保存の変更'
+    : lastSavedAt
+      ? `保存済み ${formatClock(lastSavedAt)}`
+      : saveMessage;
+
+  const summaryUpdatedAt = lastSavedAt ? formatClock(lastSavedAt) : '—';
+
+  // AIサマリー生成コントラクト（v1 ルール生成。§4.4・§13）
+  const summary = useMemo(
+    () =>
+      buildSummary({
+        problems,
+        labResults,
+        chartHistory,
+        alerts: patient.alerts,
+        todayReason: patient.comment || undefined,
+        updatedAt: summaryUpdatedAt,
+      }),
+    [problems, labResults, chartHistory, patient.alerts, patient.comment, summaryUpdatedAt],
+  );
+
+  // エージェント提案（未処理のみ）
+  const proposals = useMemo(
+    () =>
+      buildProposals({
+        prescriptions,
+        catalog: orderConfig.prescriptionCatalog,
+        problems,
+        alerts: patient.alerts,
+        managedProblemCount: activeProblemNames.length,
+        billingAcked: acceptedProposalIds.has('billing-management'),
+      }).filter((p) => !dismissedProposalIds.has(p.id)),
+    [
+      prescriptions,
+      orderConfig.prescriptionCatalog,
+      problems,
+      patient.alerts,
+      activeProblemNames.length,
+      acceptedProposalIds,
+      dismissedProposalIds,
+    ],
+  );
+  const agentCount = proposals.filter((p) => !acceptedProposalIds.has(p.id)).length;
+
+  const planSummary = {
+    rx: prescriptions.length,
+    lab: pendingLabOrders.length,
+    imaging: imagingOrders.filter((o) => o.status !== 'cancelled').length,
+    points: streamBlocks[0]?.kind === 'today' ? (streamBlocks[0].billing?.total ?? null) : null,
+  };
+
+  const jumpToBlock = useCallback((dateKey: string) => {
+    const container = sheetScrollRef.current;
+    if (!container) return;
+    const target = container.querySelector<HTMLElement>(`[data-datekey="${CSS.escape(dateKey)}"]`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const handleProposalAction = (proposalId: string, action: ProposalAction) => {
+    switch (action.type) {
+      case 'addDiagnosis':
+        void handleAddDiagnosis(action.diagnosisName);
+        setAcceptedProposalIds((prev) => new Set(prev).add(proposalId));
+        break;
+      case 'ackBilling':
+        setAcceptedProposalIds((prev) => new Set(prev).add(proposalId));
+        break;
+      case 'openUrl':
+        window.open(action.url, '_blank', 'noopener');
+        break;
+      case 'dismiss':
+        setDismissedProposalIds((prev) => new Set(prev).add(proposalId));
+        break;
     }
   };
 
-  const abnormalLabCount = labResults.filter((r) => r.flag === 'high').length;
+  const calBase = (() => {
+    const raw = lastSavedAt ? lastSavedAt.replace(/\//g, '-').split(/[ T]/)[0] : '';
+    const d = raw ? new Date(raw) : new Date();
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  })();
+  const calMonth = { year: calBase.getFullYear(), month: calBase.getMonth() + 1 };
+  const todayIso = `${calBase.getFullYear()}-${String(calBase.getMonth() + 1).padStart(2, '0')}-${String(calBase.getDate()).padStart(2, '0')}`;
+  const visitDates = chartHistory.map((v) => v.date);
+
+  // === Write モード（その場エディタ / ／ / @） ===
+  const slashRecents: RecentEntry[] = [];
+  const copyableGroup = prescriptionTimeline.find((g) => g.copyable && !g.isToday);
+  if (copyableGroup) {
+    slashRecents.push({ id: 'do', label: `前回Do処方（${copyableGroup.itemCount}剤）`, sub: `前回 ${copyableGroup.label}` });
+  }
+  if (orderConfig.labSetOptions[0]) {
+    slashRecents.push({
+      id: `lab:${orderConfig.labSetOptions[0].id}`,
+      label: `${orderConfig.labSetOptions[0].label} セット`,
+      sub: `${orderConfig.labSetOptions[0].items.length}項目`,
+    });
+  }
+  if (orderConfig.prescriptionSets[0]) {
+    slashRecents.push({
+      id: `rx:${orderConfig.prescriptionSets[0].id}`,
+      label: orderConfig.prescriptionSets[0].label,
+      sub: `${orderConfig.prescriptionSets[0].items.length}剤`,
+    });
+  }
+
+  const runRecent = (id: string) => {
+    if (id === 'do') {
+      void handleCopyPrevious();
+    } else if (id.startsWith('lab:')) {
+      const set = orderConfig.labSetOptions.find((s) => s.id === id.slice(4));
+      if (set) {
+        markNew(set.label);
+        void handleAddLab(set.id, '通常');
+      }
+    } else if (id.startsWith('rx:')) {
+      const set = orderConfig.prescriptionSets.find((s) => s.id === id.slice(3));
+      if (set) {
+        for (const item of set.items) {
+          const drug = orderConfig.prescriptionCatalog.find((d) => d.id === item.drugId);
+          if (drug) markNew(drug.drugName);
+        }
+        void handleAddPrescriptionsBatch(set.items);
+      }
+    }
+  };
+
+  const insertIntoDraft = (section: keyof SoapDraft, text: string) => {
+    setDraft((prev) => ({ ...prev, [section]: prev[section] ? `${prev[section]} ${text}` : text }));
+  };
+
+  const missingDxCount = prescriptions.filter((rx) => {
+    const drug = orderConfig.prescriptionCatalog.find(
+      (d) => d.drugName === rx.drugName || rx.drugName.includes(d.drugName),
+    );
+    return drug?.relatedProblem && !activeProblemNames.some((n) => n.includes(drug.relatedProblem ?? '×'));
+  }).length;
+
+  const finishWriting = async () => {
+    await handleSave();
+    setWriteMode(false);
+  };
+  keyActionsRef.current.finishVisit = handleFinishVisit;
+  keyActionsRef.current.finishWriting = () => {
+    void finishWriting();
+  };
+
+  const autosaveLabel = `自動保存 · v${version} · ${lastSavedAt ? formatClock(lastSavedAt) : '—'}`;
+  const todayBlockForEdit = streamBlocks.find((b) => b.kind === 'today') ?? null;
+
+  const commandActions: CommandAction[] = [
+    { id: 'compose', label: 'オーダーを追加（コンポーザ）', kbd: '⌘O', run: () => setComposerOpen(true) },
+    { id: 'write', label: '本日の記載を書く', kbd: 'E', run: () => setWriteMode(true) },
+    { id: 'labs', label: '検査を表で見る', kbd: '⌘L', run: () => setLabsMatrixOpen(true) },
+    { id: 'panel', label: '左パネルを並べる', kbd: '⌘\\', run: toggleLeft },
+    { id: 'agent', label: 'エージェントを召喚', kbd: '⌘J', run: toggleRight },
+    { id: 'finish', label: isInpatientChart ? '病棟へ戻る' : '診察を終了', run: handleFinishVisit },
+  ];
+  const commandPatients = [
+    ...recentPatients,
+    ...availablePatients.filter((p) => !recentPatients.some((r) => r.id === p.id)),
+  ];
 
   return (
     <>
-      <ChartShell
-      topBar={
-        <ChartTopBar
-          patient={patient}
-          availablePatients={availablePatients}
-          recentPatients={recentPatients}
-          currentUser={currentUser}
-          isDirty={isDirty}
-          isMutating={isMutating}
-          saveMessage={saveMessage}
-          lastSavedAt={lastSavedAt}
-          version={version}
-          abnormalLabCount={abnormalLabCount}
-          finishLabel={isInpatientChart ? '病棟へ戻る' : '診察終了'}
-          modeLabel={isInpatientChart ? `${currentAdmission?.wardName ?? '病棟'} ${currentAdmission?.bedLabel ?? ''}`.trim() : '外来'}
-          onOpenPatient={onOpenPatient}
-          onSave={handleSave}
-          onReturnReception={onReturnReception}
-          onFinishVisit={handleFinishVisit}
-          onOpenLabs={() => setLabsSheetOpen(true)}
-        />
-      }
-      tabs={
-        <nav className="flex h-11 items-end gap-1 px-6" aria-label="カルテ画面">
-          {chartTabs.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setActiveView(tab.value)}
-              className={`h-full border-b-2 px-4 text-[13px] font-medium transition-colors ${
-                activeView === tab.value
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
-              }`}
-              aria-current={activeView === tab.value ? 'page' : undefined}
-            >
-              {tab.label}
+      <ClinicalShell
+        activeRail={isInpatientChart ? 'ward' : 'outpatient'}
+        userInitial={currentUser.displayName.slice(0, 1)}
+        onNavigate={onNavigate}
+        topBar={
+          <TopBar
+            crumbRoot={isInpatientChart ? '病棟' : '外来'}
+            patientName={patient.name}
+            crumbTail={isInpatientChart ? currentAdmission?.wardName : undefined}
+            agentCount={agentCount}
+            onBack={onReturnReception}
+            onOpenSearch={() => setCommandOpen(true)}
+            onOpenAgent={toggleRight}
+          />
+        }
+        patientBar={
+          <PatientBar
+            patient={patient}
+            metaLine={patientMeta}
+            saveDot={saveDot}
+            saveText={saveText}
+            finishLabel={isInpatientChart ? '病棟へ戻る' : '診察を終了'}
+            writeMode={writeMode}
+            isMutating={isMutating}
+            onStartWrite={() => setWriteMode(true)}
+            onFinishVisit={handleFinishVisit}
+            onFinishWriting={() => void finishWriting()}
+          />
+        }
+        aiStrip={
+          <AiStrip
+            oneLiner={summary.oneLiner}
+            generatedFrom={summary.generatedFrom}
+            updatedAt={summary.generatedAt}
+            onExpand={() => setSummaryExpanded(true)}
+          />
+        }
+      >
+        {writeMode ? (
+          <aside className="flex w-14 flex-none flex-col items-center gap-2.5 border-r border-border bg-card pt-3">
+            <button type="button" title="患者（⌘\ で展開）" onClick={toggleLeft} className="grid size-9 place-items-center rounded-[9px] text-text-tertiary hover:bg-surface-subtle">
+              <User size={18} strokeWidth={1.7} />
             </button>
-          ))}
-        </nav>
-      }
-      left={
-        <PatientPane
-          patient={patient}
-          profile={profile}
-          problems={problems}
-          visitHistory={visitHistory}
-          chartHistory={chartHistory}
-          prescriptions={prescriptions}
-          labOrders={labOrders}
-          imagingOrders={imagingOrders}
-          isMutating={isMutating}
-          onSaveContext={handleSaveContext}
-          onOpenCalendar={() => setActiveView('calendar')}
-        />
-      }
-      center={
-        <RecordPane
-          patientId={patient.id}
-          view={activeView}
-          draft={draft}
-          authorName={currentUser.displayName}
-          department={patient.department}
-          isDirty={isDirty}
-          vitals={vitals}
-          templates={prioritizedChartTemplates}
-          selectedTemplateId={selectedTemplateId}
-          isMutating={isMutating}
-          versions={versions}
-          chartHistory={chartHistory}
-          prescriptionTimeline={prescriptionTimeline}
-          labResults={labResults}
-          labLongTrends={labLongTrends}
-          labOrders={labOrders}
-          imagingOrders={imagingOrders}
-          procedureOrders={procedureOrders}
-          scheduledVisit={scheduledVisit}
-          reservationSlots={reservationSlots}
-          workspaceError={workspaceError}
+            <span
+              title="注意"
+              className={`grid size-9 place-items-center rounded-[9px] ${
+                patient.alerts.length > 0 ? 'bg-destructive-bg text-destructive' : 'text-text-tertiary'
+              }`}
+            >
+              <TriangleAlert size={18} strokeWidth={1.7} />
+            </span>
+            <button type="button" title="AI（⌘J）" onClick={toggleRight} className="grid size-9 place-items-center rounded-[9px] text-text-tertiary hover:bg-surface-subtle">
+              <Sparkles size={18} strokeWidth={1.7} />
+            </button>
+            <span title="暦" className="grid size-9 place-items-center rounded-[9px] text-text-tertiary">
+              <Calendar size={18} strokeWidth={1.7} />
+            </span>
+          </aside>
+        ) : pins.left ? (
+          <StoryboardPanel
+            patient={patient}
+            profile={profile}
+            problems={problems}
+            summary={summary}
+            visitDates={visitDates}
+            month={calMonth}
+            today={todayIso}
+            onAddProblem={() => setComposerOpen(true)}
+            onExpandSummary={() => setSummaryExpanded(true)}
+            onJumpDate={jumpToBlock}
+            onUnpin={toggleLeft}
+          />
+        ) : null}
+        <Sheet
+          blocks={filteredBlocks}
+          activeLens={activeLens}
+          onLensChange={setActiveLens}
+          onOpenCalendar={toggleLeft}
+          onOpenLabs={() => setLabsMatrixOpen(true)}
+          onTogglePanels={toggleLeft}
+          expandedVisits={expandedVisits}
+          onToggleVisit={toggleVisit}
+          onCompose={() => setComposerOpen(true)}
+          streamEndLabel={`↓ スクロールで初診まで続く（全 ${streamBlocks.length} 件）`}
           isLoading={isLoading}
-          onDraftChange={setDraft}
-          onSelectTemplate={setSelectedTemplateId}
-          onApplyTemplate={handleApplyTemplate}
-          onCopyPrevious={handleCopyPrevious}
-          onAddOrder={setOrderDialogTab}
-          onOpenReservation={isInpatientChart ? undefined : () => setReservationDialogOpen(true)}
-          onCancelReservation={isInpatientChart ? undefined : handleCancelReservation}
+          errorMessage={workspaceError}
+          scrollRef={sheetScrollRef}
+          wide={isInpatientChart}
+          writeEditor={
+            writeMode && todayBlockForEdit ? (
+              <InlineEditor
+                dateLabel={todayBlockForEdit.dateLabel}
+                meta={todayBlockForEdit.meta}
+                draft={draft}
+                onDraftChange={setDraft}
+                acts={todayBlockForEdit.acts}
+                billing={todayBlockForEdit.billing}
+                recents={slashRecents}
+                labResults={labResults}
+                vitals={vitals}
+                autosaveLabel={autosaveLabel}
+                onCompose={() => setComposerOpen(true)}
+                onRunRecent={runRecent}
+                onCopyPrevious={() => void handleCopyPrevious()}
+                onApplyTemplate={handleApplyTemplate}
+              />
+            ) : undefined
+          }
+          aiCard={
+            !writeMode && summaryExpanded && !pins.left ? (
+              <AiSummaryCard
+                summary={summary}
+                format={summaryFormat}
+                onFormatChange={setSummaryFormat}
+                onCollapse={() => setSummaryExpanded(false)}
+                onJumpTo={jumpToBlock}
+                onAsk={toggleRight}
+              />
+            ) : null
+          }
         />
-      }
-      right={
-        <OrderPane
-          orderConfig={orderConfig}
-          patientDepartment={patient.department}
-          activeProblemNames={activeProblemNames}
-          prescriptions={prescriptions}
-          labOrders={labOrders}
-          imagingOrders={imagingOrders}
-          procedureOrders={procedureOrders}
-          isMutating={isMutating}
-          orderMessage={orderMessage}
-          openAddTab={orderDialogTab}
-          onOpenAddTabHandled={() => setOrderDialogTab(null)}
-          onAddPrescription={handleAddPrescription}
-          onAddLab={handleAddLab}
-          onAddImaging={handleAddImaging}
-          onAddProcedure={handleAddProcedure}
-          onUpdateLab={handleUpdateLab}
-          onCancelLab={handleCancelLab}
-          onUpdateImaging={handleUpdateImaging}
-          onCancelImaging={handleCancelImaging}
-          onUpdateProcedure={handleUpdateProcedure}
-          onCancelProcedure={handleCancelProcedure}
-          onAddPrescriptionsBatch={handleAddPrescriptionsBatch}
-        />
-      }
-    />
-      <LabsSheet
-        open={labsSheetOpen}
-        onClose={() => setLabsSheetOpen(false)}
-        results={labResults}
-        trends={labLongTrends}
+        {writeMode ? (
+          <WriteToolsTray
+            missingDxCount={missingDxCount}
+            labResults={labResults}
+            vitals={vitals}
+            previousAssessment={chartHistory[0]?.summary}
+            onInsert={insertIntoDraft}
+          />
+        ) : pins.right ? (
+          <AgentTray
+            proposals={proposals}
+            acceptedIds={acceptedProposalIds}
+            planSummary={planSummary}
+            onAction={handleProposalAction}
+            onAsk={toggleRight}
+            onUnpin={toggleRight}
+          />
+        ) : null}
+      </ClinicalShell>
+      <OrderComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        orderConfig={orderConfig}
+        patient={patient}
+        currentUserId={currentUser.userId}
+        labResults={labResults}
+        activeProblemNames={activeProblemNames}
+        prescriptionTimeline={prescriptionTimeline}
+        isMutating={isMutating}
+        onAddPrescription={(drugId, dosage, days) => {
+          const drug = orderConfig.prescriptionCatalog.find((d) => d.id === drugId);
+          if (drug) markNew(drug.drugName);
+          void handleAddPrescription(drugId, dosage, days);
+        }}
+        onAddPrescriptionsBatch={(items) => {
+          for (const item of items) {
+            const drug = orderConfig.prescriptionCatalog.find((d) => d.id === item.drugId);
+            if (drug) markNew(drug.drugName);
+          }
+          void handleAddPrescriptionsBatch(items);
+        }}
+        onAddLab={(setId, urgency) => {
+          const set = orderConfig.labSetOptions.find((s) => s.id === setId);
+          if (set) markNew(set.label);
+          void handleAddLab(setId, urgency);
+        }}
+        onAddImaging={(entry) => {
+          markNew(entry.category);
+          void handleAddImaging(entry);
+        }}
+        onAddProcedure={(entry) => {
+          markNew(entry.title);
+          void handleAddProcedure(entry);
+        }}
+        onCopyPrevious={handleCopyPrevious}
+        onAddDiagnosis={handleAddDiagnosis}
+      />
+      <LabsMatrix open={labsMatrixOpen} onClose={() => setLabsMatrixOpen(false)} trends={labLongTrends} />
+      <CommandPalette
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        actions={commandActions}
+        patients={commandPatients}
+        onOpenPatient={onOpenPatient}
       />
       <NextVisitDialog
         open={reservationDialogOpen}

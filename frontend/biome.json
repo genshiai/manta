@@ -11,7 +11,20 @@
     ]
   },
   "linter": {
-    "enabled": true
+    "enabled": true,
+    "rules": {
+      "style": {
+        "noRestrictedImports": {
+          "level": "warn",
+          "options": {
+            "paths": {
+              "@/vendor/dads": "レガシー: 新規コードで vendor/dads を使わない（KARTE_UI_SPEC §2-6）",
+              "@/lib/cn": "レガシー: cn は @/components/ui/utils を使う（KARTE_UI_SPEC §2-6）"
+            }
+          }
+        }
+      }
+    }
   },
   "formatter": {
     "enabled": true,
