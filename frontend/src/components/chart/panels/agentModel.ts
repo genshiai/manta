@@ -75,17 +75,17 @@ export function buildProposals(args: BuildArgs): Proposal[] {
     }
   }
 
-  // 算定漏れ: 特定疾患療養管理料
+  // 算定候補: 特定疾患療養管理料（デモ判定。実際の算定状況・要件は未連携）
   if (args.managedProblemCount >= 1 && !args.billingAcked) {
     proposals.push({
       id: 'billing-management',
       badge: 'acc',
-      title: '算定漏れ: 特定疾患療養管理料 225点',
-      why: '継続管理中の疾患があります。今月未算定（施設ルール）。',
+      title: '算定候補: 特定疾患療養管理料 225点（要確認）',
+      why: '継続管理中の疾患があります。算定要件と今月の算定状況をご確認ください（デモ判定・会計未連携）。',
       cand: '候補',
       actions: [
-        { kind: 'primary', label: '会計に追加', type: 'ackBilling' },
-        { kind: 'ghost', label: '算定しない', type: 'dismiss' },
+        { kind: 'primary', label: '確認済みにする', type: 'ackBilling' },
+        { kind: 'ghost', label: '対象外', type: 'dismiss' },
       ],
     });
   }

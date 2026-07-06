@@ -13,7 +13,6 @@ import {
   HeartPulse,
   Mars,
   ShieldAlert,
-  Siren,
   Stethoscope,
   UserCheck,
   UserRound,
@@ -21,7 +20,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
-import { departmentOptions, isVisitClosed, type AlertItem, type LabProgress, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
+import { isVisitClosed, type AlertItem, type LabProgress, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
 import { cn } from '../lib/cn';
 import { type HomeSettings, type HomeView, homeProfileConfigs, homeViewLabels } from '../lib/homeSettings';
 import { readStorage, writeStorage } from '../lib/storage';
@@ -32,6 +31,7 @@ type ReceptionBoardProps = {
   homeSettings: HomeSettings;
   inpatientAdmissions: InpatientAdmission[];
   patients: PatientRecord[];
+  recentPatients: PatientRecord[];
   searchQuery: string;
   statusFilter: ReceptionStatus | 'all';
   departmentFilter: string | 'all';
@@ -86,9 +86,6 @@ const badgeToneClasses: Record<BadgeTone, string> = {
   paused: 'border-red-200 bg-red-50 text-red-1000',
   active: 'border-blue-200 bg-blue-50 text-blue-900',
 };
-
-const emergencySeverity = ['中等症', '軽症', '中等症', '軽症'];
-const emergencyChiefComplaints = ['胸部圧迫感', '血糖高値', '皮疹増悪', '咳嗽'];
 
 const WorkBadge = ({
   icon: Icon,
@@ -192,6 +189,7 @@ export const ReceptionBoard = ({
   homeSettings,
   inpatientAdmissions,
   patients,
+  recentPatients,
   searchQuery,
   statusFilter,
   departmentFilter,
@@ -213,6 +211,14 @@ export const ReceptionBoard = ({
   const sameNameReviewCount = patients.filter((patient) => patient.sameNameDuplicateCount > 1).length;
   const interruptedCount = patients.filter((patient) => patient.status === '診察一時中断').length;
   const profileConfig = homeProfileConfigs[homeSettings.profile];
+  // 診療科フィルタの選択肢は実際の患者一覧から導出する（モック患者由来にしない）。
+  // フィルタ適用中は patients が絞られるため、選択中の値も必ず候補に含める。
+  const departmentOptions = Array.from(
+    new Set([
+      ...patients.map((patient) => patient.department),
+      ...(departmentFilter !== 'all' ? [departmentFilter] : []),
+    ]),
+  ).sort();
   const [activeView, setActiveView] = useState<HomeView>(homeSettings.defaultView);
   const [workScope, setWorkScope] = useState<WorkScope>(homeSettings.profile === 'personal' ? 'assigned' : 'all');
   const [pendingOnly, setPendingOnly] = useState(false);
@@ -245,7 +251,6 @@ export const ReceptionBoard = ({
   const viewIconMap = {
     outpatient: Stethoscope,
     inpatient: Building2,
-    emergency: Siren,
   };
   const [savedSearches, setSavedSearches] = useState<SavedReceptionSearch[]>([]);
 
@@ -273,7 +278,7 @@ export const ReceptionBoard = ({
       patient.status === '診察一時中断' ||
       patient.sameNameDuplicateCount > 1,
   );
-  const modePatients = activeView === 'emergency' ? patients.slice(0, 3) : patients;
+  const modePatients = patients;
   const assignedModePatients = modePatients.filter((patient) => patient.doctor === currentUser.displayName);
   const departmentModePatients = modePatients.filter((patient) => patient.department === currentUser.department);
   const scopedPatients =
@@ -288,7 +293,6 @@ export const ReceptionBoard = ({
   const viewCounts: Record<HomeView, number> = {
     outpatient: patients.length,
     inpatient: inpatientAdmissions.length,
-    emergency: Math.min(3, patients.length),
   };
   const scopeOptions: Array<{ value: WorkScope; label: string; count: number }> = [
     { value: 'all', label: '全体', count: modePatients.length },
@@ -312,11 +316,9 @@ export const ReceptionBoard = ({
   const headerLabels =
     activeView === 'inpatient'
       ? ['病棟/病室', '患者', '主治医/チーム', '入院日数', '未読', '指示/文書']
-      : activeView === 'emergency'
-        ? ['到着', '緊急度', '患者', '主訴', '状態', '滞在']
-        : isClinicProfile
-          ? ['時刻', '患者', '年齢/性別', '状態', '検査', 'メモ']
-          : ['時刻', '患者', '診療科/担当', '状態', '検査/文書', 'メモ'];
+      : isClinicProfile
+        ? ['時刻', '患者', '年齢/性別', '状態', '検査', 'メモ']
+        : ['時刻', '患者', '診療科/担当', '状態', '検査/文書', 'メモ'];
 
   const createSearchLabel = () => {
     const parts = [
@@ -444,28 +446,7 @@ export const ReceptionBoard = ({
     </>
   );
 
-  const renderPatientCells = (patient: PatientRecord, index: number) => {
-    const severity = emergencySeverity[index % emergencySeverity.length];
-    const chiefComplaint = emergencyChiefComplaints[index % emergencyChiefComplaints.length];
-
-    if (activeView === 'emergency') {
-      return (
-        <>
-          <div>
-            <p className='text-mono-14B-150 text-solid-gray-900'>{patient.receptionTime}</p>
-            <p className='mt-1 text-[12px] text-solid-gray-536'>到着</p>
-          </div>
-          <div>
-            <WorkBadge icon={Siren} label={`緊急度 ${severity}`} tone={severity === '中等症' ? 'progress' : 'done'} />
-          </div>
-          {renderPatientIdentity(patient)}
-          <div className='text-[14px] leading-normal text-solid-gray-700'>{chiefComplaint}</div>
-          <div>{renderStatusBadge(patient.status)}</div>
-          <div className='text-[15px] font-bold text-solid-gray-900'>{patient.elapsed}</div>
-        </>
-      );
-    }
-
+  const renderPatientCells = (patient: PatientRecord) => {
     return (
       <>
         <div>
@@ -480,10 +461,7 @@ export const ReceptionBoard = ({
           <p className='mt-1 text-[12px] text-solid-gray-536'>{isClinicProfile ? patient.department : patient.doctor}</p>
         </div>
         <div>{renderStatusBadge(patient.status)}</div>
-        <div>
-          {renderLabBadge(patient.labProgress)}
-          {!isClinicProfile ? <p className='mt-1 text-[12px] text-solid-gray-536'>文書確認</p> : null}
-        </div>
+        <div>{renderLabBadge(patient.labProgress)}</div>
         <div className='line-clamp-2 text-[13px] leading-normal text-solid-gray-700'>{patient.comment}</div>
       </>
     );
@@ -737,7 +715,7 @@ export const ReceptionBoard = ({
                   {renderInpatientCells(admission)}
                 </button>
               ))
-            : activePatients.map((patient, index) => (
+            : activePatients.map((patient) => (
                 <button
                   className={cn(
                     buttonBaseStyle,
@@ -749,7 +727,7 @@ export const ReceptionBoard = ({
                   onClick={() => onOpenChart(patient.id)}
                   type='button'
                 >
-                  {renderPatientCells(patient, index)}
+                  {renderPatientCells(patient)}
                 </button>
               ))}
         </div>
@@ -794,23 +772,29 @@ export const ReceptionBoard = ({
               <h2 className='text-[16px] font-bold leading-snug text-text-primary'>最近開いたカルテ</h2>
             </div>
             <div className='space-y-2'>
-              {patients.slice(0, 3).map((patient) => (
-                <button
-                  className='w-full cursor-pointer rounded-md border border-border bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px hover:border-brand hover:bg-white hover:shadow-sm active:translate-y-0 active:shadow-none'
-                  key={patient.id}
-                  onClick={() => onOpenChart(patient.id)}
-                  type='button'
-                >
-                  <div className='flex items-baseline justify-between gap-2'>
-                    <span className='truncate text-[13px] font-bold text-text-primary'>{patient.name}</span>
-                    <span className='text-[11px] text-text-tertiary'>{patient.elapsed}</span>
-                  </div>
-                  <div className='mt-1 flex flex-wrap items-center gap-2'>
-                    <span className='text-[12px] text-text-secondary'>{patient.department}</span>
-                    {renderLabBadge(patient.labProgress)}
-                  </div>
-                </button>
-              ))}
+              {recentPatients.length === 0 ? (
+                <p className='rounded-md border border-dashed border-border px-3 py-4 text-center text-[12px] text-text-tertiary'>
+                  まだカルテを開いていません
+                </p>
+              ) : (
+                recentPatients.slice(0, 3).map((patient) => (
+                  <button
+                    className='w-full cursor-pointer rounded-md border border-border bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-px hover:border-brand hover:bg-white hover:shadow-sm active:translate-y-0 active:shadow-none'
+                    key={patient.id}
+                    onClick={() => onOpenChart(patient.id)}
+                    type='button'
+                  >
+                    <div className='flex items-baseline justify-between gap-2'>
+                      <span className='truncate text-[13px] font-bold text-text-primary'>{patient.name}</span>
+                      <span className='text-[11px] text-text-tertiary'>{patient.department}</span>
+                    </div>
+                    <div className='mt-1 flex flex-wrap items-center gap-2'>
+                      <span className='text-[12px] text-text-secondary'>{patient.kana}</span>
+                      {renderLabBadge(patient.labProgress)}
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </section>
         </aside>

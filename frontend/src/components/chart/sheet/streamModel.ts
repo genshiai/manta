@@ -289,9 +289,10 @@ export function filterByLens(blocks: StreamBlock[], lens: Lens): StreamBlock[] {
 }
 
 /**
- * クライアント側の算定プレビュー（v1 ルール生成のフォールバック）。
- * backend の /karte/patients/{id}/billing-preview 相当を、ロード済みデータから概算する。
- * 仕様: §12（取得失敗時は「—点」で診療を止めない → 呼び出し側で null 許容）
+ * クライアント側の「概算」算定プレビュー（デモ用）。
+ * 実際の診療報酬点数計算ではなく、再診/管理料/処方の代表点数を用いた粗い目安。
+ * backend の billing-preview API は未実装のため、UI では必ず「概算」バッジを付けて表示する
+ * （無印の点数表示にしない）。仕様: §12（未取得時は「—点」で診療を止めない → null 許容）。
  */
 export function computeBillingPreview(args: {
   hasVisit: boolean;

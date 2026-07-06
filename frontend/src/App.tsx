@@ -479,6 +479,7 @@ function App() {
             onSortChange={handleSortChange}
             onStatusFilterChange={handleStatusFilterChange}
             patients={patients}
+            recentPatients={recentChartPatients}
             searchQuery={searchQuery}
             sortKey={sortKey}
             statusFilter={statusFilter}

@@ -1,7 +1,7 @@
 import { readStorage, writeStorage } from './storage';
 
 export type HomeProfile = 'clinic' | 'hospital' | 'ward' | 'er' | 'personal';
-export type HomeView = 'outpatient' | 'inpatient' | 'emergency';
+export type HomeView = 'outpatient' | 'inpatient';
 
 export type HomeSettings = {
   profile: HomeProfile;
@@ -20,7 +20,6 @@ export const homeSettingsStorageKey = 'manta-home-settings';
 export const homeViewLabels: Record<HomeView, string> = {
   outpatient: '外来',
   inpatient: '入院',
-  emergency: '救急',
 };
 
 export const homeProfileConfigs: Record<HomeProfile, HomeProfileConfig> = {
@@ -44,9 +43,9 @@ export const homeProfileConfigs: Record<HomeProfile, HomeProfileConfig> = {
   },
   er: {
     label: '救急',
-    description: '到着時刻、緊急度、滞在時間を優先する救急向け構成です。',
-    defaultView: 'emergency',
-    views: ['emergency', 'outpatient', 'inpatient'],
+    description: '外来の受付・到着時刻と滞在時間を中心に確認する構成です。',
+    defaultView: 'outpatient',
+    views: ['outpatient', 'inpatient'],
   },
   personal: {
     label: '医師個人',

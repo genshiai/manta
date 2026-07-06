@@ -95,9 +95,12 @@ export function ActsColumn({ heading = '行為', acts, billing, onAdd, onActActi
         <ActRow key={act.id} act={act} onActAction={onActAction} />
       ))}
       {billing ? (
-        <div className="mt-0.5 flex justify-between border-t border-dashed border-border pt-[7px] text-[11px] text-text-secondary tabular-nums">
-          <span>{billing.lines.map((l) => `${l.label} ${l.points}`).join(' + ')}</span>
-          <b className="font-bold text-text-primary">{billing.total}点</b>
+        <div className="mt-0.5 flex items-baseline justify-between gap-2 border-t border-dashed border-border pt-[7px] text-[11px] text-text-secondary tabular-nums">
+          <span className="min-w-0 truncate">{billing.lines.map((l) => `${l.label} ${l.points}`).join(' + ')}</span>
+          <span className="flex items-baseline gap-1">
+            <span className="rounded bg-muted px-1 text-[9px] font-bold not-italic text-text-tertiary tabular-nums">概算</span>
+            <b className="font-bold text-text-primary">{billing.total}点</b>
+          </span>
         </div>
       ) : acts.length > 0 ? (
         <div className="mt-0.5 flex justify-between border-t border-dashed border-border pt-[7px] text-[11px] text-text-tertiary tabular-nums">

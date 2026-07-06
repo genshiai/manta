@@ -45,8 +45,7 @@ export function AgentTray({
           </span>
           エージェント
           <span className="ms-auto flex items-center gap-1.5 text-[10.5px] font-semibold text-text-tertiary">
-            <span className="size-1.5 rounded-full bg-success" />
-            文脈: 本日の診察
+            ルール候補・本日の診察から
           </span>
           <button type="button" aria-label="ピンを外す" onClick={onUnpin} className="text-text-tertiary hover:text-text-secondary">
             <PinOff size={13} strokeWidth={1.7} />
