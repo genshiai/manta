@@ -17,7 +17,7 @@ from ..master_data.models import (
     StandardUsageMaster,
 )
 from ..rececon.models import FacilityClaimRule
-from ...security import get_current_user, hash_password, require_role
+from ...security import hash_password, require_role
 from ..auth.schemas import UserSummaryRead
 from ..auth.services import get_user_or_404, user_to_summary
 from ..common.audit import log_audit
@@ -716,7 +716,7 @@ def reset_user_password(
 def list_audit_logs(
     limit: int = Query(default=20, le=100),
     scope: str | None = Query(default=None),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_role("管理者")),
     db: Session = Depends(get_db),
 ) -> list[AuditLogRead]:
     query = select(AuditLog).order_by(desc(AuditLog.created_at))

@@ -36,13 +36,14 @@ def is_hashed_password(password: str) -> bool:
 
 
 def verify_password(plain_password: str, stored_password: str) -> bool:
-    if is_hashed_password(stored_password):
-        try:
-            return password_hash.verify(stored_password, plain_password)
-        except (VerifyMismatchError, InvalidHashError):
-            return False
-
-    return plain_password == stored_password
+    # 平文パスワードは照合を許可しない。レガシー移行は seed 側で argon2 化する
+    # （password_needs_upgrade / seed_demo_data）。
+    if not is_hashed_password(stored_password):
+        return False
+    try:
+        return password_hash.verify(stored_password, plain_password)
+    except (VerifyMismatchError, InvalidHashError):
+        return False
 
 
 def password_needs_upgrade(stored_password: str) -> bool:
