@@ -208,6 +208,17 @@ def test_login_and_list_patients() -> None:
     assert all(item["department"] in {"内科", "共通"} for item in internal_master_response.json()["chart_templates"])
 
 
+def test_fhir_gateway_requires_authentication() -> None:
+    # SEC-1: /fhir/* は認証なしでアクセスできてはならない。
+    with TestClient(app) as client:
+        read_response = client.get("/fhir/Patient/0009900040")
+        search_response = client.get("/fhir/Condition?patient=0009900040")
+        create_response = client.post("/fhir/Patient", json={})
+    assert read_response.status_code == 401
+    assert search_response.status_code == 401
+    assert create_response.status_code == 401
+
+
 def test_search_receipt_comment_masters() -> None:
     comment_code = "820999993"
     with SessionLocal() as db:

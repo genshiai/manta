@@ -58,6 +58,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.security import get_current_user
 from app.modules.gateway.fhir.capability_statement import build_capability_statement
 from app.modules.gateway.fhir.mappers.appointment import (
     apply_fhir_to_orm as apply_fhir_to_appointment,
@@ -211,7 +212,9 @@ async def _parse_fhir_appointment(request: Request) -> FhirAppointment:
     return await _parse_fhir_resource(request, FhirAppointment, label="Appointment")
 
 
-router = APIRouter(prefix="/fhir", tags=["fhir"])
+# FHIR ゲートウェイも /api/* と同様に JWT 認証を必須にする（無認証で患者データを
+# 読み書きできる状態を塞ぐ）。外部システム向けの認証方式の高度化は別 ADR で扱う。
+router = APIRouter(prefix="/fhir", tags=["fhir"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/metadata")
