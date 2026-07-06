@@ -46,7 +46,7 @@ export function CommandPalette({ open, onClose, actions, patients, onOpenPatient
       kind: 'patient' as const,
       run: () => onOpenPatient(p),
       label: p.name,
-      sub: `${p.kana} · ${p.id} · ${p.age}歳 ${p.sex}`,
+      sub: `${p.kana} · ${p.id} · ${p.age} ${p.sex}`,
     })),
   ];
 

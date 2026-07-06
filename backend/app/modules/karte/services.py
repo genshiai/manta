@@ -56,12 +56,28 @@ def get_patient_or_404(db: Session, patient_id: str) -> Patient:
     return patient
 
 
+def patient_age_label(patient: Patient) -> str:
+    """birth_date から年齢を算出して "68歳" 形式で返す。無ければ保存済み文字列。
+
+    seed の age 文字列は固定で経年更新されないため、birth_date があれば毎回算出する。
+    """
+    if patient.birth_date is not None:
+        today = date.today()
+        years = (
+            today.year
+            - patient.birth_date.year
+            - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
+        )
+        return f"{years}歳"
+    return patient.age
+
+
 def patient_to_read(patient: Patient) -> PatientSummaryRead:
     return PatientSummaryRead(
         id=patient.id,
         name=patient.name,
         kana=patient.kana,
-        age=patient.age,
+        age=patient_age_label(patient),
         sex=patient.sex,
         department=patient.department,
         doctor=patient.doctor,

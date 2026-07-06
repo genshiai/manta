@@ -84,7 +84,7 @@ export function StoryboardPanel({
           <div className="min-w-0">
             <div className="text-[15px] font-bold leading-[1.3] text-text-primary">{patient.name}</div>
             <div className="text-[11.5px] text-text-tertiary tabular-nums">
-              {[dob, `${patient.age}歳`, patient.sex, blood, doctor].filter(Boolean).join(' · ')}
+              {[dob, patient.age, patient.sex, blood, doctor].filter(Boolean).join(' · ')}
             </div>
           </div>
           <button type="button" aria-label="ピンを外す" onClick={onUnpin} className="ms-auto text-text-tertiary hover:text-text-secondary">
