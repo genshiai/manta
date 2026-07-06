@@ -2038,52 +2038,36 @@ def backfill_conditions_from_patient_problems(db: Session) -> bool:
 def sync_inpatient_demo_data(db: Session) -> bool:
     updated = False
 
+    # insert-only: 既存の病棟・病床はシード値で上書きしない（手動のベッド状態変更を巻き戻さない）。
     for item in INPATIENT_DEMO_DATA["wards"]:
-        existing = db.get(WardMaster, item["id"])
-        if existing is None:
+        if db.get(WardMaster, item["id"]) is None:
             db.add(WardMaster(**item))
             updated = True
-            continue
-        for key, value in item.items():
-            if getattr(existing, key) != value:
-                setattr(existing, key, value)
-                updated = True
 
     db.flush()
 
     for item in INPATIENT_DEMO_DATA["beds"]:
-        existing = db.get(BedMaster, item["id"])
-        if existing is None:
+        if db.get(BedMaster, item["id"]) is None:
             db.add(BedMaster(**item))
             updated = True
-            continue
-        for key, value in item.items():
-            if getattr(existing, key) != value:
-                setattr(existing, key, value)
-                updated = True
 
     db.flush()
 
     admissions_by_patient: dict[str, Admission] = {}
     for item in INPATIENT_DEMO_DATA["admissions"]:
         patient_id = item["patient_id"]
+        # insert-only: その患者に入院履歴が既にあれば（退院済み含め）シード値で
+        # 巻き戻さない。以前は active 系のみ検索していたため、退院させると再入院が
+        # 捏造され「デモ患者が退院できない」状態になっていた。
         existing = db.scalar(
-            select(Admission).where(
-                Admission.patient_id == patient_id,
-                Admission.status.in_(["planned", "active", "discharge_permitted"]),
-            )
+            select(Admission)
+            .where(Admission.patient_id == patient_id)
+            .order_by(Admission.id.desc())
         )
         if existing is None:
             existing = Admission(**item, updated_at=utcnow())
             db.add(existing)
             updated = True
-        else:
-            for key, value in item.items():
-                if getattr(existing, key) != value:
-                    setattr(existing, key, value)
-                    updated = True
-            if updated:
-                existing.updated_at = utcnow()
         admissions_by_patient[patient_id] = existing
 
     db.flush()
