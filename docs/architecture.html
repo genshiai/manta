@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manta アーキテクチャ概観</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --card: #ffffff;
+      --ink: #1a1a1f;
+      --muted: #5b6270;
+      --line: #e4e7ec;
+      --brand: #0071e3;
+      --green: #1a7f37;
+      --yellow: #9a6700;
+      --orange: #bc4c00;
+      --green-bg: #e9f6ee;
+      --yellow-bg: #fdf6e3;
+      --orange-bg: #fdeee3;
+      --radius: 14px;
+      --maxw: 980px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #171a21;
+        --ink: #e7e9ee;
+        --muted: #9aa2b1;
+        --line: #262b34;
+        --brand: #4aa3ff;
+        --green: #4ac26b;
+        --yellow: #d9b34a;
+        --orange: #e58a4e;
+        --green-bg: #16241b;
+        --yellow-bg: #241f12;
+        --orange-bg: #241a12;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 48px 20px 96px; }
+    header.hero { margin-bottom: 40px; }
+    .eyebrow { color: var(--brand); font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 8px; }
+    h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.2; margin: 0 0 12px; letter-spacing: -.02em; }
+    .lede { color: var(--muted); font-size: 17px; max-width: 68ch; margin: 0; }
+    h2 { font-size: 22px; margin: 56px 0 4px; letter-spacing: -.01em; }
+    h2 .num { color: var(--brand); font-variant-numeric: tabular-nums; margin-right: 10px; }
+    .sub { color: var(--muted); font-size: 15px; margin: 0 0 20px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .diagram { overflow-x: auto; }
+    .diagram .mermaid { min-width: 520px; text-align: center; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; color: var(--muted); font-size: 13px; }
+    .legend b { color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+    thead th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+    tbody td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+    .pill.g { color: var(--green); background: var(--green-bg); }
+    .pill.y { color: var(--yellow); background: var(--yellow-bg); }
+    .pill.o { color: var(--orange); background: var(--orange-bg); }
+    .mod { font-weight: 700; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: color-mix(in srgb, var(--brand) 12%, transparent); padding: 1px 6px; border-radius: 6px; }
+    .note { color: var(--muted); font-size: 13.5px; margin-top: 14px; }
+    a { color: var(--brand); }
+    footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+    .grid2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 760px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <p class="eyebrow">Manta · アーキテクチャ概観</p>
+      <h1>どういうレイヤーで、何が動いているのか</h1>
+      <p class="lede">
+        Manta は <b>モノレポ + モジュラーモノリス</b> の電子カルテです。カルテを正本に、外部連携（FHIR / ORCA）とレセコンを同じプラットフォームに内包します。
+        この 1 枚で、システム全体・バックエンドのレイヤー・認証の流れ・機能の成熟度を俯瞰できます。
+      </p>
+    </header>
+
+    <section>
+      <h2><span class="num">1</span>システム全体図</h2>
+      <p class="sub">ブラウザ（React）から REST + JWT でバックエンド（FastAPI）を呼び、外部連携はゲートウェイに閉じ込める。</p>
+      <div class="card diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph CLIENT["ブラウザ · React 18 + Vite + Tailwind"]
+    UI["カルテ / 受付 / 病棟 / レセコン / 設定 UI"]
+  end
+  subgraph API["Manta Backend · FastAPI（モジュラーモノリス）"]
+    AUTH["auth<br/>JWT 発行・検証"]
+    DOMAIN["karte / inpatient / rececon<br/>診療ワークフロー"]
+    ADMIN["admin / master_data<br/>管理・公的マスタ"]
+    GW["gateway<br/>FHIR マッパー / ORCA アダプタ"]
+  end
+  DB[("PostgreSQL 16<br/>真実の源 (source of truth)")]
+  EXT["外部システム<br/>FHIR R4B / JP Core"]
+  ORCA["ORCA 日レセ<br/>（現状 mock アダプタ）"]
+
+  UI -- "REST + Authorization: Bearer JWT" --> AUTH
+  UI -- "REST + JWT" --> DOMAIN
+  UI -- "REST + JWT" --> ADMIN
+  AUTH --> DB
+  DOMAIN --> DB
+  ADMIN --> DB
+  DOMAIN --> GW
+  GW -- "read/write" --> EXT
+  GW -- "送信前提（未実送信）" --> ORCA
+
+  classDef ext fill:#fdeee3,stroke:#bc4c00,color:#7a3200;
+  class EXT,ORCA ext;
+        </pre>
+      </div>
+      <p class="note">ポイント：FHIR は「データモデル」ではなく<b>ゲートウェイ</b>。真実の源はドメイン ORM（<code>patients</code> / <code>chart_notes</code> / 各種オーダ…）で、必要なときだけ FHIR ↔ ORM を相互変換します。</p>
+    </section>
+
+    <section>
+      <h2><span class="num">2</span>バックエンドのレイヤー依存</h2>
+      <p class="sub">8 モジュールを「上から下への一方向依存」に制限。逆流は <a href="https://import-linter.readthedocs.io/">import-linter</a> が CI で検出（下位が上位を import したらビルドが落ちる）。</p>
+      <div class="card diagram">
+        <pre class="mermaid">
+flowchart TB
+  admin["admin — 管理・マスタ運用（最上位）"]
+  gateway["gateway — FHIR / ORCA 連携"]
+  rececon["rececon — レセプト・算定・返戻・月次"]
+  inpatient["inpatient — 入院・病棟・退院"]
+  karte["karte — 外来カルテ・SOAP・オーダ"]
+  master["master_data — 公的マスタ（病名/薬価/点数表）"]
+  auth["auth — 認証（JWT + Argon2）"]
+  common["common — 監査ログ・時刻等の基盤"]
+
+  admin --> gateway --> rececon --> inpatient --> karte --> master --> auth --> common
+
+  classDef top fill:#e9f2ff,stroke:#0071e3,color:#00447a;
+  class admin,gateway top;
+  classDef base fill:#e9f6ee,stroke:#1a7f37,color:#0c4a1e;
+  class auth,common base;
+        </pre>
+      </div>
+      <p class="note">矢印は「依存の向き（上が下を使う）」。下位ほど基盤、上位ほど具体的なワークフロー。契約は <code>backend/pyproject.toml</code> に記述。</p>
+    </section>
+
+    <section>
+      <h2><span class="num">3</span>認証（JWT）の流れ — 誰がトークンを与えるか</h2>
+      <p class="sub">外部 IdP は使わず、<b>Manta 自身のログインエンドポイントが JWT を発行</b>する。利用者アカウントは管理者が作成。</p>
+      <div class="card diagram">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as 利用者（医師/管理者）
+  participant F as フロント（React）
+  participant A as auth (/api/auth/login)
+  participant R as 保護API (/api/*, /fhir/*)
+  U->>F: 利用者 ID + パスワード
+  F->>A: ログイン要求
+  A->>A: Argon2 照合 → ロール確認 → 期限確認
+  A-->>F: JWT を発行（HS256・60分・sub + role）
+  Note over F: localStorage(manta-session) に保存
+  F->>R: 各リクエストに Authorization ヘッダで JWT を送る
+  R->>R: 署名（MANTA_JWT_SECRET_KEY）と期限を検証 → 利用者を解決
+  R-->>F: データ（無効/欠落トークンは 401）
+        </pre>
+      </div>
+      <div class="legend">
+        <span><b>発行元：</b> Manta backend（<code>create_access_token</code>）</span>
+        <span><b>署名鍵：</b> <code>MANTA_JWT_SECRET_KEY</code>（本番で既定値なら起動を拒否）</span>
+        <span><b>権限：</b> 管理者限定 API は <code>require_role("管理者")</code></span>
+      </div>
+      <p class="note">現状の限界：リフレッシュトークン無し（60 分で失効 → 再ログイン）、失効リスト無し、ログイン失敗ロックは未実装。将来は外部 IdP 連携も差し込み可能。</p>
+    </section>
+
+    <section>
+      <h2><span class="num">4</span>データの流れ — カルテが正本、会計は派生</h2>
+      <p class="sub">会計・レセプトはカルテ／オーダ／病名から導く派生データ。AI は候補生成のみで、確定は必ず人間。</p>
+      <div class="card diagram">
+        <pre class="mermaid">
+flowchart LR
+  K["カルテ・オーダ・病名<br/>（正本）"] --> B["算定候補・警告の生成<br/>（ルール / 施設別 DSL）"]
+  B --> C["ClaimDraft<br/>レセプト下書き"]
+  C --> V["送信前レビュー<br/>👤 人間が確定"]
+  V --> O["ORCA アダプタ<br/>→ 送信（将来）"]
+  B -. "AI は候補のみ・確定しない" .-> C
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="num">5</span>機能の成熟度</h2>
+      <p class="sub">「動く／一部／デモ」を色で区別。デモ（🟠）には見せかけ表示を含むため、UI 上でもその旨を明示しています。</p>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>領域</th><th>状態</th><th>いま出来ること → これから</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mod">認証・権限</td><td><span class="pill g">🟢 動く</span></td><td>JWT ログイン（Argon2）・ロール・監査ログ → 失敗ロック・外部 IdP</td></tr>
+            <tr><td class="mod">外来カルテ</td><td><span class="pill g">🟢 動く</span></td><td>ドキュメント型 UI・SOAP 版管理・下書き自動退避・オーダ・処方コピー・PMDA 相互作用警告・次回予約</td></tr>
+            <tr><td class="mod">受付ボード</td><td><span class="pill g">🟢 動く</span></td><td>外来 / 入院ビュー・検索 / フィルタ・最近開いたカルテ</td></tr>
+            <tr><td class="mod">病棟</td><td><span class="pill y">🟡 一部</span></td><td>ベッドボード・転棟・看護記録・退院サマリ・クリニカルパス → 入退院の状態遷移 UI</td></tr>
+            <tr><td class="mod">レセコン</td><td><span class="pill y">🟡 一部</span></td><td>入院 claim draft・施設別ルール DSL・返戻 / 査定・月次クローズ → 外来レセ・点数計算・レセ電(UKE)生成</td></tr>
+            <tr><td class="mod">AI 補助</td><td><span class="pill o">🟠 デモ</span></td><td>ルール生成・定型文（LLM 未接続）→ 実 LLM 接続</td></tr>
+            <tr><td class="mod">FHIR 連携</td><td><span class="pill y">🟡 一部</span></td><td>9 リソースの read・5 リソースの write（要 JWT）→ JP Core 厳密検証・検索拡張</td></tr>
+            <tr><td class="mod">ORCA 連携</td><td><span class="pill o">🟠 デモ</span></td><td>mock アダプタ + レスポンス正規化 → 実 ORCA 送信</td></tr>
+            <tr><td class="mod">マスタ取込</td><td><span class="pill g">🟢 動く</span></td><td>支払基金 / MEDIS / 厚労省 / PMDA の実ファイル取込スクリプト</td></tr>
+          </tbody>
+        </table>
+        <div class="legend">
+          <span><span class="pill g">🟢</span> 実データで動く</span>
+          <span><span class="pill y">🟡</span> 一部実装</span>
+          <span><span class="pill o">🟠</span> デモ（見せかけを含む）</span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      技術スタック：React 18 / TypeScript / Vite / Tailwind v4（フロント）・FastAPI / SQLAlchemy 2 / PostgreSQL 16（バック）・FHIR R4B / JP Core・ORCA アダプタ。<br />
+      さらに詳しく：<a href="../README.md">README</a> ・ <a href="why-manta.md">なぜ Manta を作るのか</a> ・ <a href="decisions/">ADR（意思決定の記録）</a> ・ <a href="AUDIT_2026-07-06_REMEDIATION.md">実装監査と修正指示書</a>
+    </footer>
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: dark ? 'dark' : 'default',
+      securityLevel: 'loose',
+      flowchart: { htmlLabels: true, curve: 'basis' },
+      themeVariables: { fontFamily: '-apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif' },
+    });
+  </script>
+</body>
+</html>
