@@ -6,8 +6,8 @@
 
 ## 使い方
 
-- 進捗の定点観測: [PDF_PROGRESS.md](/Users/daichi/Work/genshiai/manta/docs/PDF_PROGRESS.md)
-- 全体方針: [IMPLEMENTATION_PLAN.md](/Users/daichi/Work/genshiai/manta/docs/IMPLEMENTATION_PLAN.md)
+- 進捗の定点観測: [PDF_PROGRESS.md](PDF_PROGRESS.md)
+- 全体方針: [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
 - この文書: 「次に何を作るか」を開発タスク単位で見るための一覧
 
 ## 直近の実装順

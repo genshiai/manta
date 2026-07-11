@@ -87,7 +87,7 @@ uv run python scripts/import_pmda_package_insert.py \
 - `source_updated_at`
 - `source_url`
 
-現状: importer、相互作用テーブル構造化、照合 resolver、警告根拠表示は実装済み。全件運用には PMDA メディナビ/マイ医薬品集から XML 全件または採用薬分を出力して `/Users/daichi/Downloads/manta-master-data/pmda-package-inserts/xml/` へ置く。
+現状: importer、相互作用テーブル構造化、照合 resolver、警告根拠表示は実装済み。全件運用には PMDA メディナビ/マイ医薬品集から XML 全件または採用薬分を出力して `~/Downloads/manta-master-data/pmda-package-inserts/xml/` へ置く。
 
 ### 必須度 A: 標準病名マスタ
 

@@ -423,4 +423,4 @@ chart/
 - [ADR 0006](decisions/0006-karte-document-ui.md)（決定と経緯）／ [ADR 0004](decisions/0004-receipt-gateway-and-ai-claims-assist.md)（AIは確定しない・会計は派生）／ [ADR 0003](decisions/0003-color-system-apple-hig.md)（トークン）
 - モック: [`docs/mock-html/karte-b.html`](mock-html/karte-b.html)（ビジュアル正本・実寸1440×860）
 - 調査の要点: 2号紙2カラム=エムスリーデジカル操作マニュアル p.38-45 ／ スクロール参照=BML Qualis・CSI MI・RA・Is ／ 常時サマリー=Epic Storyboard ／ ／文法=Epic SmartPhrase（2層辞書・@差込） ／ 温度板標準=厚労省掲載 看護教材（体温=青・脈拍=赤・血圧=∨∧） ／ コンポーザの系譜=BML Qualis「カルテを隠さないオーダー小画面」
-- blanc 分析: `~/Work/genshiai/medlocal/docs/blanc/reference/ANALYSIS.md`（借りるもの: 日別ブロック・セット取込・文脈連動AI CTA ／ 捨てるもの: 8タブ・16アイコンナビ・3重導線）
+- 既存カルテ UI の比較分析（私的メモ・リポジトリ非同梱）: 取り入れたもの=日別ブロック・セット取込・文脈連動AI CTA ／ 採らなかったもの=8タブ・16アイコンナビ・3重導線

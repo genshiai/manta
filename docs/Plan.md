@@ -171,7 +171,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 - Phase 1 は FastAPI 側で認証を完結させる
 - `利用者ID + パスワード`、`Argon2`、`JWT bearer` を採用する
 - ロールは `医師` / `管理者` の 2 種から始める
-- 詳細は [AUTH_DECISION.md](/Users/daichi/Work/genshiai/manta/docs/AUTH_DECISION.md) を参照
+- 詳細は [AUTH_DECISION.md](AUTH_DECISION.md) を参照
 
 ---
 

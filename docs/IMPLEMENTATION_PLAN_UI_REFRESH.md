@@ -36,7 +36,7 @@ Manta カルテ画面のフルリフレッシュ。**6 フェーズに分けて�
 
 外来クリニック向け EMR (Electronic Medical Record) SaaS。React + Vite + TypeScript フロントエンド + Python FastAPI バックエンド。本計画書はフロントエンドのみを対象とする。
 
-- リポジトリルート: `/Users/daichi/Work/genshi/manta`
+- リポジトリルート: チェックアウト先（以下のパスはルートからの相対表記）
 - フロントエンド: `frontend/` （本計画書で扱うのはここのみ）
 - バックエンド: `backend/` （本計画書では触らない）
 

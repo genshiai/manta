@@ -4,9 +4,9 @@
 
 Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 
-原本ファイルは repo に commit しない。`/Users/daichi/Downloads` などに置き、import script で DB へ投入する。
+原本ファイルは repo に commit しない。`~/Downloads` などに置き、import script で DB へ投入する。
 
-2026-05-08 時点で、公開 URL から直接取得できる薬剤系 master は Codex 側で取得済み。保存先は `/Users/daichi/Downloads/manta-master-data/`。
+2026-05-08 時点で、公開 URL から直接取得できる薬剤系 master は Codex 側で取得済み。保存先は `~/Downloads/manta-master-data/`。
 
 ## まず結論
 
@@ -20,7 +20,7 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 6. MEDIS 医薬品 HOT コードマスター
 7. 厚労省 一般名処方マスター
 
-`/Users/daichi/Downloads/tp20260415-01_01.xlsx` は 1 の「内用薬」。Manta の薬剤 master の YJ 実コード化に使える。
+`~/Downloads/tp20260415-01_01.xlsx` は 1 の「内用薬」。Manta の薬剤 master の YJ 実コード化に使える。
 
 ## 足りないデータ
 
@@ -40,7 +40,7 @@ Manta Phase 2 で必要な外部標準データの取得先と使い分け。
 保存先:
 
 ```text
-/Users/daichi/Downloads/manta-master-data/
+~/Downloads/manta-master-data/
   20260415-mhlw-drug-price/
   20260414-ssk-receipt-drug/
   20260331-medis-hot/
@@ -62,22 +62,22 @@ DB 件数:
 
 取得済みだが importer 未実装:
 
-- `/Users/daichi/Downloads/manta-master-data/20260415-mhlw-drug-price/tp20260415-01_05.xlsx`
+- `~/Downloads/manta-master-data/20260415-mhlw-drug-price/tp20260415-01_05.xlsx`
   - 「後発医薬品の有無」ファイル。薬価 Excel 本体にも先発/後発系の列があるため Phase 2 の最低限は足りているが、後発品あり/なし表示を厚労省別表で厳密化するなら importer を追加する。
 
 ## 取得・実装ステータス
 
-原本は repo 外に保存する。推奨置き場は `/Users/daichi/Downloads/manta-master-data/YYYYMMDD/`。
+原本は repo 外に保存する。推奨置き場は `~/Downloads/manta-master-data/YYYYMMDD/`。
 
 | 優先 | データ | 取得状況 | 実装状況 | 次アクション |
 | --- | --- | --- | --- | --- |
-| A | 厚労省 薬価基準収載品目リスト 内用薬・注射薬・外用薬・歯科用薬剤 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260415-mhlw-drug-price/` | importer 実装済み・投入済み | 後発医薬品の有無 Excel の追加 importer は必要なら実装する |
+| A | 厚労省 薬価基準収載品目リスト 内用薬・注射薬・外用薬・歯科用薬剤 | 取得済み: `~/Downloads/manta-master-data/20260415-mhlw-drug-price/` | importer 実装済み・投入済み | 後発医薬品の有無 Excel の追加 importer は必要なら実装する |
 | A | PMDA 医療用医薬品添付文書 XML | ロキソニン XML で検証済み。全件/採用薬分は未取得 | importer 実装済み | PMDA メディナビから XML 全件または採用薬分を取得する |
-| A | 支払基金 レセプト電算 医薬品マスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260414-ssk-receipt-drug/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
-| A | MEDIS 医薬品 HOT コードマスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260331-medis-hot/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
-| A | 支払基金 レセプト電算 コメントマスター | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260507-ssk-receipt-comment/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
-| B | 支払基金 経過措置医薬品一覧 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260305-ssk-transitional-drugs/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
-| B | 支払基金 長期収載品の選定療養対象一覧 | 取得済み: `/Users/daichi/Downloads/manta-master-data/20260312-ssk-long-term-listed/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| A | 支払基金 レセプト電算 医薬品マスター | 取得済み: `~/Downloads/manta-master-data/20260414-ssk-receipt-drug/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| A | MEDIS 医薬品 HOT コードマスター | 取得済み: `~/Downloads/manta-master-data/20260331-medis-hot/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| A | 支払基金 レセプト電算 コメントマスター | 取得済み: `~/Downloads/manta-master-data/20260507-ssk-receipt-comment/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| B | 支払基金 経過措置医薬品一覧 | 取得済み: `~/Downloads/manta-master-data/20260305-ssk-transitional-drugs/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
+| B | 支払基金 長期収載品の選定療養対象一覧 | 取得済み: `~/Downloads/manta-master-data/20260312-ssk-long-term-listed/` | importer 実装済み・投入済み | 定期更新運用を automation / バッチ化する |
 | B | 厚労省 一般名処方マスター | 未取得 | importer 未実装 | 一般名処方 Excel を取得する |
 | B | 検査項目マスター | 未取得 | importer 未実装 | JLAC10/LOINC/施設検査項目 CSV の候補を決める |
 | C | 標準病名マスター履歴 | main/index は対応済み。履歴ファイルは未検証 | importer 一部実装済み | MEDIS 標準病名 master の履歴ファイルを取得して列確認する |
@@ -85,7 +85,7 @@ DB 件数:
 ## 推奨保存構成
 
 ```text
-/Users/daichi/Downloads/manta-master-data/
+~/Downloads/manta-master-data/
   20260415-mhlw-drug-price/
     tp20260415-01_01.xlsx
     tp20260415-01_02.xlsx
@@ -141,7 +141,7 @@ DB 件数:
 | 歯科用薬剤 | `tp20260401-01_04.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260401-01_04.xlsx` |
 | 後発医薬品の有無 | `tp20260415-01_05.xlsx` | `https://www.mhlw.go.jp/topics/2026/04/xls/tp20260415-01_05.xlsx` |
 
-`/Users/daichi/Downloads/tp20260415-01_01.xlsx` の確認結果:
+`~/Downloads/tp20260415-01_01.xlsx` の確認結果:
 
 - 種別: 内用薬
 - 非空行数: 6,984 行
@@ -160,7 +160,7 @@ Manta 実装メモ:
 ```bash
 cd backend
 uv run python scripts/import_mhlw_drug_price_master.py \
-  /Users/daichi/Downloads/tp20260415-01_01.xlsx \
+  ~/Downloads/tp20260415-01_01.xlsx \
   --dry-run
 ```
 

@@ -2,10 +2,10 @@
 
 このドキュメントは原本の調達仕様書（karte-system.pdf。第三者作成のためリポジトリ非同梱・私的保管）を、実際に実装を進めるための順序に変換したものです。
 
-進捗の定点観測は [PDF_PROGRESS.md](/Users/daichi/Work/genshiai/manta/docs/PDF_PROGRESS.md) を参照してください。
-実装単位の一覧は [PDF_ACTION_BACKLOG.md](/Users/daichi/Work/genshiai/manta/docs/PDF_ACTION_BACKLOG.md) を参照してください。
-処方検索 UX は [PRESCRIPTION_SEARCH_UX.md](/Users/daichi/Work/genshiai/manta/docs/PRESCRIPTION_SEARCH_UX.md) を参照してください。
-PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](/Users/daichi/Work/genshiai/manta/docs/PMDA_SYNC_STRATEGY.md) を参照してください。
+進捗の定点観測は [PDF_PROGRESS.md](PDF_PROGRESS.md) を参照してください。
+実装単位の一覧は [PDF_ACTION_BACKLOG.md](PDF_ACTION_BACKLOG.md) を参照してください。
+処方検索 UX は [PRESCRIPTION_SEARCH_UX.md](PRESCRIPTION_SEARCH_UX.md) を参照してください。
+PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](PMDA_SYNC_STRATEGY.md) を参照してください。
 レセコン連携 / AI 算定補助方針は [RECEIPT_GATEWAY_STRATEGY.md](RECEIPT_GATEWAY_STRATEGY.md) を参照してください。
 backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) を参照してください。
 Phase 3 の入院・病棟進捗は [PHASE3_PROGRESS.md](PHASE3_PROGRESS.md) を参照してください。

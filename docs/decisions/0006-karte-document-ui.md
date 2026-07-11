@@ -9,7 +9,7 @@
 
 OSS公開を前に、カルテ画面（`frontend/src/components/chart/`）の UX が未成熟だった。具体的な問題は実測で確認済み：上部タブ8個・右ペイン320pxに約47操作子（AIチャット常駐+4キュー+4タブ式追加Dialog）・機能ごとにボタンが増殖し「3クリック以内」原則（frontend/CLAUDE.md）と乖離。
 
-統合思想の異なる4案（A 静かな2号紙=3ペイン / B ドキュメント型 / C エージェント同乗 / D キュー駆動）を同一診察シナリオのモックで比較し、ユーザーは **B（ドキュメント型）** を選択。追加の設計検討（既存カルテのWeb調査：エムスリーデジカル・BML Qualis・MI・RA・Is・Epic Storyboard/SmartPhrase・温度板の看護教材、および `~/Work/genshiai/medlocal` の blanc 分析）を経て以下が確定した。
+統合思想の異なる4案（A 静かな2号紙=3ペイン / B ドキュメント型 / C エージェント同乗 / D キュー駆動）を同一診察シナリオのモックで比較し、ユーザーは **B（ドキュメント型）** を選択。追加の設計検討（既存カルテのWeb調査：エムスリーデジカル・BML Qualis・MI・RA・Is・Epic Storyboard/SmartPhrase・温度板の看護教材、および既存カルテ UI の私的比較分析）を経て以下が確定した。
 
 ## Decision（何を決めたか）
 
@@ -57,5 +57,5 @@ OSS公開を前に、カルテ画面（`frontend/src/components/chart/`）の UX
 - 仕様正本: [`docs/KARTE_UI_SPEC.md`](../KARTE_UI_SPEC.md)
 - モック: [`docs/mock-html/karte-b.html`](../mock-html/karte-b.html)（比較検討の初代4案モックはアーティファクトのみ）
 - 調査ソース: エムスリーデジカル操作マニュアル（3ペイン・2号紙2分割の実例）／ BML Qualis・CSI MI・RA・Is（スクロール参照の明言）／ Epic Storyboard・SmartPhrase（常時サマリーと／文法）／ 厚労省掲載 看護教材・患者検温表様式（温度板の標準配色）／ Medley Developer Portal（従来カルテの課題整理）／ 日経メディカル 電子カルテ不満調査
-- 参照リポジトリ: `~/Work/genshiai/medlocal`（blanc カルテUI分析: `docs/blanc/reference/ANALYSIS.md`）
+- 参照: 既存カルテ UI の比較分析メモ（私的保管・リポジトリ非同梱）
 - 関連 ADR: 0002（StyleSeed）・0003（Apple HIG カラー）・0004（AIは確定しない・会計は派生データ）

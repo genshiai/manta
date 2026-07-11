@@ -66,5 +66,5 @@
 - [styleseed (GitHub)](https://github.com/bitjaru/styleseed)
 - [Notion 公式: Updating the design of Notion pages](https://www.notion.com/blog/updating-the-design-of-notion-pages)
 - [LogRocket: Linear design](https://blog.logrocket.com/ux-design/linear-design/)
-- 関連プラン: [`.claude/plans/peaceful-churning-treehouse.md`](../../.claude/plans/peaceful-churning-treehouse.md)
+- 関連プラン: 検討時の内部作業プラン（非公開）
 - 旧 ADR: [0001](0001-design-system-digital-cho-and-pivot.md)
