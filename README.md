@@ -241,7 +241,7 @@ Manta は **医師 × 医療事務 × エンジニア × 投資家** の 4 層�
 3. **DCO**：コミットに署名を付けてください（`git commit -s` で `Signed-off-by` が付きます）
 4. PR を出す。レビュー → マージ
 
-> 詳しい開発環境・レビュープロセスをまとめた `CONTRIBUTING.md` ／ `CODE_OF_CONDUCT.md` ／ `SECURITY.md` は **公開準備中** です。意思決定の作法は [ADR の README](docs/decisions/README.md) を参照してください。
+> 詳しくは [CONTRIBUTING.md](CONTRIBUTING.md)（開発環境・PR 作法・DCO）／ [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) ／ [SECURITY.md](SECURITY.md)（脆弱性報告）／ [GOVERNANCE.md](GOVERNANCE.md) を。意思決定の作法は [ADR の README](docs/decisions/README.md) を参照してください。
 
 ---
 
