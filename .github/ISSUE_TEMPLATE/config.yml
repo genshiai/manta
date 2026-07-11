@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 質問・雑談・アイデアの壁打ち (Discussions)
+    url: https://github.com/genshiai/manta/discussions
+    about: Issue にする前の相談はこちらへ
+  - name: 🔒 脆弱性の報告 (非公開)
+    url: https://github.com/genshiai/manta/security/advisories/new
+    about: セキュリティ問題は公開 Issue に書かず、こちらから非公開で報告してください
