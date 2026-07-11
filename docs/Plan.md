@@ -67,7 +67,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 - `docs/BACKEND_MODULE_RESTRUCTURE_PLAN.md` — Mantaカルテ / Mantaレセコン / Manta外部連携の backend 分割方針
 - `docs/FHIR_MIGRATION_PLAN.md` — FHIR R4 (JP Core) 移行計画
 - `docs/AUTH_DECISION.md` — FastAPI 自前認証の方針
-- `docs/DESIGN_REVIEW_KARTE_UX.md` — カルテ UI / UX 再検討メモ
+- カルテ UI / UX 再検討メモ — 私的保管（リポジトリ非同梱）
 - `docs/DEVELOPMENT_GUIDELINES.md` — 開発指針
 - `docs/DESIGN_GUIDELINES.md` — デザインガイドライン（Apple HIG + StyleSeed）
 - `docs/decisions/0001-0004` — ADR（デジタル庁離脱 / StyleSeed採用 / Apple HIG カラー / レセコン3層）

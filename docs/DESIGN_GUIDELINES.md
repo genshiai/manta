@@ -340,7 +340,7 @@ color: var(--text-secondary);
 └─────────────────────────────────────────────────┘
 ```
 
-詳細レイアウトは [DESIGN_REVIEW_KARTE_UX.md](DESIGN_REVIEW_KARTE_UX.md) と [IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) を参照。
+詳細レイアウトは [IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) を参照（上流のカルテ UI/UX 再検討メモは私的保管・リポジトリ非同梱）。
 
 ### グリッドシステム
 

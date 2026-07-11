@@ -101,7 +101,7 @@ Manta の主役は、**AI エージェントが動く電子カルテ** です。
 - **ORCA 実送信** — mock から実 API へ
 - **テスト基盤** — フロントエンドのテスト整備
 
-> 細かいロードマップ：[`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)・[`docs/PHASE3_PROGRESS.md`](docs/PHASE3_PROGRESS.md)・[`docs/PUBLIC_RELEASE_CHECKLIST.md`](docs/PUBLIC_RELEASE_CHECKLIST.md)
+> 細かいロードマップ：[`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)・[`docs/PHASE3_PROGRESS.md`](docs/PHASE3_PROGRESS.md)・公開準備の現在地は [`docs/OSS_RELEASE_STATUS.md`](docs/OSS_RELEASE_STATUS.md)
 
 <!-- ▼ スクリーンショット挿入予定（公開前）
 <div align="center">

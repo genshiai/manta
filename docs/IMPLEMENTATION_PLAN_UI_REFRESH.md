@@ -47,7 +47,7 @@ Manta カルテ画面のフルリフレッシュ。**6 フェーズに分けて�
 3. **[`docs/decisions/0001-design-system-digital-cho-and-pivot.md`](decisions/0001-design-system-digital-cho-and-pivot.md)** — 旧デジタル庁系離脱の経緯（Superseded by 0002）
 4. **[`docs/decisions/0002-styleseed-adoption.md`](decisions/0002-styleseed-adoption.md)** — StyleSeed + Notion skin + Tailwind v4 採用
 5. **[`docs/decisions/0003-color-system-apple-hig.md`](decisions/0003-color-system-apple-hig.md)** — **本計画書の根拠 ADR**。色・タイポ・ボタン形状の決定
-6. **[`docs/DESIGN_REVIEW_KARTE_UX.md`](DESIGN_REVIEW_KARTE_UX.md)** — 「2026-04-30 決定事項」セクションが本計画書の上流
+6. **カルテ UI/UX 再検討メモ（私的保管・リポジトリ非同梱）** — 「2026-04-30 決定事項」セクションが本計画書の上流
 7. **[`docs/design-reference/apple-jp-design.md`](design-reference/apple-jp-design.md)** — Apple JP 実測値仕様書
 8. **[`docs/mock-html/color-palettes.html`](mock-html/color-palettes.html)** — 比較モック（A. Apple HIG が採用版、ブラウザで開いて視覚確認可）
 
@@ -681,7 +681,7 @@ feat(frontend): Primary / Outline ボタンを Apple HIG 完全ピル型に
 
 本フェーズは規模が大きく（複数 PR、複数日）、本計画書のスコープ外とする。**着手前に別途 ADR と詳細計画書を起票すること**。
 
-含まれる内容（[`docs/DESIGN_REVIEW_KARTE_UX.md`](DESIGN_REVIEW_KARTE_UX.md) の決定事項①〜⑥より）:
+含まれる内容（カルテ UI/UX 再検討メモ＝私的保管の決定事項①〜⑥より）:
 
 - ① / ② カルテ画面専用の上部 7 タブ（履歴 / カレンダー / 検査 / 画像 / 文書 / 予約 / 検索）
 - ③ / ④ 中央ペインのデフォルトを「履歴ビュー」に変更し、「+ 本日の記載」ボタンで TodayChartBlock を展開
@@ -783,7 +783,7 @@ Status: `⬜ Not Started` / `🟨 In Progress` / `🟦 PR Open` / `✅ Merged` /
 
 ### 設計レビュー / 仕様書
 - [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md) — 絶対原則
-- [DESIGN_REVIEW_KARTE_UX.md](DESIGN_REVIEW_KARTE_UX.md) — 2026-04-30 決定事項
+- カルテ UI/UX 再検討メモ — 2026-04-30 決定事項（私的保管・リポジトリ非同梱）
 - [design-reference/apple-jp-design.md](design-reference/apple-jp-design.md) — Apple JP 実測仕様
 - [mock-html/color-palettes.html](mock-html/color-palettes.html) — 比較モック（A. Apple HIG 採用）
 - [frontend/CLAUDE.md](../frontend/CLAUDE.md) — Manta フロントエンド設計ルール
@@ -805,7 +805,7 @@ Status: `⬜ Not Started` / `🟨 In Progress` / `🟦 PR Open` / `✅ Merged` /
 本計画書で曖昧な箇所が出た場合の優先順位:
 
 1. **ADR 0003** に書かれていればそれに従う
-2. **DESIGN_REVIEW_KARTE_UX.md** に書かれていればそれに従う
+2. **カルテ UI/UX 再検討メモ（私的保管）** に書かれていればそれに従う
 3. **apple-jp-design.md**（実測仕様書）に書かれていればそれに従う
 4. それでも不明なら **ユーザーに確認**（推測で進めない）
 

@@ -131,7 +131,7 @@ iOS System Color（`#FF9500`, `#FF3B30`, `#34C759`, `#0071e3`）は彩度が高�
 ## References
 
 - 仕様書: [`docs/design-reference/apple-jp-design.md`](../design-reference/apple-jp-design.md)（apple.com/jp の Puppeteer 実測値、awesome-design-md-jp 由来）
-- 設計レビュー: [`docs/DESIGN_REVIEW_KARTE_UX.md`](../DESIGN_REVIEW_KARTE_UX.md) 「2026-04-30 決定事項」セクション
+- 設計レビュー: カルテ UI/UX 再検討メモ（私的保管・リポジトリ非同梱）「2026-04-30 決定事項」セクション
 - 比較モック: [`docs/mock-html/color-palettes.html`](../mock-html/color-palettes.html)
 - 関連 ADR: [0001](0001-design-system-digital-cho-and-pivot.md), [0002](0002-styleseed-adoption.md)
 - 出典: [awesome-design-md-jp](https://github.com/kzhrknt/awesome-design-md-jp/blob/main/design-md/apple/DESIGN.md)

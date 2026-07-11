@@ -223,7 +223,6 @@ docs/
 ├── AUTH_DECISION.md                         # FastAPI 自前認証の方針
 ├── PMDA_SYNC_STRATEGY.md                    # PMDA電子添文の同期方針
 ├── PRESCRIPTION_SEARCH_UX.md                # 処方検索 / サジェスト UX 方針
-├── DESIGN_REVIEW_KARTE_UX.md                # カルテ UI / UX 再検討メモ
 ├── decisions/                               # ADR（技術・設計の意思決定記録）
 │   ├── 0001-design-system-digital-cho-and-pivot.md   # デジタル庁系離脱（Superseded）
 │   ├── 0002-styleseed-adoption.md                    # StyleSeed + Notion skin + Tailwind v4

@@ -222,5 +222,5 @@ GENSHI AI, Inc. See TRADEMARKS.md for full guidelines.
 - [Mozilla 商標ポリシー (Firefox の参考事例)](https://www.mozilla.org/en-US/foundation/trademarks/policy/)
 - [CNCF (Kubernetes) 商標ポリシー](https://www.linuxfoundation.org/legal/trademark-usage)
 - [けんすう氏 プロセスエコノミー note](https://kensuu.com/n/nf4270e069c20)
-- 関連: [PUBLIC_RELEASE_CHECKLIST.md](../PUBLIC_RELEASE_CHECKLIST.md)
+- 関連: [OSS_RELEASE_STATUS.md](../OSS_RELEASE_STATUS.md)（公開準備の進捗正本）
 - 関連 ADR: [0004 Mantaレセコンと AI 算定補助層](0004-receipt-gateway-and-ai-claims-assist.md)
