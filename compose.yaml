@@ -8,7 +8,8 @@ services:
       POSTGRES_USER: manta
       POSTGRES_PASSWORD: manta
     ports:
-      - "5432:5432"
+      # デモ用 credential のまま LAN に晒さないため localhost のみに束縛
+      - "127.0.0.1:5432:5432"
     volumes:
       - manta-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +29,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   web:
     build:
@@ -40,7 +41,7 @@ services:
       api:
         condition: service_started
     ports:
-      - "4173:4173"
+      - "127.0.0.1:4173:4173"
 
 volumes:
   manta-postgres-data:
