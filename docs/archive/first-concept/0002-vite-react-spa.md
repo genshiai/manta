@@ -1,3 +1,5 @@
+> **アーカイブ**: 2026-04 の初期構想スナップショット。現在の正本は `docs/decisions/`（ADR）と各計画書。主な転換点は [README](README.md) 冒頭のバナーを参照。
+
 # ADR-0002: Vite + React SPA を採用（Next.js 不採用）
 
 ## ステータス

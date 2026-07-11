@@ -13,7 +13,7 @@
 
 Manta は、日本の電子カルテ市場の以下の問題を解決するために存在する:
 
-- ベンダーロックイン → **オープンソース（AGPL-3.0）**
+- ベンダーロックイン → **オープンソース（Apache 2.0、[ADR 0005](decisions/0005-oss-process-economy-and-license.md)）**
 - 不透明な料金 → **無料**
 - 2000年代のUI → **モダン SaaS 設計言語（Apple HIG + StyleSeed Notion skin）**
 - AI非対応 → **LLM統合前提の設計**
@@ -233,10 +233,8 @@ docs/
 ├── design-reference/
 │   └── apple-jp-design.md                   # apple.com/jp 実測値仕様
 ├── mock-html/                               # UIプロトタイプ・比較モック
-└── first/
-    ├── ARCHITECTURE.md                      # 技術アーキテクチャ
-    ├── CONTRIBUTING.md                      # コントリビューションガイド
-    └── README.md                            # プロジェクト概要
+└── archive/
+    └── first-concept/                       # 初期構想スナップショット（2026-04、AGPL/Tauri 時代）
 ```
 
 注: `docs/design-system/`（旧デジタル庁系コンポーネント実装）は履歴として残置。frontend からの参照は切れている（[ADR 0002](decisions/0002-styleseed-adoption.md)）。

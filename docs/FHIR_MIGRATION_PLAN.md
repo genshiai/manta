@@ -79,7 +79,7 @@ Manta を HL7 FHIR R4 / JP Core 準拠にするための移行計画。
 
 ## 5. 実装パターン（コード例）
 
-### 5.1 ディレクトリ配置（[ARCHITECTURE.md](first/ARCHITECTURE.md) の4層構造に準拠）
+### 5.1 ディレクトリ配置（[ARCHITECTURE.md](archive/first-concept/ARCHITECTURE.md) の4層構造に準拠）
 
 ```
 backend/app/
@@ -560,5 +560,5 @@ DocumentReference の順。各ステップで当該リソース分だけ以下�
 - [HAPI FHIR](https://hapifhir.io/) — Java 実装参考
 - [Medplum](https://www.medplum.com/) — TypeScript 実装参考（アーキ参考）
 - 厚労省 医療DX推進本部 — FHIR を標準規格として指定
-- [ARCHITECTURE.md](first/ARCHITECTURE.md) — Manta 全体アーキテクチャ
+- [ARCHITECTURE.md](archive/first-concept/ARCHITECTURE.md) — Manta 全体アーキテクチャ
 - [Plan.md](Plan.md) — Phase 2 に「FHIR R4 基盤」を記載

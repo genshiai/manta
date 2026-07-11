@@ -14,7 +14,7 @@ Phase 1 の Manta は、認証を FastAPI バックエンド内で自前実装�
 
 - `karte-system.pdf` の P1 要件では、まず利用者 ID 認証が必要
 - [requirements/PHASE_REQUIREMENTS.md](requirements/PHASE_REQUIREMENTS.md) では `ID/パスワード。JWT。権限は医師/管理者の2種で開始` と整理済み
-- [first/ARCHITECTURE.md](first/ARCHITECTURE.md) では `FastAPI 側で認証を完結` とし、Phase 1 は `JWT ベースのシンプルな認証` を採る前提
+- [archive/first-concept/ARCHITECTURE.md](archive/first-concept/ARCHITECTURE.md) では `FastAPI 側で認証を完結` とし、Phase 1 は `JWT ベースのシンプルな認証` を採る前提
 - Tauri 化や院内端末配布を見ても、フロントごとに認証を分散させるより API 側で完結させた方が運用が単純
 - Keycloak/Auth0/Clerk は SSO や組織横断統合には強いが、現段階の MVP には重い
 

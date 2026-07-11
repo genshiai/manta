@@ -6,7 +6,7 @@ Manta は当面モジュラーモノリスで進める。物理的なサーバ�
 
 - [ADR 0004: MantaレセコンとAI算定補助層を採用](decisions/0004-receipt-gateway-and-ai-claims-assist.md)
 - [Mantaレセコン / レセコン連携 / AI算定補助戦略](RECEIPT_GATEWAY_STRATEGY.md)
-- [ADR-0004: モジュラーモノリスを採用](first/0004-modular-monolith.md)
+- [ADR-0004: モジュラーモノリスを採用](archive/first-concept/0004-modular-monolith.md)
 
 ## 現状
 

@@ -48,11 +48,11 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 
 | 項目 | 状態 |
 |------|------|
-| リポジトリ・CI 基盤 | 設計済（docs/first/） |
+| リポジトリ・CI 基盤 | 設計済（docs/archive/first-concept/） |
 | デザインシステム選定 | 完了（Apple HIG + StyleSeed Notion skin、ADR 0001-0003） |
 | デザインガイドライン | 完了（docs/DESIGN_GUIDELINES.md） |
 | mock HTML（カルテ画面） | 完了（mock-html/） |
-| 技術スタック ADR | 完了（docs/decisions/ + docs/first/adr/） |
+| 技術スタック ADR | 完了（docs/decisions/ + docs/archive/first-concept/） |
 | Phase 1 要件定義 | **本ドキュメント** |
 
 ### Phase 0 の成果物
