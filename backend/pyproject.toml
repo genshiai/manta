@@ -3,6 +3,8 @@ name = "manta-backend"
 version = "0.1.0"
 description = "FastAPI backend for Manta outpatient EMR MVP"
 readme = "README.md"
+license = "Apache-2.0"
+authors = [{ name = "GENSHI AI, Inc." }]
 requires-python = ">=3.9"
 dependencies = [
   "alembic>=1.16.5,<2.0.0",

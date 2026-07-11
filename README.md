@@ -251,7 +251,7 @@ Manta は **医師 × 医療事務 × エンジニア × 投資家** の 4 層�
 - 「Manta」「GENSHI AI」の名称・ロゴは GENSHI AI 株式会社の商標です。
 
 > 方針の全文と背景は [ADR 0005（プロセスエコノミーとしての OSS 公開とライセンス）](docs/decisions/0005-oss-process-economy-and-license.md) に。
-> ライセンス本文（`LICENSE`）・`NOTICE`・`TRADEMARKS.md` は **公開準備中** です。
+> ライセンス本文は [`LICENSE`](LICENSE)、attribution 要件は [`NOTICE`](NOTICE)、商標ポリシーは [`TRADEMARKS.md`](TRADEMARKS.md) に。
 
 ---
 

@@ -1,0 +1,20 @@
+Manta
+Copyright 2026 GENSHI AI, Inc. (GENSHI AI 株式会社)
+
+This product includes software developed as part of the Manta project
+by GENSHI AI, Inc. and contributors (https://genshi.ai/).
+
+Attribution notice:
+Products and services derived from this software are requested to retain
+a visible attribution such as "Powered by Manta" or "Based on Manta".
+This NOTICE file must be included in redistributions of this work and
+derivative works, as required by Section 4(d) of the Apache License,
+Version 2.0.
+
+派生プロダクト・派生サービスには「Powered by Manta」または「Based on Manta」の
+表記の保持をお願いします。本 NOTICE ファイルは Apache License 2.0 の §4(d) に
+基づき、本ソフトウェアおよび派生物の再配布時に同梱が必要です。
+
+The names "Manta" and "GENSHI AI" and their logos are trademarks of
+GENSHI AI, Inc. Use of these trademarks is governed by TRADEMARKS.md;
+the Apache License does not grant trademark rights (Section 6).
