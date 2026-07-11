@@ -99,7 +99,7 @@ Manta の意思決定は [ADR（Architecture Decision Records）](decisions/) �
 
 そこで Manta は、真実の源を **ドメイン固有の ORM**（`patients` / `conditions` / `observations` / `chart_notes` / 各種オーダ）に置き、[`gateway/fhir/`](../backend/app/modules/gateway/fhir/) のマッパーが **必要なときだけ** ORM ↔ FHIR R4B / JP Core を相互変換します。内側は素直なドメインモデル、外向きは標準規格。**「相互運用性」と「実装のしやすさ」を両取り** する設計です。
 
-そしてこの「標準規格で外に開いている」状態こそ、**AI エージェントや外部サービスが自由に動くための前提** になります。FHIR を土台に据えるのは、相互運用のためだけでなく、来るべきエージェント時代への布石でもあります。
+そしてこの「標準規格で外に開いている」状態こそ、**AI エージェントや外部サービスが自由に動くための前提** になります。FHIR を土台に据えるのは、相互運用のためだけでなく、来るべきエージェント時代への布石でもあります。エージェント側の入口は MCP（Model Context Protocol）で開く計画です——システム連携は FHIR、エージェント操作は MCP、どちらも gateway に閉じ込める、という役割分担にしています（[ADR 0007](decisions/0007-mcp-agent-interface.md)・[MCP 戦略](MCP_STRATEGY.md)）。
 
 #### なぜ ORCA は「アダプタ」に閉じ込めるのか
 
