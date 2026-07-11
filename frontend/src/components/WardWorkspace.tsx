@@ -311,6 +311,7 @@ export const WardWorkspace = ({
     setSelectedAdmissionId(admissions[0]?.id ?? null);
   }, [admissions, selectedAdmissionId]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies(selectedAdmissionId): 入院の切替をトリガーに選択・編集状態をリセットする
   useEffect(() => {
     setSelectedLabRowKeys(new Set());
     setLastSelectedLabKey(null);
@@ -1047,7 +1048,9 @@ export const WardWorkspace = ({
         const [start, end] = [previousIndex, index].sort((a, b) => a - b);
         setSelectedLabRowKeys((current) => {
           const next = new Set(current);
-          labTimelineRows.slice(start, end + 1).forEach((item) => next.add(item.key));
+          for (const item of labTimelineRows.slice(start, end + 1)) {
+            next.add(item.key);
+          }
           return next;
         });
         setIsDraggingLabSelection(false);
@@ -2537,6 +2540,7 @@ export const WardWorkspace = ({
                         <p className='text-[11px] font-bold text-green-900'>送れる明細: {latestSendableItems.length}</p>
                         <div className='mt-2 space-y-1'>
                           {latestSendableItems.slice(0, 6).map((item, index) => (
+                            // biome-ignore lint/suspicious/noArrayIndexKey: 表示専用の固定順リストで line_id が欠けることがある
                             <p className='rounded bg-green-50 px-2 py-1 text-[11px] leading-normal text-green-950' key={`${payloadText(item, 'line_id')}-${index}`}>
                               {payloadText(item, 'receipt_code')} {payloadText(item, 'label')}
                             </p>
@@ -2547,6 +2551,7 @@ export const WardWorkspace = ({
                         <p className='text-[11px] font-bold text-red-900'>止まっている明細: {latestUnresolvedItems.length}</p>
                         <div className='mt-2 space-y-1'>
                           {latestUnresolvedItems.slice(0, 6).map((item, index) => (
+                            // biome-ignore lint/suspicious/noArrayIndexKey: 表示専用の固定順リストで line_id が欠けることがある
                             <p className='rounded bg-red-50 px-2 py-1 text-[11px] leading-normal text-red-950' key={`${payloadText(item, 'line_id')}-${index}`}>
                               {payloadText(item, 'unresolved_reason')} · {payloadText(item, 'label')}
                             </p>
