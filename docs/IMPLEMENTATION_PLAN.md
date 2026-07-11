@@ -1,6 +1,6 @@
 # Manta 実装実行計画
 
-このドキュメントは `docs/requirements/karte-system.pdf` を、実際に実装を進めるための順序に変換したものです。
+このドキュメントは原本の調達仕様書（karte-system.pdf。第三者作成のためリポジトリ非同梱・私的保管）を、実際に実装を進めるための順序に変換したものです。
 
 進捗の定点観測は [PDF_PROGRESS.md](/Users/daichi/Work/genshiai/manta/docs/PDF_PROGRESS.md) を参照してください。
 実装単位の一覧は [PDF_ACTION_BACKLOG.md](/Users/daichi/Work/genshiai/manta/docs/PDF_ACTION_BACKLOG.md) を参照してください。

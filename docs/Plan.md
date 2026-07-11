@@ -5,7 +5,7 @@
 ## 前提
 
 Manta は、オープンソースの次世代電子カルテシステムである。
-既存の電子カルテ（170ページ仕様書 `requirements/karte-system.pdf`）を参照しつつ、
+既存の電子カルテ（170 ページの調達仕様書。第三者作成のためリポジトリ非同梱・私的保管）を参照しつつ、
 **外来診療の1ループを最速で回すこと**に集中し、段階的に機能を拡張する。
 
 > 「全部作る」のではなく「診療が止まらない最小セット」から始める。
@@ -73,7 +73,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 - `docs/decisions/0001-0004` — ADR（デジタル庁離脱 / StyleSeed採用 / Apple HIG カラー / レセコン3層）
 - `docs/design-reference/apple-jp-design.md` — apple.com/jp 実測値仕様
 - `docs/requirements/PHASE_REQUIREMENTS.md` — Phase別要件一覧
-- `docs/requirements/karte-system.pdf` — 原本仕様書（参照用）
+- 原本の調達仕様書（karte-system.pdf） — 第三者作成のためリポジトリ非同梱（私的保管）。導出済み要件は `docs/requirements/PHASE_REQUIREMENTS.md` を参照
 - `docs/mock-html/` — UIプロトタイプ・比較モック
 
 ---
@@ -249,7 +249,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 
 ## 仕様書の使い方
 
-`requirements/karte-system.pdf` は **完成形の地図** として扱う。
+原本の調達仕様書（私的保管）は **完成形の地図** として扱う。
 
 - 新機能を設計する際に、該当セクションを必ず参照する
 - 既存EMRがどう解決しているかの知見として活用する

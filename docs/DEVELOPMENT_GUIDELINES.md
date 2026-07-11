@@ -230,12 +230,10 @@ docs/
 │   ├── 0003-color-system-apple-hig.md                # Apple HIG カラー / タイポ / ボタン
 │   └── 0004-receipt-gateway-and-ai-claims-assist.md  # Mantaレセコン 3 層設計
 ├── requirements/
-│   ├── karte-system.pdf                     # 原本仕様書（170ページ）
-│   └── PHASE_REQUIREMENTS.md                # Phase別要件一覧
+│   └── PHASE_REQUIREMENTS.md                # Phase別要件一覧（原本仕様書は私的保管）
 ├── design-reference/
 │   └── apple-jp-design.md                   # apple.com/jp 実測値仕様
 ├── mock-html/                               # UIプロトタイプ・比較モック
-├── karte-images/                            # 既存カルテUI参照画像
 └── first/
     ├── ARCHITECTURE.md                      # 技術アーキテクチャ
     ├── CONTRIBUTING.md                      # コントリビューションガイド

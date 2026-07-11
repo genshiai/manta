@@ -1,6 +1,6 @@
 # karte-system.pdf 実装進捗
 
-`docs/requirements/karte-system.pdf` を基準に、Manta がどこまで到達しているかを追うためのスナップショットです。
+原本の調達仕様書（karte-system.pdf。第三者作成のためリポジトリ非同梱・私的保管）を基準に、Manta がどこまで到達しているかを追うためのスナップショットです。
 
 > **全体の現在地は [Plan.md の「現在地ダッシュボード」](Plan.md#現在地ダッシュボード2026-05-02) を参照**。本ドキュメントは仕様書（karte-system.pdf）に対する実装進捗に特化したスナップショット。UI Refresh や FHIR の進捗は対応する計画書を正とする。
 
