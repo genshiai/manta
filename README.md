@@ -188,7 +188,7 @@ manta/
 ### いちばん簡単：全部入りデモ
 
 ```bash
-git clone <このリポジトリのURL> manta   # 公開後の URL に差し替えてください
+git clone https://github.com/genshiai/manta.git
 cd manta
 docker compose up
 ```

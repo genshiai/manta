@@ -2,6 +2,11 @@
 
 将来的には MEDIS JLAC10 / JLAC11 と LOINC の完全対応表に差し替える前提。
 Step 3 時点では seed / demo が使うラベルに限定した最小対応表として保持する。
+
+This material contains content from LOINC (https://loinc.org). LOINC is
+copyright (c) Regenstrief Institute, Inc. and the Logical Observation
+Identifiers Names and Codes (LOINC) Committee and is available at no cost
+under the license at https://loinc.org/license/.
 """
 
 from __future__ import annotations

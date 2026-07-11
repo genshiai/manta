@@ -105,7 +105,7 @@ Manta の意思決定は [ADR（Architecture Decision Records）](decisions/) �
 
 日本のレセコンの事実上の標準である ORCA とは、[`gateway/orca/`](../backend/app/modules/gateway/orca/) のアダプタ経由で連携します。ORCA 固有の API 形式・エラーコードは、このアダプタの中だけに閉じ込め、カルテ／レセコン本体には漏らしません。これにより、**将来 ORCA 以外のレセコンや病院 HIS を後から足せる** ようにしています。
 
-なお、ORCA の CLAIM 通信機能は 2026 年 3 月末で廃止予定のため、連携は CLAIM ではなく **日レセ API** 前提で設計しています（[ADR 0004](decisions/0004-receipt-gateway-and-ai-claims-assist.md)）。
+なお、ORCA の CLAIM 通信機能は 2026 年 3 月末で廃止されたため、連携は CLAIM ではなく **日レセ API** 前提で設計しています（[ADR 0004](decisions/0004-receipt-gateway-and-ai-claims-assist.md)）。
 
 #### なぜ認証を Argon2 + JWT で自前実装するのか
 
