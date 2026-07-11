@@ -7,7 +7,9 @@
 
 ## 結論
 
-**公開ブロッカー(REL-1〜5)は 2026-07-11 に解消した。** 残っているのは、①公開直前にミラーで行う履歴除去(filter-repo。手順は §5 末尾に確定済み)、②公開時に揃える整備(REL-6〜10)、③リポジトリ外の関係者調整、の 3 つ。
+**公開ブロッカー(REL-1〜5)と公開時整備(REL-6・7・9・10)は 2026-07-11 に解消した。** リポジトリ側に残るのは REL-8 の仕上げ(スクリーンショット挿入と、たたき台文面の本人の声での上書き)だけ。あとは、①公開直前にミラーで行う履歴除去(filter-repo)と GitHub リポジトリ設定(§6 の手順)、②リポジトリ外(LP、告知記事、関係者への事前共有)。
+
+著作権管理の前提も確定した: **主体は GENSHI AI 株式会社、CLA は導入しない**(導入する唯一の条件も含めて [ADR 0005](decisions/0005-oss-process-economy-and-license.md) に明記)。
 
 コード側の公開ブロッカー(P0 セキュリティと、動いている風の見せかけ表示)は 7/7 の是正スプリントで解消済み。AI・外来レセプト・ORCA 実送信は未実装のまま残るが、UI 上で未実装だと分かる表示に直してあるので、Pre-Alpha として公開する分には妨げにならない。プロセスエコノミーとして出す以上、機能が足りないことより「動いている風の捏造」のほうがブランドを毀損する。是正はその方針で行った。なお、エージェント接続の方針(全機能の MCP 化)を [ADR 0007](decisions/0007-mcp-agent-interface.md) と [MCP_STRATEGY.md](MCP_STRATEGY.md) に確定した。
 
@@ -23,7 +25,7 @@
 | 2026-05 下旬〜07-05 | カルテ UI を「読む、書く、作業する」のドキュメント型へ刷新([ADR 0006](decisions/0006-karte-document-ui.md)、全 7 フェーズ) |
 | 2026-07-06 | 公開前監査を 2 本実施。①リポジトリ監査(履歴のシークレット、実患者データ、第三者著作物、内部情報) ②実装監査(モック、見せかけ表示、危険実装の全数調査 → [監査指示書](AUDIT_2026-07-06_REMEDIATION.md)、43 タスク) |
 | 2026-07-07〜08 | 是正スプリント 19 コミット。FHIR 無認証の閉鎖、環境種別 `MANTA_ENV` の導入、見せかけ表示 8 件の正直化、下書き自動保存など 28 タスクを解消。バックエンド 141 テスト緑 |
-| 2026-07-11 | 本レポート作成、残作業を REL 系列に整理。同日中に REL-1〜5(体裁ブロッカー)を解消し、MCP 方針を [ADR 0007](decisions/0007-mcp-agent-interface.md) に起票 |
+| 2026-07-11 | 本レポート作成、残作業を REL 系列に整理。同日中に REL-1〜7・9・10 を解消(ライセンス 3 点、内部情報退避、コミュニティ文書、.github 整備、compose 堅牢化)。MCP 方針を [ADR 0007](decisions/0007-mcp-agent-interface.md) に、著作権管理の前提(GENSHI AI 株式会社・CLA なし)を ADR 0005 に確定 |
 
 数字で見る現在地: 108 コミット、追跡ファイル 369、バックエンドは Python 148 ファイルとテスト 141 本、フロントエンドは 124 ファイルとテスト 0 本(テスト基盤の導入は HYG-2)。
 
@@ -43,9 +45,9 @@
 | 法務ファイル | ✅ 完了(07-11) | LICENSE、NOTICE、TRADEMARKS.md、license フィールド(REL-1) |
 | 第三者著作物・内部情報の除去 | ✅ HEAD 完了(07-11) | PDF・画像・内部文書は ../manta-private/ へ退避、ローカルパス除去(REL-2〜4)。**履歴除去は公開直前に filter-repo** |
 | ライセンス記述の統一 | ✅ 完了(07-11) | docs/first を archive 化 + バナー、AGPL 記述を是正(REL-5) |
-| コミュニティファイル | ⛔ 未着手 | CONTRIBUTING、CODE_OF_CONDUCT、SECURITY、GOVERNANCE(REL-6) |
-| GitHub 整備 | 🚧 一部 | backend CI のみ。frontend CI、DCO チェック、テンプレート、dependabot が無い(REL-7) |
-| README 仕上げ | 🚧 一部 | 本文とアーキ図は済。clone URL、スクリーンショット、たたき台の上書きが残る(REL-8) |
+| コミュニティファイル | ✅ 完了(07-11) | CONTRIBUTING、CODE_OF_CONDUCT、SECURITY、GOVERNANCE の 4 本(REL-6) |
+| GitHub 整備 | ✅ 完了(07-11) | Issue/PR テンプレ、DCO チェック、frontend CI(lint 緑化済み)、dependabot(REL-7)。**リポジトリ設定(Discussions 等)は公開当日に §6 の手順で** |
+| README 仕上げ | 🚧 残 2 点 | clone URL は反映済み。**スクリーンショット挿入と、たたき台の本人の声での上書きが残る**(REL-8) |
 | 発信・関係者調整 | ⛔ リポジトリ外 | 私的チェックリストで管理(本レポートの対象外) |
 
 ---
@@ -192,9 +194,9 @@ git filter-repo \
 
 コミットハッシュは変わるが、ADR や docs はパスで相互参照しているので壊れない。公開後の履歴書き換えは不可能に近いので、この 7 パスに漏れが無いかを public 化の直前にもう一度確認する(§6 のチェックリスト)。
 
-### 公開時に揃えるもの(REL-6〜10。ブロッカーではないが初日に有る方が良い)
+### 公開時に揃えるもの(REL-6〜10) — REL-8 の 2 点を除き 2026-07-11 完了
 
-#### REL-6 — コミュニティ文書 4 本
+#### REL-6 — コミュニティ文書 4 本 ✅ 完了(07-11)
 
 - `CONTRIBUTING.md`: 開発環境(compose、uv、npm)、PR ルール(Conventional Commits + 日本語 subject)、DCO(`git commit -s`)、ADR の起票方法
 - `CODE_OF_CONDUCT.md`: Contributor Covenant 2.1 の日本語版
@@ -203,7 +205,7 @@ git filter-repo \
 - **前提**: 報告用と行動規範用のメールボックス開設。開設が間に合わなければ GitHub の Private vulnerability reporting を一次窓口にして README にその旨を書く(こちらを推奨。メール運用より漏れない)
 - README の「CONTRIBUTING は公開準備中」の一文を実リンクに差し替え
 
-#### REL-7 — .github 整備
+#### REL-7 — .github 整備 ✅ 完了(07-11。リポジトリ設定は §6 の公開当日手順で)
 
 - Issue テンプレート 3 種(bug_report、feature_request、医療現場からの業務提案)と config.yml(Discussions への誘導)
 - PULL_REQUEST_TEMPLATE.md(Conventional Commits、DCO、テスト方針のチェック欄)
@@ -211,17 +213,17 @@ git filter-repo \
 - dependabot.yml(pip と npm と actions)
 - frontend CI(tsc --noEmit、biome check、vite build。テストは HYG-2 完了後に追加)
 
-#### REL-8 — README 仕上げ
+#### REL-8 — README 仕上げ 🚧 残り 2 点(スクリーンショット・たたき台)
 
-- clone URL のプレースホルダを公開 URL に差し替え
+- ~~clone URL のプレースホルダを公開 URL に差し替え~~ → 済(github.com/genshiai/manta)
 - スクリーンショット 1〜2 枚(カルテ画面と受付)を `docs/screenshots/` に追加して挿入
 - たたき台マーカー(HTML コメント)の中身を本人の声で確定し、マーカーを外す。`docs/why-manta.md` の同マーカーも同様
 
-#### REL-9 — compose の公開ポート最小化
+#### REL-9 — compose の公開ポート最小化 ✅ 完了(07-11)
 
-- `compose.yaml:10-11` の db を `"127.0.0.1:5432:5432"` バインドに変更。デモ credential(manta/manta)のまま LAN に晒さない
+- db だけでなく api / web も含む 3 ポートすべてを `127.0.0.1` バインドに変更(localhost のデモ体験は不変、LAN 露出だけ防ぐ)
 
-#### REL-10 — 小修正まとめ(1 PR で)
+#### REL-10 — 小修正まとめ ✅ 完了(07-11)
 
 - `backend/app/modules/gateway/fhir/loinc.py` 冒頭に LOINC(Regenstrief Institute)の出典と利用条件の一文
 - `docs/why-manta.md:108` の「ORCA の CLAIM 通信は 2026 年 3 月末で廃止予定」を過去形に(既に廃止済み)
@@ -239,11 +241,19 @@ git filter-repo \
 
 ### Go の条件
 
-1. REL-1〜5 の完了(法務と情報衛生)
-2. filter-repo 後のミラーで最終確認 3 点: `gitleaks detect`、削除 7 パスの `git log --all` が空、`grep -r` で内部固有名詞ゼロ
-3. リポジトリ外の調整(関係者への事前共有、告知記事)は私的チェックリストで管理。ここが済んでいること
+1. ~~REL-1〜5 の完了(法務と情報衛生)~~ → 2026-07-11 完了
+2. REL-8 の残り: スクリーンショット挿入、たたき台文面の本人の声での上書き(README と why-manta の HTML コメント範囲)
+3. filter-repo 後のミラーで最終確認 3 点: `gitleaks detect`、削除 7 パスの `git log --all` が空、`grep -r` で内部固有名詞ゼロ
+4. リポジトリ外の調整(関係者への事前共有、告知記事)は私的チェックリストで管理。ここが済んでいること
 
-REL-6〜10 は初日に有る方が良いが、Go を止めるほどではない。CONTRIBUTING が無くても PR は来るし、来てから整えても間に合う。
+### 公開当日の GitHub 設定(public 化と同時に行う)
+
+- Visibility を public に切替(filter-repo 済みミラーを push した公開用リポジトリで)
+- **Security → Private vulnerability reporting を ON**(SECURITY.md が報告窓口として前提にしている)
+- Discussions を有効化し、カテゴリを整備(告知 / 臨床 / 技術 / アイデア / デザイン)
+- Branch protection(main): PR 必須、CI(backend-tests / backend-lint / frontend-ci / dco)必須、直 push 禁止
+- Description / Website / Topics 設定(`electronic-health-record`、`fhir`、`fastapi`、`react`、`medical-ai` など)
+- ラベル整備(`good-first-issue`、`help-wanted`、`clinical-feedback`、`karte`、`rececon`、`gateway`、`docs`)と、`good-first-issue` を 5〜10 本用意して公開時の閑散を防ぐ
 
 ### 止める条件
 
