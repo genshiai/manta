@@ -41,3 +41,7 @@ build/
 docs/design-system/html-components/
 docs/design-system/react-components/
 docs/design-system/tailwind-theme/
+
+# ローカル参照画像（公開リポには含めない）
+manta-1.png
+manta-1.svg
