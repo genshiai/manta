@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppHeader } from './components/AppHeader';
+import { AppShell } from './components/AppShell';
 import { BillingWorkspace } from './components/BillingWorkspace';
 import { ChartWorkspace } from './components/ChartWorkspace';
 import { LoginScreen } from './components/LoginScreen';
 import { ReceptionBoard } from './components/ReceptionBoard';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
-import { StatusFooter } from './components/StatusFooter';
 import { WardWorkspace } from './components/WardWorkspace';
 import type { PatientRecord, ReceptionStatus } from './data/chartMock';
 import { demoUsers } from './data/workflowMock';
@@ -90,7 +89,7 @@ function App() {
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientsError, setPatientsError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
-  const [chartMeta, setChartMeta] = useState<ChartMeta>(initialChartMeta);
+  const [, setChartMeta] = useState<ChartMeta>(initialChartMeta);
   const [homeSettings, setHomeSettings] = useState<HomeSettings>(readHomeSettings);
   const [recentChartPatients, setRecentChartPatients] = useState<PatientRecord[]>(readRecentChartPatients);
 
@@ -238,8 +237,6 @@ function App() {
       setSelectedPatient(synced);
     }
   }, [patients, selectedPatient]);
-
-  const currentPatient = screen === 'chart' ? selectedPatient : null;
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -395,7 +392,7 @@ function App() {
   }
 
   // カルテ画面は ClinicalShell が 56px レール込みでビューポート全体を占有する
-  // （AppHeader / StatusFooter は出さない。KARTE_UI_SPEC §3）。
+  // （AppShell の共通トップバーは出さず、独自の TopBar/PatientBar/AIStrip を使う。KARTE_UI_SPEC §3）。
   const isChartScreen = screen === 'chart' && Boolean(selectedPatient);
 
   if (isChartScreen && selectedPatient) {
@@ -421,23 +418,19 @@ function App() {
     );
   }
 
-  const rootClassName = 'min-h-screen bg-surface-page text-text-primary';
-  const mainSlotClassName = '';
+  const shellScreen: 'reception' | 'ward' | 'billing' | 'settings' =
+    screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : 'reception';
 
   return (
-    <div className={rootClassName}>
-      <AppHeader
-        currentUser={session}
-        currentPatient={currentPatient}
-        onNavigate={setScreen}
-        onSearchChange={handleSearchChange}
-        onSwitchUser={handleSwitchUser}
-        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : 'reception'}
-        searchQuery={searchQuery}
-      />
-
-      <div className={mainSlotClassName}>
-        {screen === 'settings' ? (
+    <AppShell
+      currentUser={session}
+      onNavigate={setScreen}
+      onSearchChange={handleSearchChange}
+      onSwitchUser={handleSwitchUser}
+      screen={shellScreen}
+      searchQuery={searchQuery}
+    >
+      {screen === 'settings' ? (
           <SettingsWorkspace
             currentUser={session}
             homeSettings={homeSettings}
@@ -487,15 +480,7 @@ function App() {
             </section>
           </main>
         )}
-      </div>
-
-      <StatusFooter
-        chartMeta={chartMeta}
-        currentPatient={currentPatient ?? undefined}
-        currentUser={session}
-        screen={screen === 'chart' ? 'chart' : screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : 'reception'}
-      />
-    </div>
+    </AppShell>
   );
 }
 
