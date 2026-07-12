@@ -1,18 +1,32 @@
-/* Manta フォント設定: Apple HIG (apple.com/jp) 準拠のシステムフォントスタック
- * 根拠: docs/decisions/0003-color-system-apple-hig.md
- *
- * - SF Pro JP: macOS / iOS 同梱 (Apple 端末で最優先)
- * - ヒラギノ角ゴ Pro: macOS フォールバック (注: ProN ではなく Pro)
- * - メイリオ / Meiryo: Windows フォールバック
- * - -apple-system / system-ui: 各 OS の標準
- *
- * ネットワーク取得は行わない (@import / @font-face / <link> 不使用)。
- * Linux / Android では system sans-serif にフォールバック。
+/* Manta フォント設定
+ * 本文・UI: Guguru Sans Code 35（Google Sans Code + IBM Plex Sans JP / OFL-1.1・yuru7）を自己ホスト。
+ *   coding フォント由来で、数値・用量・検査値・単位が桁揃いで読みやすい。35 変種は半角を 3:5 幅にして
+ *   純等幅より窮屈さを緩和。ファイルは frontend/public/fonts/ に同梱し、ネットワーク取得はしない
+ *   （オンプレ前提。外部 CDN / Google Fonts / <link> は使わない）。
+ * フォールバック: SF Pro JP / ヒラギノ角ゴ Pro / メイリオ / 各 OS の system sans。
+ * 根拠: docs/decisions/0003-color-system-apple-hig.md ・ docs/KARTE_UX_IMPROVEMENTS.md §5
+ * 標準幅（1:2）にしたい場合は GuguruSansCode-Regular/Bold に差し替え、family 名を合わせるだけ。
  */
+
+@font-face {
+  font-family: 'Guguru Sans Code 35';
+  src: url('/fonts/GuguruSansCode35-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Guguru Sans Code 35';
+  src: url('/fonts/GuguruSansCode35-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 body {
   font-family:
-    "SF Pro JP", "SF Pro Text", "SF Pro Icons",
+    'Guguru Sans Code 35',
+    "SF Pro JP", "SF Pro Text",
     "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3",
     メイリオ, Meiryo, "ＭＳ Ｐゴシック",
     -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;

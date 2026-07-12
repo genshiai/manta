@@ -1,9 +1,9 @@
-import { ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronRight, Lock, MoreHorizontal } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import type { VitalEntry } from '../../../types/workflow';
 import { cn } from '../../ui/utils';
 import { ActsColumn } from './ActsColumn';
-import type { SoapText, TodayBlock, VisitBlock } from './streamModel';
+import type { RichText, SoapText, TodayBlock, VisitBlock } from './streamModel';
 
 const SOAP_ROWS: Array<{ key: keyof SoapText; label: string }> = [
   { key: 'subjective', label: 'S' },
@@ -11,6 +11,33 @@ const SOAP_ROWS: Array<{ key: keyof SoapText; label: string }> = [
   { key: 'assessment', label: 'A' },
   { key: 'plan', label: 'P' },
 ];
+
+/** 赤入れ（差分）レンダラ。文字列はそのまま、セグメント列は ins(緑)/del(赤・取消線) で描く。P2 */
+function Redline({ value }: { value: RichText }) {
+  if (typeof value === 'string') return <>{value}</>;
+  return (
+    <>
+      {value.map((seg, i) => {
+        const key = `${i}-${seg.t}-${seg.text}`;
+        if (seg.t === 'ins') {
+          return (
+            <ins key={key} className="rounded-[3px] bg-success-bg px-0.5 text-success no-underline">
+              {seg.text}
+            </ins>
+          );
+        }
+        if (seg.t === 'del') {
+          return (
+            <del key={key} className="rounded-[3px] bg-destructive-bg px-0.5 text-destructive line-through">
+              {seg.text}
+            </del>
+          );
+        }
+        return <span key={key}>{seg.text}</span>;
+      })}
+    </>
+  );
+}
 
 function SoapRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -45,12 +72,14 @@ function DayHeader({
   time,
   meta,
   todayChip,
+  finalized,
   onMenu,
 }: {
   dateLabel: string;
   time?: string;
   meta: string;
   todayChip?: boolean;
+  finalized?: { at: string; version: number };
   onMenu?: () => void;
 }) {
   return (
@@ -61,6 +90,12 @@ function DayHeader({
       </span>
       {todayChip ? (
         <span className="rounded-md bg-brand-tint px-2 py-0.5 text-[11px] font-semibold text-brand">本日</span>
+      ) : null}
+      {finalized ? (
+        <span className="inline-flex items-center gap-1 rounded-md bg-success-bg px-2 py-0.5 text-[11px] font-semibold text-success tabular-nums">
+          <Lock size={11} strokeWidth={2.2} />
+          確定 v{finalized.version} · {finalized.at}
+        </span>
       ) : null}
       <span className="text-[11.5px] text-text-tertiary">{meta}</span>
       <span className="flex-1" />
@@ -92,7 +127,13 @@ export function TodayDayBlock({ block, onCompose, onActAction }: TodayDayBlockPr
       data-datekey={block.dateKey}
       className="relative border-b border-border shadow-[inset_3px_0_0_var(--brand)]"
     >
-      <DayHeader dateLabel={block.dateLabel} time={block.time} meta={block.meta} todayChip />
+      <DayHeader
+        dateLabel={block.dateLabel}
+        time={block.time}
+        meta={block.meta}
+        todayChip
+        finalized={block.finalized}
+      />
       <div className="grid grid-cols-[1fr_232px] gap-x-[18px] px-5 pb-3.5">
         <div className="flex min-w-0 flex-col gap-2.5">
           {SOAP_ROWS.map(({ key, label }) => {
@@ -114,6 +155,20 @@ export function TodayDayBlock({ block, onCompose, onActAction }: TodayDayBlockPr
           onActAction={onActAction}
         />
       </div>
+      {block.amendments && block.amendments.length > 0 ? (
+        <div className="flex flex-col gap-2.5 px-5 pb-1">
+          {block.amendments.map((am) => (
+            <div key={`${am.at}-${am.author}`} className="border-l-[2.5px] border-brand pl-3">
+              <div className="pb-0.5 text-[10.5px] text-text-tertiary tabular-nums">
+                追記 · {am.author} · {am.at}
+              </div>
+              <div className="text-[13.5px] leading-[1.7] text-text-primary">
+                <Redline value={am.body} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <button
         type="button"
         onClick={onCompose}

@@ -50,6 +50,13 @@ export type SoapText = {
   plan: string;
 };
 
+/** 赤入れ（差分）セグメント。eq=そのまま / ins=追加(緑) / del=削除(赤・取消線)。P2（KARTE_UX_IMPROVEMENTS 論点②） */
+export type RedlineSeg = { t: 'eq' | 'ins' | 'del'; text: string };
+/** プレーン文字列 または 赤入れセグメント列。P2 */
+export type RichText = string | RedlineSeg[];
+/** 確定後の追記（誰・いつ・本文）。本文は赤入れ可。P2 */
+export type Amendment = { author: string; at: string; body: RichText };
+
 type BaseBlock = {
   id: string;
   /** 生の日付文字列（ジャンプ用キー） */
@@ -69,6 +76,10 @@ export type TodayBlock = BaseBlock & {
   acts: SheetAct[];
   billing: BillingPreview;
   version: number;
+  /** 版確定（ロック）済みなら確定時刻と版。未確定は undefined。P2 */
+  finalized?: { at: string; version: number };
+  /** 確定後の追記（時系列）。P2 */
+  amendments?: Amendment[];
 };
 
 export type VisitBlock = BaseBlock & {

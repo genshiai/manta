@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PatientRecord } from '../../../data/chartMock';
 import {
@@ -68,6 +68,7 @@ export function OrderComposer({
   const [dosageIndex, setDosageIndex] = useState(0);
   const [days, setDays] = useState('28日分');
   const [addDiagnosis, setAddDiagnosis] = useState(true);
+  const [entered, setEntered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const hits = useMemo(() => searchOrders(query, orderConfig), [query, orderConfig]);
@@ -79,7 +80,11 @@ export function OrderComposer({
       setQuery('');
       setActiveIndex(0);
       setAddDiagnosis(true);
-      requestAnimationFrame(() => inputRef.current?.focus());
+      setEntered(false);
+      requestAnimationFrame(() => {
+        setEntered(true);
+        inputRef.current?.focus();
+      });
     }
   }, [open]);
 
@@ -240,22 +245,28 @@ export function OrderComposer({
   };
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop close
-    <div className="clinical fixed inset-0 z-50" onKeyDown={handleKeyDown}>
+    <div className="clinical fixed inset-0 z-50">
+      {/* カルテは減光しない（見ながら書く）。クリック / esc で閉じる。KARTE_UX_IMPROVEMENTS 論点① */}
       <button
         type="button"
         aria-label="閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--dim)]"
+        className="absolute inset-0 cursor-default bg-transparent"
       />
+      {/* 右ドロワー: 背景のカルテ（検査値・前回処方・温度板）を隠さず横に並ぶ */}
       <div
         role="dialog"
         aria-label="オーダーコンポーザ"
-        className="absolute left-1/2 top-24 w-[760px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-[14px] border border-border bg-popover shadow-[var(--shadow-modal)]"
+        onKeyDown={handleKeyDown}
+        className={cn(
+          'absolute inset-y-0 right-0 flex w-[min(560px,94vw)] flex-col border-l border-border bg-popover shadow-[var(--shadow-modal)]',
+          'transition-transform duration-[var(--duration-normal)] ease-[var(--ease-default)] motion-reduce:transition-none',
+          entered ? 'translate-x-0' : 'translate-x-full',
+        )}
       >
         {/* header */}
         <div className="flex items-center gap-2.5 border-b border-border px-[18px] py-3">
-          <span className="grid size-[26px] place-items-center rounded-[7px] bg-brand-tint text-[11px] font-bold text-brand">
+          <span className="grid size-[26px] flex-none place-items-center rounded-[7px] bg-brand-tint text-[11px] font-bold text-brand">
             ⌘O
           </span>
           <input
@@ -268,35 +279,39 @@ export function OrderComposer({
             placeholder="処方・検査・画像・処置・セットを横断検索"
             className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-text-primary outline-none placeholder:text-text-tertiary"
           />
-          <span className="whitespace-nowrap text-[11px] text-text-tertiary">横断検索</span>
+          <button
+            type="button"
+            aria-label="閉じる"
+            onClick={onClose}
+            className="grid size-7 flex-none place-items-center rounded-md text-text-tertiary hover:bg-surface-subtle"
+          >
+            <X size={16} strokeWidth={1.9} />
+          </button>
         </div>
 
-        {/* body */}
-        <div className="grid min-h-[328px] grid-cols-[252px_1fr]">
-          {/* left: history */}
-          <div className="flex flex-col gap-0.5 border-r border-border bg-surface-subtle p-2">
-            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] text-text-tertiary">
-              よく使う・履歴（この患者）
-            </div>
-            {history.filter((h) => h.group === 'patient').map((item) => (
-              <HistoryRow key={item.no} item={item} />
-            ))}
-            {history.some((h) => h.group === 'self') ? (
-              <div className="mt-2 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] text-text-tertiary">
-                よく使う（あなた・全患者）
+        {/* body（スクロール領域） */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* history */}
+          {history.length > 0 ? (
+            <div className="flex flex-col gap-0.5 border-b border-border bg-surface-subtle p-2">
+              <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] text-text-tertiary">
+                よく使う・履歴（この患者）
               </div>
-            ) : null}
-            {history.filter((h) => h.group === 'self').map((item) => (
-              <HistoryRow key={item.no} item={item} />
-            ))}
-            {history.length === 0 ? (
-              <p className="px-2.5 py-3 text-[11px] leading-relaxed text-text-tertiary">
-                使うほど、この患者とあなたの履歴がここに並びます。
-              </p>
-            ) : null}
-          </div>
+              {history.filter((h) => h.group === 'patient').map((item) => (
+                <HistoryRow key={item.no} item={item} />
+              ))}
+              {history.some((h) => h.group === 'self') ? (
+                <div className="mt-2 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] text-text-tertiary">
+                  よく使う（あなた・全患者）
+                </div>
+              ) : null}
+              {history.filter((h) => h.group === 'self').map((item) => (
+                <HistoryRow key={item.no} item={item} />
+              ))}
+            </div>
+          ) : null}
 
-          {/* right: hits + form + safety */}
+          {/* hits + form + safety */}
           <div className="flex flex-col gap-2.5 p-4">
             {hits.length === 0 ? (
               <p className="py-6 text-center text-[12.5px] text-text-tertiary">
@@ -376,7 +391,7 @@ export function OrderComposer({
         </div>
 
         {/* footer */}
-        <div className="flex items-center gap-3.5 border-t border-border px-[18px] py-2.5 text-[11px] text-text-tertiary">
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-t border-border px-[18px] py-2.5 text-[11px] text-text-tertiary">
           <span>
             <Kbd>⏎</Kbd> 追加して閉じる
           </span>
