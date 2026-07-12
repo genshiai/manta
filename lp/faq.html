@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FAQ | よくある質問 | Manta</title>
+  <meta name="description" content="Manta のよくある質問。いま診療に使える？無料？商用利用は？ORCA 連携は？FHIR 対応の範囲は？医療者でも参加できる？ ぜんぶ正直に答えます。" />
+  <link rel="canonical" href="https://mantajp.com/faq" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Manta" />
+  <meta property="og:title" content="Manta FAQ | よくある質問" />
+  <meta property="og:description" content="いま使える？無料？ORCA 連携は？ Manta についての質問に正直に答えます。" />
+  <meta property="og:url" content="https://mantajp.com/faq" />
+  <meta property="og:image" content="https://mantajp.com/assets/img/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#fbfbfd" />
+  <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" />
+  <link rel="icon" href="assets/brand/manta-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/brand/manta-icon-180.png" />
+  <link rel="icon" href="favicon.ico" sizes="48x48" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="preload" href="assets/fonts/plemoljp35-regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/plemoljp35-semibold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/site.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "いま、診療に使えますか？", "acceptedAnswer": { "@type": "Answer", "text": "まだ使えません。Manta は Pre-Alpha（公開して一緒に育てていく段階）で、デモ・検証用です。実患者データは入れないでください。" } },
+      { "@type": "Question", "name": "無料で使えますか？商用利用は？", "acceptedAnswer": { "@type": "Answer", "text": "Apache License 2.0 のオープンソースなので、無料で使え、商用利用も fork も自由です。派生プロダクトには Powered by Manta の表記をお願いしています。" } },
+      { "@type": "Question", "name": "ORCA（日レセ）と連携できますか？", "acceptedAnswer": { "@type": "Answer", "text": "現状は mock アダプタです。ORCA の CLAIM 通信廃止を踏まえ、日レセ API 前提で設計しており、実送信はこれからの開発項目です。" } },
+      { "@type": "Question", "name": "FHIR 対応の範囲は？", "acceptedAnswer": { "@type": "Answer", "text": "対象は FHIR の R4B 版と日本向けプロファイルの JP Core で、現在 9 リソースの読み取りと 5 リソースの書き込みに対応しています。FHIR はデータモデルではなくゲートウェイとして実装しています。" } },
+      { "@type": "Question", "name": "AI は何をしてくれますか？", "acceptedAnswer": { "@type": "Answer", "text": "AI の役割は候補生成とレビュー補助に限定し、確定は必ず人間が行います。現状の AI 機能はルール生成・定型文のデモ段階で、実 LLM 接続はこれからです。" } },
+      { "@type": "Question", "name": "医療者ですがコードは書けません。参加できますか？", "acceptedAnswer": { "@type": "Answer", "text": "参加できます。現場の知見を Issue や Discussions で共有すること自体が貢献です。コーディング AI の時代、臨床医がエージェントを使って実装に参加することも現実になりつつあります。" } }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="logo" href="index.html" aria-label="Manta ホーム"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+    <nav class="nav-links" id="navLinks" aria-label="サイト内">
+      <a href="about.html">ビジョン</a>
+      <a href="technology.html">技術</a>
+      <a href="community.html">コミュニティ</a>
+      <a href="faq.html" aria-current="page">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-secondary btn-sm" href="https://github.com/genshiai/manta" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="btn-gh-label">GitHub</span>
+      </a>
+      <button class="nav-burger" aria-expanded="false" aria-label="メニュー" aria-controls="navLinks"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero" style="padding-bottom:clamp(32px,4vw,56px);">
+    <div class="hero-bg" aria-hidden="true"><span class="hero-wm"></span></div>
+    <div class="wrap-narrow">
+      <p class="eyebrow rv on">FAQ</p>
+      <h1 class="h-display rv on" style="--d:.05s; font-size:clamp(30px,4.6vw,46px);">よくある質問に、<br />正直に答えます。</h1>
+      <p class="lede rv on" style="--d:.1s; margin-top:20px;">まだ出来ていないことは、出来ていないと書きます。ここにない質問は <a href="https://github.com/genshiai/manta/discussions" rel="noopener">GitHub Discussions</a> へ。</p>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0;">
+    <div class="wrap-narrow">
+
+      <h2 class="h-sub rv" style="margin:32px 0 16px;">使う</h2>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>いま、診療に使えますか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p><b>まだ使えません。</b>Manta は Pre-Alpha、公開しながら一緒に育てていく段階で、いまはデモと検証用です。実患者データは入れないでください。本番の診療と請求に使える品質になったら、はっきりそう宣言します。</p>
+          <p>いまの進捗は<a href="index.html#status">「いま、どこまで動くのか」</a>で、動く / 一部 / デモを区別して公開しています。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>試すには何が必要ですか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>Docker だけです。<code class="inline">git clone</code> して <code class="inline">docker compose up</code> すると、マイグレーションとデモデータ投入込みでフル環境が立ち上がります。手順は<a href="index.html#quickstart">クイックスタート</a>へ。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>データはどこに保存されますか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>あなたの手元です。Manta はセルフホストが前提で、真実の源は自分で立てた PostgreSQL にあります。特定ベンダーのクラウドに囲い込まれることはありませんし、FHIR ゲートウェイ経由で標準形式のままデータを取り出せる設計です。</p>
+        </div>
+      </details>
+
+      <h2 class="h-sub rv" style="margin:48px 0 16px;">ライセンス</h2>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>無料ですか？商用利用はできますか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>Apache License 2.0 のオープンソースです。無料で使えて、商用利用も fork も自由。特許条項がコントリビューターを守ります。</p>
+          <p>ひとつだけお願いがあります。fork や派生プロダクトには <b>Powered by Manta</b>（または Based on Manta）の表記を。名前を隠させるより、出典を明記してもらうほうが、良い形は広く伝わると考えています。なお「Manta」「GENSHI AI」の名称・ロゴは <a href="https://github.com/genshiai/manta/blob/main/TRADEMARKS.md" rel="noopener">商標ポリシー</a>の対象です。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>貢献したコードが、将来クローズドにされませんか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>されません。リポジトリ全体が Apache License 2.0 で、例外はありません。あなたが書いたコードは Apache 2.0 のまま世界に残ります。</p>
+        </div>
+      </details>
+
+      <h2 class="h-sub rv" style="margin:48px 0 16px;">連携と AI</h2>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>ORCA（日レセ）と連携できますか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>現状は <b>mock アダプタ</b>で、実送信はまだできません。ORCA の CLAIM 通信が 2026 年 3 月末で廃止されたことを踏まえ、日レセ API 前提で設計しており、実 ORCA への送信はロードマップ上の開発項目です。</p>
+          <p>ORCA 固有の仕様は gateway のアダプタに閉じ込めてあるので、将来は他社レセコンや病院 HIS のアダプタも足せる構造にしています。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>FHIR 対応の範囲は？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>対象は FHIR の R4B 版と、日本向けプロファイルの JP Core です。現在 <b>9 リソースの読み取りと 5 リソースの書き込み</b>に対応しています（要認証）。JP Core の厳密な検証と検索の拡張はこれからです。</p>
+          <p>設計上のポイントは、FHIR を DB スキーマにしていないことです。真実の源はドメイン ORM に置き、境界でだけ FHIR と相互変換します。理由は<a href="technology.html#gateway">技術ページ</a>に書きました。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>AI は何をしてくれますか？勝手にカルテを書きませんか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>AI の役割は、<b>候補生成とレビュー補助まで</b>です。算定漏れや病名不足を説明付きで提示しますが、カルテと会計の確定は必ず人間が行います。生成物には候補バッジと根拠を必ず付けます。</p>
+          <p>いまの AI 機能は、ルール生成と定型文のデモ段階です（LLM 未接続）。実 LLM 接続と、AI エージェント向けの MCP インターフェースが、これからの大きな開発テーマです。</p>
+        </div>
+      </details>
+
+      <h2 class="h-sub rv" style="margin:48px 0 16px;">参加する</h2>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>医療者ですが、コードは書けません。参加できますか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>できます。というより、あなたの参加が一番欲しいのです。「現場のこの業務、こう作ってほしい」を <a href="https://github.com/genshiai/manta/issues" rel="noopener">Issue</a> や <a href="https://github.com/genshiai/manta/discussions" rel="noopener">Discussions</a> に書いてもらえれば、それ自体が貢献です。</p>
+          <p>それに、これからは違います。コーディング AI を使えば、臨床医が自分でプロトタイプを書いて PR を出すことも現実になりつつある。読みやすい Python を選んだのは、そのためでもあります。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>なぜ Rust ではなく Python なんですか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>作者が個人的に使いたかったのは Rust です。でも、このプロジェクトは多くの人が入ってくれないと成り立たない。<b>読みやすさは、そのまま入りやすさになります。</b>だからいまは Python で速く、広く作ります。Rust への移行は、いつか作者かそのチームが引き受けます。全文は<a href="about.html">ビジョン</a>の「技術のこと」へ。</p>
+        </div>
+      </details>
+
+      <details class="faq-item rv">
+        <summary><span class="q">Q</span>誰が作っていますか？<span class="tgl">＋</span></summary>
+        <div class="a">
+          <p>医師で GENSHI AI 代表の長嶋大地と、AI コーディングエージェント、そしてコミュニティです。少人数 + AI で電子カルテ級のソフトウェアがどこまで作れるか、Manta はその公開実験でもあります。会社については <a href="https://genshi.ai/" rel="noopener">genshi.ai</a> へ。</p>
+        </div>
+      </details>
+
+      <div class="rv" style="margin-top:56px; text-align:center;">
+        <p style="color:var(--muted); font-size:14.5px; margin-bottom:20px;">答えが見つからないときは、遠慮なく。</p>
+        <a class="btn btn-primary" href="https://github.com/genshiai/manta/discussions" rel="noopener">Discussions で質問する</a>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="index.html"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+        <p>AI エージェントが動く、次世代のオープンソース電子カルテ。医師が、OSS と AI の力でゼロから作り直す。</p>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="about.html">ビジョン</a></li>
+          <li><a href="technology.html">技術とアーキテクチャ</a></li>
+          <li><a href="community.html">コミュニティ</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Develop</h4>
+        <ul>
+          <li><a href="https://github.com/genshiai/manta" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/genshiai/manta/issues" rel="noopener">Issues</a></li>
+          <li><a href="https://github.com/genshiai/manta/discussions" rel="noopener">Discussions</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/docs/why-manta.md" rel="noopener">なぜ Manta を作るのか（why-manta）</a></li>
+          <li><a href="https://github.com/genshiai/manta/tree/main/docs/decisions" rel="noopener">ADR（意思決定の記録）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/CONTRIBUTING.md" rel="noopener">CONTRIBUTING</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://genshi.ai/" rel="noopener">GENSHI AI</a></li>
+          <li><a href="https://zenn.dev/p/genshi_ai" rel="noopener">Zenn</a></li>
+          <li><a href="https://note.com/ikora" rel="noopener">note</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/LICENSE" rel="noopener">ライセンス（Apache-2.0）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/TRADEMARKS.md" rel="noopener">商標ポリシー</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/SECURITY.md" rel="noopener">脆弱性の報告</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-giant"><img src="assets/brand/manta-lockup.svg" alt="" loading="lazy" width="720" height="222" /></div>
+    <div class="foot-bottom">
+      <span>© 2026 GENSHI AI, Inc.</span>
+      <span>Apache License 2.0</span>
+      <span class="spacer"></span>
+      <span>Pre-Alpha · 実患者データは入れないでください</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

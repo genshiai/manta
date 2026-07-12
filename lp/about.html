@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ビジョン | AIが当たり前に動くカルテを、オープンソースで | Manta</title>
+  <meta name="description" content="止まったカルテに、生成 AI が来た。Manta が目指すのは、AI が当たり前にそこにいるカルテ。F1 のような実験場として、ベンダーロックインの外側で、オープンソースで作る。医師、長嶋大地によるビジョン全文です。" />
+  <link rel="canonical" href="https://mantajp.com/about" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Manta" />
+  <meta property="og:title" content="ビジョン | AIが当たり前に動くカルテを、オープンソースで" />
+  <meta property="og:description" content="AI がカルテの中を縦横無尽に駆け抜けて、人間の shit job を片づけて、頼もしい相棒になる。カルテって本来、そういう未来の医療の土台であっていいんじゃないか。" />
+  <meta property="og:url" content="https://mantajp.com/about" />
+  <meta property="og:image" content="https://mantajp.com/assets/img/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#fbfbfd" />
+  <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" />
+  <link rel="icon" href="assets/brand/manta-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/brand/manta-icon-180.png" />
+  <link rel="icon" href="favicon.ico" sizes="48x48" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="preload" href="assets/fonts/plemoljp35-regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/plemoljp35-semibold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/site.css" />
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="logo" href="index.html" aria-label="Manta ホーム"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+    <nav class="nav-links" id="navLinks" aria-label="サイト内">
+      <a href="about.html" aria-current="page">ビジョン</a>
+      <a href="technology.html">技術</a>
+      <a href="community.html">コミュニティ</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-secondary btn-sm" href="https://github.com/genshiai/manta" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="btn-gh-label">GitHub</span>
+      </a>
+      <button class="nav-burger" aria-expanded="false" aria-label="メニュー" aria-controls="navLinks"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero" style="padding-bottom:0;">
+    <div class="hero-bg" aria-hidden="true"><span class="hero-wm"></span></div>
+    <div class="wrap-narrow">
+      <p class="eyebrow rv on">Vision</p>
+      <h1 class="h-display rv on" style="--d:.05s; font-size:clamp(30px,4.6vw,46px);">AIが当たり前に動くカルテを、<br />オープンソースで。</h1>
+      <div class="byline rv on" style="--d:.1s; margin-top:26px;"><img class="avatar" src="assets/img/daichi.webp" alt="長嶋大地" width="48" height="48" /><span><span class="nm">長嶋大地</span><span class="rl">医師 / GENSHI AI 代表</span></span></div>
+    </div>
+    <div class="wrap" style="margin-top:clamp(32px,5vw,56px);">
+      <div class="art-frame rv on" style="--d:.15s">
+        <img src="assets/img/art-manta.webp" alt="深い青の海を、光に向かって斜めに泳ぐ一枚のマンタ" width="1024" height="688" fetchpriority="high" />
+      </div>
+    </div>
+  </section>
+
+  <article class="section" style="padding-top:clamp(48px,6vw,80px);">
+    <div class="wrap-narrow prose">
+
+      <h2>止まったカルテ</h2>
+      <p>いまのカルテの多くは、2000年代初頭のデザインをベースに、ツギハギで機能を足してきたシステムです。モダン化は少しずつ進んでいます。ただ、その間に Web の考え方は変わったし、システムはクラウドに乗ったし、SaaS も新しい UI/UX のやり方もどんどん積み上がりました。カルテはそこに追いつけていない、と思います。</p>
+      <p>そこにさらに、生成 AI が来ました。</p>
+
+      <h2>AIが動くカルテ</h2>
+      <p>私が作りたいのは、AI が当たり前にそこにいるカルテです。</p>
+      <p>AI がカルテの中を縦横無尽に駆け抜けて、人間の shit job を片づけて、散らかった情報の交通整理をして、頼もしい相棒になる。カルテって本来、そういう未来の医療の土台であっていいんじゃないか。ずっとそう思っています。</p>
+
+      <h2>F1としての実験場</h2>
+      <p>私たちのビジョンは、既存のカルテを置き換えることでも、どこかと戦うことでもありません。やりたいのは、ビジョンを届けることです。</p>
+      <p>イメージは F1 に近いかもしれません。F1 で試された技術が、時間をかけて市販車に降りてくる。Manta も、ある意味でその実験場だと思っています。ここで最先端を試して、うまくいったものが現場に少しずつ伝わっていけばいい。</p>
+      <p>ただ、実験場だからといって妥協はしたくありません。むしろ実験場だからこそ、いちばんいいと思えるものを、妥協せずに作ります。</p>
+
+      <h2>ロックインという敵</h2>
+      <p>AI が動くことと同じくらい大事なのが、相互運用できるデータ形式です。この二つが、同時に必要です。</p>
+      <p>私がいちばん恨んでいるのは、ベンダーロックインです。データが一社の囲いの中に閉じ込められて、外に出せない。他とつながらない。現場の「こう直したい」も反映されない。医療みたいに公共性の高い領域で、これが当たり前になっているのは、どう考えてもおかしいです。</p>
+      <p>だから Manta は、いったん HL7 FHIR（JP）を採用しています。正直、FHIR が正解だとは思っていません。思うところは色々あります。それでも、自分たちで独自形式を作るより、すでに米国で実績のある FHIR に一回乗っておくほうが正しい。そう判断しました。<br />これについては後々変更するかもしれませんが、共通フォーマットが重要であることはこの先も変わらないと思います。</p>
+
+      <figure class="prose-break rv" style="margin-left:0; margin-right:0;">
+        <img src="assets/img/art-currents.webp" alt="海流のように流れる光の線" loading="lazy" width="1024" height="688" />
+      </figure>
+
+      <h2>技術のこと</h2>
+      <p>技術選定には、妥協した部分もあります。私は技術ヲタクなので、この部分は先に申し上げておきたいです。</p>
+      <p>Web で作る以上、フロントエンドは JavaScript（TypeScript）で決まりです。ここに選ぶ余地はありません。逆に言えば Web だから、インストールも要らないし、どの端末でも同じ画面が動く。マルチプラットフォームは勝手についてきます。</p>
+      <p>Javaが夢見たマルチプラットフォームの世界を、今度はWebで実現します。これはもう2010年以降デファクト・スタンダードと言っても構わないでしょう。デスクトップアプリですら、Electron, TauriなどWebベースが採用されています。</p>
+      <p>悩んだのはバックエンドです。個人的に使いたいのは Rust でした。メモリ安全性、実行効率、言語そのものが課してくる制約。医療という領域で、これだけ大きいものを長く作るなら、この堅さは効いてくると思います。dicom-rs みたいに、医療まわりのライブラリも育ってきました。</p>
+      <p>それでも、最初は Python にしました。</p>
+      <p>このプロジェクトは、多くの人が入ってくれないと成り立たないからです。最先端であることと、コードが読めること。その両方が要ります。これまで医療ソフトに手を入れられるのはエンジニアだけでした。でもこれからは、臨床医だってコーディングエージェントを使えばこのようなプロジェクトに参加できるのです。そのとき、読みやすさは、そのまま入りやすさになります。だからいまは、Python で速く、広く作ります。</p>
+      <p>Rust への移行は、いつか私か、私のチームが引き受けるつもりです。自分はPython も Rust も書きますし、すでに2026年現在では Rust 化に成功したプロジェクトが散見されます。いまの AI コーディングエージェントがあれば、移行そのものは十分いけると踏んでいます。</p>
+
+      <h2>オープンソースという礎</h2>
+      <p>最初は、比較的自由で商用利用も認める Apache License 2.0 でいきます。将来は変えるかもしれませんが、まずはここから。</p>
+      <p>理由はシンプル。閉じたくないからです。ここに、できるだけ多くの人の知見を集めたい。これまで、こういったプロジェクトは、エンジニアの視点しか注入できませんでした。でもこれからは、コーディングAIのお陰で、臨床医もここに加わることができます。だから、できるだけ広く開いた場所にしておきたいんです。</p>
+      <p>これは建前ではありません。いま私が書いているこの文章も、Manta が置いてある GitHub も、その裏で動いているサーバーも、ほとんど Linux の上にあります。コードはもちろん git で管理されています。人類がこの OSS のエコシステムを手に入れたことは、それ自体が発明で、ひとつの勝利だと思います。私たちは毎日、その恩恵の上でコードを書いています。</p>
+      <p>医療は、公共性が高い。なのに、いまの日本ではそれがコントロールできなくなっています。ベンダーロックインが当たり前で、相互運用はできなくて、現場の改善も反映されない。国によっては、相互運用を法律で義務づけていたり、カルテの基盤そのものを国が持っていたりします。日本は国民皆保険という、すごくいい仕組みを持っています。それなのに、その上で動くシステムがこの体たらくで、アップデートされないまま放置されている。これはまずい、と本気で思っています。</p>
+      <p>OSS の精神こそ、これからの医療を変える礎になる。私はそう信じています。</p>
+      <p>そして中立だからこそ、皆さんの率直な意見や、素晴らしい力を受け入れることができると思います。</p>
+
+      <figure class="prose-break rv" style="margin-left:0; margin-right:0;">
+        <img src="assets/img/art-surface.webp" alt="水中から見上げた、光がゆらめく海面" loading="lazy" width="1024" height="688" />
+      </figure>
+
+      <h2>まだ途中</h2>
+      <p>書けるのは、いまのところここまで。話したいことはまだたくさんあります。これは第一稿で、これからちゃんと書き足していきます。</p>
+      <p>もし少しでも引っかかったら、一緒に作りませんか。医師でも、医療事務でも、看護師でも、エンジニアでも、デザイナーでも。あなたの視点が入るたびに、Manta は良くなります。</p>
+
+      <div style="margin-top:48px; display:flex; flex-wrap:wrap; gap:12px;">
+        <a class="btn btn-primary" href="https://github.com/genshiai/manta" rel="noopener">GitHub で参加する</a>
+        <a class="btn btn-secondary" href="community.html">コミュニティを見る</a>
+      </div>
+
+      <div style="margin-top:64px; padding-top:32px; border-top:1px solid var(--line); display:flex; align-items:center; gap:18px;">
+        <img class="avatar" src="assets/img/daichi.webp" alt="長嶋大地" width="96" height="96" loading="lazy" style="flex:none;" />
+        <div style="font-size:14px; line-height:1.9;">
+          <b style="font-size:16.5px;">長嶋大地</b>　医師 / GENSHI AI 代表<br />
+          <span style="color:var(--muted);">発信：<a href="https://note.com/ikora" rel="noopener">note</a> ・ <a href="https://zenn.dev/p/genshi_ai" rel="noopener">Zenn</a> ・ <a href="https://genshi.ai/" rel="noopener">genshi.ai</a></span>
+        </div>
+      </div>
+
+    </div>
+  </article>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="index.html"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+        <p>AI エージェントが動く、次世代のオープンソース電子カルテ。医師が、OSS と AI の力でゼロから作り直す。</p>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="about.html">ビジョン</a></li>
+          <li><a href="technology.html">技術とアーキテクチャ</a></li>
+          <li><a href="community.html">コミュニティ</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Develop</h4>
+        <ul>
+          <li><a href="https://github.com/genshiai/manta" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/genshiai/manta/issues" rel="noopener">Issues</a></li>
+          <li><a href="https://github.com/genshiai/manta/discussions" rel="noopener">Discussions</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/docs/why-manta.md" rel="noopener">なぜ Manta を作るのか（why-manta）</a></li>
+          <li><a href="https://github.com/genshiai/manta/tree/main/docs/decisions" rel="noopener">ADR（意思決定の記録）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/CONTRIBUTING.md" rel="noopener">CONTRIBUTING</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://genshi.ai/" rel="noopener">GENSHI AI</a></li>
+          <li><a href="https://zenn.dev/p/genshi_ai" rel="noopener">Zenn</a></li>
+          <li><a href="https://note.com/ikora" rel="noopener">note</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/LICENSE" rel="noopener">ライセンス（Apache-2.0）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/TRADEMARKS.md" rel="noopener">商標ポリシー</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/SECURITY.md" rel="noopener">脆弱性の報告</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-giant"><img src="assets/brand/manta-lockup.svg" alt="" loading="lazy" width="720" height="222" /></div>
+    <div class="foot-bottom">
+      <span>© 2026 GENSHI AI, Inc.</span>
+      <span>Apache License 2.0</span>
+      <span class="spacer"></span>
+      <span>Pre-Alpha · 実患者データは入れないでください</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

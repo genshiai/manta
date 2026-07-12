@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>技術 | モジュラーモノリスと、ゲートウェイに閉じ込めた相互運用 | Manta</title>
+  <meta name="description" content="Manta のアーキテクチャ。FastAPI + React のモジュラーモノリス、import-linter で機械強制するレイヤー依存、FHIR / ORCA / MCP をゲートウェイに閉じ込める設計、カルテを正本とするデータフロー。すべての意思決定は ADR として公開。" />
+  <link rel="canonical" href="https://mantajp.com/technology" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Manta" />
+  <meta property="og:title" content="Manta の技術 | モジュラーモノリスと、ゲートウェイに閉じ込めた相互運用" />
+  <meta property="og:description" content="8 モジュールの一方向依存を CI で機械強制。FHIR はデータモデルではなくゲートウェイ。AI は候補のみ、確定は人間。" />
+  <meta property="og:url" content="https://mantajp.com/technology" />
+  <meta property="og:image" content="https://mantajp.com/assets/img/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#fbfbfd" />
+  <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" />
+  <link rel="icon" href="assets/brand/manta-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/brand/manta-icon-180.png" />
+  <link rel="icon" href="favicon.ico" sizes="48x48" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="preload" href="assets/fonts/plemoljp35-regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/plemoljp35-semibold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/site.css" />
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="logo" href="index.html" aria-label="Manta ホーム"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+    <nav class="nav-links" id="navLinks" aria-label="サイト内">
+      <a href="about.html">ビジョン</a>
+      <a href="technology.html" aria-current="page">技術</a>
+      <a href="community.html">コミュニティ</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-secondary btn-sm" href="https://github.com/genshiai/manta" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="btn-gh-label">GitHub</span>
+      </a>
+      <button class="nav-burger" aria-expanded="false" aria-label="メニュー" aria-controls="navLinks"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- hero -->
+  <section class="hero" style="padding-bottom:clamp(48px,6vw,80px);">
+    <div class="hero-bg" aria-hidden="true"><span class="hero-wm"></span></div>
+    <div class="wrap">
+      <div class="feature-row">
+        <div class="fr-copy">
+          <p class="eyebrow rv on">Technology</p>
+          <h1 class="h-display rv on" style="--d:.05s; font-size:clamp(30px,4.6vw,46px);">実験場だからこそ、<br />妥協しない。</h1>
+          <p class="lede rv on" style="--d:.1s; margin-top:20px;">F1 で試された技術が、時間をかけて市販車に降りてくる。Manta はカルテの実験場です。UI と AI では最先端を試し、医療データを預かる土台は、枯れて堅い技術で固める。その線引きと理由を、全部公開しています。</p>
+          <p class="hero-note rv on" style="--d:.15s; margin-top:26px; text-align:left;">FastAPI + PostgreSQL 16 ・ React 18 + TypeScript ・ FHIR 対応</p>
+        </div>
+        <div class="fr-media rv on rv-scale" style="--d:.12s">
+          <div class="art-frame plx"><img src="assets/img/art-layers.webp" alt="8枚の半透明レイヤーが整然と積み上がった抽象アート。1枚だけが明るく光る" width="1024" height="688" fetchpriority="high" data-plx="-0.04" /></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- stack -->
+  <section class="section section-soft" id="stack">
+    <div class="wrap">
+      <div class="section-head rv">
+        <p class="eyebrow">Stack</p>
+        <h2 class="h-section">地味でも、枯れていて速い構成。</h2>
+        <p class="lede">派手さより、医療データを扱う土台としての堅牢さを優先しました。型と非同期に強く、コードが読めること。それがこのスタックの選定基準です。</p>
+      </div>
+      <div class="card table-card rv">
+        <table class="tbl">
+          <thead><tr><th>領域</th><th>採用技術</th></tr></thead>
+          <tbody>
+            <tr><td class="strong">フロントエンド</td><td>React 18 ・ TypeScript ・ Vite ・ Tailwind CSS v4 ・ Radix UI ・ Lucide。設計基盤は StyleSeed（Apple HIG skin / <a href="https://github.com/genshiai/manta/blob/main/docs/decisions/0003-color-system-apple-hig.md" rel="noopener">ADR 0003</a>）</td></tr>
+            <tr><td class="strong">バックエンド</td><td>Python ・ FastAPI ・ SQLAlchemy 2 ・ Alembic ・ PostgreSQL 16。認証は JWT + Argon2（自前実装、本番でデフォルト鍵なら起動拒否）</td></tr>
+            <tr><td class="strong">相互運用</td><td>FHIR R4B / JP Core（<code class="inline">fhir.resources</code>）・ ORCA 日レセ API アダプタ ・ MCP（計画 / <a href="https://github.com/genshiai/manta/blob/main/docs/decisions/0007-mcp-agent-interface.md" rel="noopener">ADR 0007</a>）</td></tr>
+            <tr><td class="strong">設計の規律</td><td>import-linter によるレイヤー機械強制 ・ ADR による意思決定記録 ・ Conventional Commits + DCO</td></tr>
+            <tr><td class="strong">開発・実行</td><td>Docker Compose ・ uv（Python）・ Biome（JS/TS lint / format）・ GitHub Actions CI</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-2" style="margin-top:18px;">
+        <div class="card rv">
+          <h3>なぜ、Rust ではなく Python か。</h3>
+          <p>個人的に使いたかったのは Rust です。それでも最初は Python にしました。このプロジェクトは、多くの人が入ってくれないと成り立たないからです。コーディングエージェントの時代、臨床医もコードに参加できる。<b style="color:var(--ink);">読みやすさは、そのまま入りやすさになります。</b>だからいまは Python で速く、広く作ります。Rust への移行は、いつか作者自身かそのチームが引き受ける計画です。</p>
+        </div>
+        <div class="card rv" style="--d:.07s">
+          <h3>なぜ、Web か。</h3>
+          <p>Web だから、インストールは要らないし、どの端末でも同じ画面が動く。マルチプラットフォームは勝手についてきます。Java が夢見たマルチプラットフォームの世界を、今度は Web で実現します。フロントエンドが TypeScript なのは、もう選ぶ余地のない決定です。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- architecture -->
+  <section class="section" id="architecture">
+    <div class="wrap">
+      <div class="section-head rv">
+        <p class="eyebrow">Architecture</p>
+        <h2 class="h-section">モノレポ + モジュラーモノリス</h2>
+        <p class="lede">マイクロサービスにはしません。早すぎる物理分割は MVP を殺すからです。代わりに 8 モジュールの依存方向を「上から下への一方向」に制限し、逆流は CI が検出してビルドを落とします。境界を守るのは、レビュアーの善意ではなく機械です。</p>
+      </div>
+
+      <div class="layers rv" role="img" aria-label="バックエンド8モジュールの依存スタック。上位のadmin/gatewayから下位のauth/commonへ一方向に依存する">
+        <div class="layer top"><span class="mod">admin</span><span class="role">管理・マスタ運用（最上位）</span><span class="band">Workflow</span></div>
+        <div class="layer top"><span class="mod">gateway</span><span class="role">外部連携：FHIR マッパー / ORCA アダプタ / MCP（計画）</span><span class="band">Gateway</span></div>
+        <div class="layer"><span class="mod">rececon</span><span class="role">レセプト・算定・返戻 / 査定・月次クローズ</span><span class="band">Domain</span></div>
+        <div class="layer"><span class="mod">inpatient</span><span class="role">入院・病棟・退院ワークフロー</span><span class="band">Domain</span></div>
+        <div class="layer"><span class="mod">karte</span><span class="role">外来カルテ・SOAP・オーダ</span><span class="band">Domain</span></div>
+        <div class="layer"><span class="mod">master_data</span><span class="role">公的マスタ（病名 / 薬価 / 点数表 …）</span><span class="band">Data</span></div>
+        <div class="layer base"><span class="mod">auth</span><span class="role">認証（JWT + Argon2）・ロール</span><span class="band">Foundation</span></div>
+        <div class="layer base"><span class="mod">common</span><span class="role">監査ログ・時刻ユーティリティ等の基盤</span><span class="band">Foundation</span></div>
+      </div>
+      <p class="rv" style="margin-top:16px; font-size:13px; color:var(--faint);">依存の向きは上 → 下のみ。下位が上位を import したら <a href="https://import-linter.readthedocs.io/" rel="noopener">import-linter</a> の契約違反として CI が落ちます（契約は <code class="inline">backend/pyproject.toml</code>）。必要が実際に来た時点で切り出せる状態を、いまのうちに保証しておくための設計です。</p>
+
+      <figure class="rv rv-scale" style="margin:clamp(36px,5vw,52px) 0 0;">
+        <div class="art-frame"><img src="assets/img/art-architecture.webp" alt="Manta のシステム全体図。ブラウザ（React 18）から REST + JWT で FastAPI のモジュラーモノリスへ。内部に auth、karte / inpatient / rececon、admin / master_data、gateway（FHIR / ORCA / MCP）。データは PostgreSQL 16 が正本で、外部システムへは gateway が変換だけを担う" loading="lazy" width="1024" height="688" /></div>
+        <figcaption style="margin-top:14px; color:var(--faint); font-size:12.5px; text-align:center;">システム全体図。ブラウザから REST + JWT で FastAPI を呼び、外部連携は gateway に隔離します。正本は PostgreSQL 16 です。</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- gateway -->
+  <section class="section section-soft" id="gateway">
+    <div class="wrap">
+      <div class="section-head rv">
+        <p class="eyebrow">Gateway</p>
+        <h2 class="h-section">FHIR は「データモデル」ではなく、<br />ゲートウェイ。</h2>
+        <p class="lede">FHIR をそのまま DB スキーマにすると、日々の臨床ロジックが FHIR リソースの抽象度に引きずられて重くなります。だから真実の源はドメイン固有の ORM に置き、外部フォーマットは境界の内側に入れません。内側は素直なドメインモデルのまま、外に向けては標準規格で話します。</p>
+      </div>
+      <div class="grid-3">
+        <div class="card card-hover rv">
+          <span class="tag">gateway/fhir</span>
+          <h3>FHIR マッパー</h3>
+          <p>ドメインの ORM と FHIR を、必要なときだけ相互変換します。対応しているのは FHIR の R4B 版と、日本向けプロファイルの JP Core です。現在 9 リソースの読み取りと 5 リソースの書き込みができます（要認証）。</p>
+        </div>
+        <div class="card card-hover rv" style="--d:.07s">
+          <span class="tag">gateway/orca</span>
+          <h3>ORCA アダプタ</h3>
+          <p>日レセ API への変換と送受信、ORCA 固有エラーの正規化を、このアダプタの中に閉じ込めています。カルテやレセコンの本体は ORCA の仕様を知らずに済みます。現状は mock で、実送信はこれからです。</p>
+        </div>
+        <div class="card card-hover rv" style="--d:.14s">
+          <span class="tag">gateway/mcp（計画）</span>
+          <h3>MCP サーバー</h3>
+          <p>AI エージェントのための 3 つめの入口です。システム連携は FHIR、エージェント操作は MCP という役割分担で、カルテの全機能をエージェントからも使えるように開いていきます。</p>
+        </div>
+      </div>
+      <p class="rv" style="margin-top:20px; font-size:13px; color:var(--faint);">アダプタを足せば、他社レセコンや病院 HIS にも広げられます。ORCA の CLAIM 通信は 2026 年 3 月末で廃止されたため、連携は日レセ API 前提で設計しています（<a href="https://github.com/genshiai/manta/blob/main/docs/decisions/0004-receipt-gateway-and-ai-claims-assist.md" rel="noopener">ADR 0004</a>）。</p>
+    </div>
+  </section>
+
+  <!-- data flow -->
+  <section class="section" id="dataflow">
+    <div class="wrap">
+      <div class="section-head rv">
+        <p class="eyebrow">Data Flow</p>
+        <h2 class="h-section">カルテが正本、会計は派生</h2>
+        <p class="lede">会計とレセプトは、カルテとオーダと病名から導かれる派生データです。医師の入力 UI を、請求の都合に侵食させないための順番です。</p>
+      </div>
+      <div class="flow rv" role="img" aria-label="カルテ正本からORCA送信までのデータフロー。確定は人間が行う">
+        <div class="flow-node"><b>カルテ・オーダ・病名</b><span>正本 / source of truth</span></div>
+        <div class="flow-node"><b>Billing Core</b><span>算定候補・警告の生成</span></div>
+        <div class="flow-node"><b>ClaimDraft</b><span>レセプト下書き</span></div>
+        <div class="flow-node human"><b>送信前レビュー</b><span>👤 人間が確定</span></div>
+        <div class="flow-node ext"><b>ORCA 送信</b><span>将来 / 現状 mock</span></div>
+      </div>
+      <p class="rv" style="margin-top:18px; font-size:13px; color:var(--faint);">AI は候補を生成するだけで、確定しません。会計送信とレセプト請求の確定は、必ず人間が行います。</p>
+    </div>
+  </section>
+
+  <!-- master data -->
+  <section class="section section-soft" id="masterdata">
+    <div class="wrap">
+      <div class="feature-row rev">
+        <div class="fr-media rv rv-scale"><div class="art-frame plx"><img src="assets/img/art-masterdata.webp" alt="奥へ続く、整然と並んだ無数のガラスタイルのアーカイブ壁" loading="lazy" width="1024" height="688" data-plx="-0.04" /></div></div>
+        <div class="fr-copy rv" style="--d:.1s">
+          <p class="eyebrow">Master Data</p>
+          <h2 class="h-section" style="font-size:clamp(24px,3vw,32px);">保険診療の現実から<br />逃げない</h2>
+          <p style="margin-top:16px;">カルテだけなら、もっと早く作れます。Manta があえて重い道を選んでいるのは、日本の保険診療の現実を正面から飲み込むと決めたからです。マスタの取り込みと改定対応は地味で、運用負荷も高い。でも、ここを避けたら現場で会計に流れず、価値が半分になる。</p>
+          <ul>
+            <li>MEDIS-DC 標準病名マスター（ICD10 対応）・診療報酬点数表</li>
+            <li>医薬品マスタ（YJ / HOT コード）・PMDA 電子添文と相互作用</li>
+            <li>レセプトコメントマスタ・施設別ルール DSL</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- repo -->
+  <section class="section" id="repo">
+    <div class="wrap">
+      <div class="grid-2" style="align-items:center;">
+        <div class="rv">
+          <p class="eyebrow">Monorepo</p>
+          <h2 class="h-section" style="font-size:clamp(24px,3vw,32px);">1 リポジトリに、全部あります</h2>
+          <p class="lede" style="margin-top:14px;">フロントもバックも設計文書も、同じ場所で版管理しています。<code class="inline">docker compose up</code> 一発で、DB と API と Web が立ち上がります。</p>
+          <div style="margin-top:24px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="btn btn-primary" href="https://github.com/genshiai/manta" rel="noopener">リポジトリを見る</a>
+            <a class="btn btn-secondary" href="https://github.com/genshiai/manta/blob/main/docs/why-manta.md" rel="noopener">設計思想の全文</a>
+          </div>
+        </div>
+        <div class="term rv" style="--d:.08s">
+          <div class="term-bar">
+            <span class="d d1"></span><span class="d d2"></span><span class="d d3"></span>
+            <span class="term-title">manta/</span>
+          </div>
+          <pre>manta/
+├─ frontend/      <span class="c">React 18 + Vite + Tailwind v4 + Radix</span>
+├─ backend/       <span class="c">FastAPI + SQLAlchemy 2 + Alembic</span>
+│   └─ app/modules/
+│       ├─ karte/ inpatient/ rececon/
+│       ├─ gateway/  <span class="c">fhir / orca / (mcp)</span>
+│       └─ auth/ master_data/ admin/ common/
+├─ docs/          <span class="c">設計ドキュメント・ADR</span>
+└─ compose.yaml   <span class="c">db + api + web を一発起動</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="index.html"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+        <p>AI エージェントが動く、次世代のオープンソース電子カルテ。医師が、OSS と AI の力でゼロから作り直す。</p>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="about.html">ビジョン</a></li>
+          <li><a href="technology.html">技術とアーキテクチャ</a></li>
+          <li><a href="community.html">コミュニティ</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Develop</h4>
+        <ul>
+          <li><a href="https://github.com/genshiai/manta" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/genshiai/manta/issues" rel="noopener">Issues</a></li>
+          <li><a href="https://github.com/genshiai/manta/discussions" rel="noopener">Discussions</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/docs/why-manta.md" rel="noopener">なぜ Manta を作るのか（why-manta）</a></li>
+          <li><a href="https://github.com/genshiai/manta/tree/main/docs/decisions" rel="noopener">ADR（意思決定の記録）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/CONTRIBUTING.md" rel="noopener">CONTRIBUTING</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://genshi.ai/" rel="noopener">GENSHI AI</a></li>
+          <li><a href="https://zenn.dev/p/genshi_ai" rel="noopener">Zenn</a></li>
+          <li><a href="https://note.com/ikora" rel="noopener">note</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/LICENSE" rel="noopener">ライセンス（Apache-2.0）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/TRADEMARKS.md" rel="noopener">商標ポリシー</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/SECURITY.md" rel="noopener">脆弱性の報告</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-giant"><img src="assets/brand/manta-lockup.svg" alt="" loading="lazy" width="720" height="222" /></div>
+    <div class="foot-bottom">
+      <span>© 2026 GENSHI AI, Inc.</span>
+      <span>Apache License 2.0</span>
+      <span class="spacer"></span>
+      <span>Pre-Alpha · 実患者データは入れないでください</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>
