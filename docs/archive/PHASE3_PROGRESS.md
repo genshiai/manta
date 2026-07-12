@@ -1,5 +1,7 @@
 # Phase 3 Progress
 
+> 📦 **アーカイブ済み。** Phase 3（入院・病棟）の進捗ログ。要点は [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) の変更履歴に反映済み。以下は当時のログ（内容は当時のまま）。
+
 更新日: 2026-05-18
 
 Phase 3 は「入院・病棟・AI」。Phase 2 の外来支援を土台に、入院エピソード、病棟、病床、看護記録、指示簿、経過表、サマリ、AI 要約へ広げる。

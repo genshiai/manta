@@ -46,7 +46,7 @@
 - **[ADR 0002](decisions/0002-styleseed-adoption.md)** — StyleSeed Notion skin + Tailwind v4 採用
 - **[ADR 0001](decisions/0001-design-system-digital-cho-and-pivot.md)** — 旧デジタル庁系離脱の経緯（Superseded by 0002）
 - **[design-reference/apple-jp-design.md](design-reference/apple-jp-design.md)** — apple.com/jp 実測値仕様
-- **[IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md)** — UI リフレッシュの実装計画（Phase 1-5 完了済み）
+- **[archive/IMPLEMENTATION_PLAN_UI_REFRESH.md](archive/IMPLEMENTATION_PLAN_UI_REFRESH.md)** — UI リフレッシュの実装計画（完了・アーカイブ）
 
 ### 外部参照
 
@@ -340,7 +340,7 @@ color: var(--text-secondary);
 └─────────────────────────────────────────────────┘
 ```
 
-詳細レイアウトは [IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) を参照（上流のカルテ UI/UX 再検討メモは私的保管・リポジトリ非同梱）。
+詳細レイアウトは [archive/IMPLEMENTATION_PLAN_UI_REFRESH.md](archive/IMPLEMENTATION_PLAN_UI_REFRESH.md)（アーカイブ）を参照（上流のカルテ UI/UX 再検討メモは私的保管・リポジトリ非同梱）。
 
 ### グリッドシステム
 

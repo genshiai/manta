@@ -1,5 +1,7 @@
 # Manta UI リフレッシュ実装計画 (2026-04-30)
 
+> 📦 **アーカイブ済み（完了）。** UI リフレッシュ（Phase 1-6）は完了済み。現在の正本は [ADR 0002](../decisions/0002-styleseed-adoption.md)・[ADR 0003](../decisions/0003-color-system-apple-hig.md)・[DESIGN_GUIDELINES.md](../DESIGN_GUIDELINES.md)、カルテ UI は [KARTE_UI_SPEC.md](../KARTE_UI_SPEC.md)。以下は当時のハンドオフ本文（内容・内部リンクは当時のまま）。
+
 > 新規 AI エージェント向け実装ハンドオフ。本ドキュメントを単独で読めば Phase 1〜5 を完遂できることを目指す。Phase 6 は規模が大きいため別計画書に分離する前提。
 
 ---

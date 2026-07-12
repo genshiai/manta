@@ -13,7 +13,7 @@
   - 完了: 7
   - 部分実装: 6
   - 未着手: 0
-- UI Refresh は Phase 1-5 完了 + Phase 6 初期完了（Apple HIG 移行済み、[IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) 参照）
+- UI Refresh は Phase 1-5 完了 + Phase 6 初期完了（Apple HIG 移行済み、[archive/IMPLEMENTATION_PLAN_UI_REFRESH.md](archive/IMPLEMENTATION_PLAN_UI_REFRESH.md) 参照）
 - backend モジュール分割は未着手（[BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) を正とし、Wave 4.6 として優先実施予定）
 - 直近の重点（PDF 仕様書ベース）:
   - 3.7 病名ツールの標準病名 master import と ICD10 検索

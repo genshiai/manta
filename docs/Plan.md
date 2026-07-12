@@ -1,5 +1,7 @@
 # Manta 開発計画 / Development Plan
 
+> ⚠️ この「現在地ダッシュボード」は 2026-05-02 で凍結しており、現状とズレがある。**最新の実装状況は [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)（Wave 実行の正本）・[OSS_RELEASE_STATUS.md](OSS_RELEASE_STATUS.md)、docs 索引は [README.md](README.md) を参照**。本書は Phase 0-4 の製品ロードマップの読み物として残す。
+
 ---
 
 ## 前提
@@ -20,7 +22,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 |---|---|---|
 | **Phase（機能）** | Phase 1 実装中 — カルテUI 大半完了、優先度A 残作業あり | [Phase 1](#phase-1--mvp外来診療1ループ) |
 | **Wave（PDF実装計画）** | Wave 0-5 完了 / **Wave 4.5・4.6 未着手** | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) |
-| **UI Refresh** | Phase 1-5 完了（Apple HIG 移行）+ Phase 6 初期完了 | [IMPLEMENTATION_PLAN_UI_REFRESH.md](IMPLEMENTATION_PLAN_UI_REFRESH.md) |
+| **UI Refresh** | 完了（Apple HIG 移行・Phase 1-6） | [archive/IMPLEMENTATION_PLAN_UI_REFRESH.md](archive/IMPLEMENTATION_PLAN_UI_REFRESH.md) |
 | **FHIR Step** | Step 0-9 read adapter 完了 / Write は途中 | [FHIR_MIGRATION_PLAN.md](FHIR_MIGRATION_PLAN.md) |
 | **backend 構造** | **未着手**（`main.py` / `models.py` / `schemas.py` 集約） | [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) |
 
@@ -58,7 +60,7 @@ Manta は、オープンソースの次世代電子カルテシステムであ�
 ### Phase 0 の成果物
 - `docs/Plan.md` — 本ドキュメント
 - `docs/IMPLEMENTATION_PLAN.md` — PDF準拠の実装実行計画（Wave 0-5）
-- `docs/IMPLEMENTATION_PLAN_UI_REFRESH.md` — UI リフレッシュ計画（Phase 1-5 完了済み）
+- `docs/archive/IMPLEMENTATION_PLAN_UI_REFRESH.md` — UI リフレッシュ計画（完了・アーカイブ）
 - `docs/PDF_PROGRESS.md` — PDF基準の実装進捗スナップショット
 - `docs/PDF_ACTION_BACKLOG.md` — PDFを実装単位に落とした作業一覧
 - `docs/PMDA_SYNC_STRATEGY.md` — PMDA電子添文の同期方針

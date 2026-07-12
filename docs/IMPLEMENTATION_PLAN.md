@@ -8,7 +8,7 @@
 PMDA 電子添文同期方針は [PMDA_SYNC_STRATEGY.md](PMDA_SYNC_STRATEGY.md) を参照してください。
 レセコン連携 / AI 算定補助方針は [RECEIPT_GATEWAY_STRATEGY.md](RECEIPT_GATEWAY_STRATEGY.md) を参照してください。
 backend 分割方針は [BACKEND_MODULE_RESTRUCTURE_PLAN.md](BACKEND_MODULE_RESTRUCTURE_PLAN.md) を参照してください。
-Phase 3 の入院・病棟進捗は [PHASE3_PROGRESS.md](PHASE3_PROGRESS.md) を参照してください。
+Phase 3 の入院・病棟進捗の詳細ログは [archive/PHASE3_PROGRESS.md](archive/PHASE3_PROGRESS.md)（アーカイブ）を参照。要点は本書の変更履歴に反映済み。
 
 前提は以下の通りです。
 

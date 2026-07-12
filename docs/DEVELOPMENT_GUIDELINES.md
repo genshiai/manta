@@ -3,7 +3,7 @@
 本ドキュメントは、Manta プロジェクト全体の開発指針をまとめたものである。
 デザイン・エンジニアリング・医療ドメイン固有のルールを一箇所に集約する。
 
-技術スタックの詳細は `first/ARCHITECTURE.md` を参照。
+技術スタックの詳細は [`archive/first-concept/ARCHITECTURE.md`](archive/first-concept/ARCHITECTURE.md)（初期構想・アーカイブ）を参照。
 
 ---
 
@@ -207,6 +207,8 @@ Apple HIG (apple.com/jp 実測値) を [`frontend/src/styles/theme.css`](../fron
 ---
 
 ## 5. ドキュメント構成
+
+> docs の索引と各文書の状態（正本／スナップショット／歴史）は [`docs/README.md`](README.md) を正とする。下記ツリーは参考。
 
 ```
 docs/

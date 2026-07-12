@@ -42,6 +42,7 @@ NNNN-kebab-case-title.md
 | [0004](0004-receipt-gateway-and-ai-claims-assist.md) | Mantaレセコンと AI 算定補助層を採用 | Accepted | rececon, receipt, billing, claims, orca, ai, architecture |
 | [0005](0005-oss-process-economy-and-license.md) | Manta を プロセスエコノミー として OSS 公開、ライセンスは Apache 2.0 統一 | Proposed | license, oss, community, marketing, governance |
 | [0006](0006-karte-document-ui.md) | カルテUIをドキュメント型「読む・書く・作業する」に転換 | Accepted | design-system, frontend, karte, ux, ai |
+| [0007](0007-mcp-agent-interface.md) | MCP を AI エージェント向け第一級インターフェースとして gateway に追加 | Accepted | gateway, ai-agent, mcp, architecture, security |
 
 ## ファイル一覧外（本ディレクトリのメタ）
 
