@@ -5,7 +5,6 @@
       "src/**/*.{ts,tsx,js,jsx,json}",
       "!src/components/ui/**",
       "!src/components/patterns/**",
-      "!src/icons/**",
       "!src/utils/styleseed/**",
       "!src/tokens/**"
     ]

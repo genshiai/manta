@@ -114,6 +114,13 @@
   --lab-low: #0a5dc2;   /* 検査低値 */
   --dim: rgba(29, 29, 31, 0.34); /* コンポーザ背景の減光 */
   --shadow-popover: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.1);
+
+  /* === オーダー種別の意味色（HENRY_UX_BENCHMARK §7 P0-2）===
+   * brand(単色アクセント)と分離した「種別=色」の一元定義。小アイコンの tint 専用で塗り・本文には使わない。 */
+  --domain-med: #0a7d76;       /* 処方・注射・内服 = ティール */
+  --domain-test: #9333c4;      /* 検体検査・画像・生体 = パープル */
+  --domain-procedure: #c05600; /* 処置・手技 = バーントオレンジ */
+  --ai: #5b3cc4;               /* AI 専用色 = インディゴ（Notion / Gemini 慣習の紫系） */
 }
 
 .dark {
@@ -185,6 +192,12 @@
   --sidebar-accent-foreground: #e0dfde;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-ring: #62aef0;
+
+  /* オーダー種別の意味色（ダーク・輝度上げ） */
+  --domain-med: #4fc9c0;
+  --domain-test: #cf9bea;
+  --domain-procedure: #ff9f45;
+  --ai: #a08cf5;
 }
 
 /* === 臨床画面ライト固定 (KARTE_UI_SPEC §9.1) ===
@@ -240,6 +253,10 @@
   --lab-high: #d70015;
   --lab-low: #0a5dc2;
   --dim: rgba(29, 29, 31, 0.34);
+  --domain-med: #0a7d76;
+  --domain-test: #9333c4;
+  --domain-procedure: #c05600;
+  --ai: #5b3cc4;
   --shadow-card: rgba(0, 0, 0, 0.04) 0px 4px 18px, rgba(0, 0, 0, 0.02) 0px 0.8px 2.93px;
   color: var(--foreground);
 }
@@ -251,6 +268,10 @@
   --color-lab-high: var(--lab-high);
   --color-lab-low: var(--lab-low);
   --color-dim: var(--dim);
+  --color-domain-med: var(--domain-med);
+  --color-domain-test: var(--domain-test);
+  --color-domain-procedure: var(--domain-procedure);
+  --color-ai: var(--ai);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

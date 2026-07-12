@@ -1,6 +1,7 @@
 import { TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PatientRecord } from '../../../data/chartMock';
+import { domainForOrderKind, domainToneClass } from '../../../lib/orderDomains';
 import {
   readPrescriptionSignals,
   recordPrescriptionSignal,
@@ -430,6 +431,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
 
 function HitRow({ hit, active, onClick }: { hit: OrderHit; active: boolean; onClick: () => void }) {
   const tail = hit.kind === 'drug' ? hit.tail : undefined;
+  const { Icon, tone } = domainForOrderKind(hit.kind);
   return (
     <button
       type="button"
@@ -439,6 +441,7 @@ function HitRow({ hit, active, onClick }: { hit: OrderHit; active: boolean; onCl
         active ? 'border-brand bg-brand-tint' : 'border-border hover:bg-surface-subtle',
       )}
     >
+      <Icon size={16} strokeWidth={1.8} className={cn('flex-none', domainToneClass[tone])} />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-bold text-text-primary">{hit.label}</div>
         <div className="text-[10.5px] text-text-tertiary">{hit.meta}</div>
