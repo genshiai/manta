@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -6,6 +6,7 @@ import {
   Clock3,
   Edit3,
   FileWarning,
+  Info,
   RefreshCw,
   Search,
   Send,
@@ -498,6 +499,20 @@ export const BillingWorkspace = ({
       returnEventCount: returnEvents.filter((event) => event.status === 'open' || event.status === 'in_progress').length,
     };
   }, [drafts, returnEvents]);
+
+  // レセプト点検の常時表示カウント（HENRY_UX_BENCHMARK §7 P2-6）。読込済み一覧（既定=all）を集計。
+  const validationCounts = useMemo(
+    () => ({
+      errors: drafts.reduce((sum, draft) => sum + draft.openErrorCount, 0),
+      warnings: drafts.reduce((sum, draft) => sum + draft.openWarningCount, 0),
+    }),
+    [drafts],
+  );
+  const claimsAnchorRef = useRef<HTMLDivElement>(null);
+  const jumpToClaimIssues = () => {
+    setQueue('open_issues');
+    claimsAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const patientIds = useMemo(() => new Set(patients.map((patient) => patient.id)), [patients]);
   const selectedPatient = selectedSummary
@@ -1552,6 +1567,7 @@ export const BillingWorkspace = ({
           </div>
         ) : null}
 
+        <div className="scroll-mt-2" ref={claimsAnchorRef} />
         <Table>
           <TableHeader>
             <TableRow className="bg-solid-gray-50">
@@ -2168,6 +2184,40 @@ export const BillingWorkspace = ({
           ) : null}
         </div>
       </Drawer>
+      {/* レセプト点検の常時表示フッター（HENRY_UX_BENCHMARK §7 P2-6）。クリックで未解決キューへ絞り込み */}
+      <div className="sticky bottom-0 z-20 -mx-4 mt-4 flex items-center gap-2.5 border-t border-border bg-card/95 px-5 py-2.5 backdrop-blur lg:-mx-6 lg:px-6">
+        <span className="text-[12px] font-bold text-text-tertiary">レセプト点検</span>
+        {validationCounts.errors > 0 || validationCounts.warnings > 0 ? (
+          <>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive-bg px-2.5 py-1 text-[12px] font-bold text-destructive tabular-nums transition-opacity hover:opacity-80 disabled:opacity-40"
+              disabled={validationCounts.errors === 0}
+              onClick={jumpToClaimIssues}
+              type="button"
+            >
+              <AlertTriangle size={13} strokeWidth={2.2} />
+              エラー {validationCounts.errors}
+            </button>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning-bg px-2.5 py-1 text-[12px] font-bold text-warning tabular-nums transition-opacity hover:opacity-80 disabled:opacity-40"
+              disabled={validationCounts.warnings === 0}
+              onClick={jumpToClaimIssues}
+              type="button"
+            >
+              <Info size={13} strokeWidth={2.2} />
+              注意 {validationCounts.warnings}
+            </button>
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-bg px-2.5 py-1 text-[12px] font-bold text-success">
+            <CheckCircle2 size={13} strokeWidth={2.2} />
+            点検 OK
+          </span>
+        )}
+        <span className="ms-auto text-[11px] text-text-tertiary tabular-nums">
+          全 {stats.total} 件 / 未解決 {stats.openIssueCount} 件
+        </span>
+      </div>
       <ConfirmModal
         cancelText="やめる"
         confirmText="締め取消"
