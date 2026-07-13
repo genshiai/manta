@@ -17,9 +17,15 @@ import {
   UserCheck,
   UserRound,
   Venus,
+  SearchX,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { Button, Heading, HeadingTitle, Select, buttonBaseStyle } from '../vendor/dads';
+import { EmptyState } from './patterns/empty-state';
+import { Skeleton } from './ui/skeleton';
+import { toast } from './ui/toast';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { isVisitClosed, type AlertItem, type LabProgress, type PatientRecord, type ReceptionStatus } from '../data/chartMock';
 import { cn } from '../lib/cn';
 import { type HomeSettings, type HomeView, homeProfileConfigs, homeViewLabels } from '../lib/homeSettings';
@@ -343,6 +349,7 @@ export const ReceptionBoard = ({
       },
       ...current.filter((item) => item.label !== label).slice(0, 4),
     ]);
+    toast(`「${label}」を条件として保存しました。`, 'success');
   };
 
   const handleApplySavedSearch = (savedSearch: SavedReceptionSearch) => {
@@ -351,8 +358,9 @@ export const ReceptionBoard = ({
     onDepartmentFilterChange(savedSearch.departmentFilter);
   };
 
-  const handleRemoveSavedSearch = (savedSearchId: string) => {
+  const handleRemoveSavedSearch = (savedSearchId: string, label: string) => {
     setSavedSearches((current) => current.filter((item) => item.id !== savedSearchId));
+    toast(`「${label}」を削除しました。`);
   };
 
   const renderStatusBadge = (status: ReceptionStatus) => {
@@ -652,12 +660,6 @@ export const ReceptionBoard = ({
           </div>
         ) : null}
 
-        {isLoading ? (
-          <div className='border-b border-solid-gray-200 px-5 py-3 text-[14px] font-normal leading-none text-solid-gray-536 lg:px-6'>
-            更新中…
-          </div>
-        ) : null}
-
         {errorMessage ? (
           <div className='border-b border-red-200 bg-red-50 px-5 py-3 text-[14px] font-normal leading-none text-red-900 lg:px-6'>
             {errorMessage}
@@ -679,14 +681,19 @@ export const ReceptionBoard = ({
                 >
                   {savedSearch.label}
                 </button>
-                <button
-                  aria-label={`${savedSearch.label} を削除`}
-                  className='px-1 text-[14px] font-normal leading-none text-solid-gray-536 hover:text-solid-gray-900'
-                  onClick={() => handleRemoveSavedSearch(savedSearch.id)}
-                  type='button'
-                >
-                  ×
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      aria-label={`${savedSearch.label} を削除`}
+                      className='grid size-5 flex-none place-items-center rounded text-text-tertiary transition-colors hover:bg-surface-muted hover:text-text-primary'
+                      onClick={() => handleRemoveSavedSearch(savedSearch.id, savedSearch.label)}
+                      type='button'
+                    >
+                      <X size={13} strokeWidth={2} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>削除</TooltipContent>
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -733,12 +740,28 @@ export const ReceptionBoard = ({
         </div>
 
         {(activeView === 'inpatient' ? activeInpatientAdmissions.length === 0 : activePatients.length === 0) ? (
-          <div className='px-5 py-10 text-center lg:px-6'>
-            <p className='text-[18px] font-bold leading-snug text-solid-gray-900'>該当する患者がいません</p>
-            <p className='mt-2 text-[16px] font-normal leading-none text-solid-gray-536'>
-              患者群、スコープ、フィルタ、または受付状態を見直してください。
-            </p>
-          </div>
+          isLoading ? (
+            <div className='flex flex-col'>
+              {['s1', 's2', 's3', 's4', 's5', 's6'].map((key) => (
+                <div
+                  className='flex items-center gap-3 border-b border-border px-5 py-3.5 lg:px-6'
+                  key={key}
+                >
+                  <Skeleton className='size-8 flex-none rounded-full bg-surface-muted' />
+                  <Skeleton className='h-3.5 w-32 bg-surface-muted' />
+                  <Skeleton className='h-3.5 w-20 bg-surface-muted' />
+                  <Skeleton className='ms-auto h-3.5 w-16 bg-surface-muted' />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              className='py-12'
+              description='患者群・スコープ・フィルタ・受付状態のいずれかを見直してください。'
+              icon={SearchX}
+              title='該当する患者がいません'
+            />
+          )
         ) : null}
         </section>
 

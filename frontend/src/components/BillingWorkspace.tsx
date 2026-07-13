@@ -68,9 +68,11 @@ import type {
   UserSession,
 } from '../types/workflow';
 import { Button } from './ui/button';
+import { ConfirmModal } from './ui/confirm-modal';
 import { Drawer } from './ui/drawer';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { toast } from './ui/toast';
 
 type BillingWorkspaceProps = {
   currentUser: UserSession;
@@ -324,6 +326,7 @@ export const BillingWorkspace = ({
   const [claimSlaDryRun, setClaimSlaDryRun] = useState<ClaimSlaNotificationDryRun | null>(null);
   const [claimTransmissions, setClaimTransmissions] = useState<ClaimTransmissionSummary[]>([]);
   const [monthlyCloseReport, setMonthlyCloseReport] = useState<Record<string, unknown> | null>(null);
+  const [cancelCloseConfirmOpen, setCancelCloseConfirmOpen] = useState(false);
   const [billingAuditLogs, setBillingAuditLogs] = useState<AuditLogEntry[]>([]);
   const [closeMonth, setCloseMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [closeCancelReason, setCloseCancelReason] = useState('');
@@ -963,6 +966,7 @@ export const BillingWorkspace = ({
       setCloseCancelReason('');
       await refreshMonthlyCloseSummary();
       refreshDrafts();
+      toast(`${closeMonth} の月次締めを取り消しました。`, 'success');
     } catch (error) {
       handleAuthAwareError(error, '月次締めの取消に失敗しました。');
     } finally {
@@ -1474,7 +1478,7 @@ export const BillingWorkspace = ({
             />
             <Button
               disabled={isClosingMonth || currentUser.role !== '管理者' || monthlyCloseSummary?.close?.status !== 'closed' || !closeCancelReason.trim()}
-              onClick={handleCancelMonthClose}
+              onClick={() => setCancelCloseConfirmOpen(true)}
               size="sm"
               variant="outline"
             >
@@ -2164,6 +2168,22 @@ export const BillingWorkspace = ({
           ) : null}
         </div>
       </Drawer>
+      <ConfirmModal
+        cancelText="やめる"
+        confirmText="締め取消"
+        isOpen={cancelCloseConfirmOpen}
+        message={[
+          `${closeMonth} の確定済み月次締めを取り消します。`,
+          '取消者・取消理由は監査記録に残ります。よろしいですか？',
+        ]}
+        onCancel={() => setCancelCloseConfirmOpen(false)}
+        onConfirm={() => {
+          setCancelCloseConfirmOpen(false);
+          void handleCancelMonthClose();
+        }}
+        title="月次締めを取り消しますか？"
+        variant="destructive"
+      />
     </main>
   );
 };
