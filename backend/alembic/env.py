@@ -18,6 +18,7 @@ from app.db import Base
 # before Alembic builds its diff.
 from app.modules.auth import models  # noqa: F401
 from app.modules.common import models  # noqa: F401
+from app.modules.communication import models  # noqa: F401
 from app.modules.gateway.orca import models  # noqa: F401
 from app.modules.inpatient import models  # noqa: F401
 from app.modules.karte import models  # noqa: F401

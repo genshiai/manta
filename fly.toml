@@ -1,0 +1,33 @@
+# Fly.io config for the Manta public demo.
+# App + built SPA run here; the database is external (Neon).
+# Secrets are NOT stored here — set them with `fly secrets set` (see README/deploy notes):
+#   MANTA_DATABASE_URL   Neon connection string, scheme rewritten to postgresql+psycopg://
+#   MANTA_JWT_SECRET_KEY random value, e.g. $(openssl rand -hex 32)
+app = "manta-demo"
+primary_region = "nrt"  # Tokyo
+
+[build]
+  dockerfile = "Dockerfile"
+  [build.args]
+    VITE_API_BASE_URL = ""  # same-origin: the API serves the SPA
+
+[env]
+  MANTA_STATIC_DIR = "/app/static"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

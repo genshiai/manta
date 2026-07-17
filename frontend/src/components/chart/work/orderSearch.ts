@@ -55,11 +55,12 @@ export function searchOrders(query: string, config: ChartOrderConfig, limit = 8)
   const q = normalize(query);
   if (!q) return [];
   const hits: OrderHit[] = [];
+  const prescriptionBrowse = /^(処方|薬剤|内服)$/.test(q);
 
   // 薬剤
   for (const drug of config.prescriptionCatalog) {
     if (drug.isActive === false) continue;
-    if (drugHaystack(drug).includes(q)) {
+    if (prescriptionBrowse || drugHaystack(drug).includes(q)) {
       const priceLabel =
         drug.drugPrice != null && drug.drugPrice !== ''
           ? `薬価 ¥${drug.drugPrice}${typeof drug.drugPrice === 'number' ? '/錠' : ''}`

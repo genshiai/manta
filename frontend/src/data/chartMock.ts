@@ -27,6 +27,10 @@ export type DetailItem = {
 export type AlertItem = {
   label: string;
   color: AlertColor;
+  source?: string;
+  note?: string;
+  recordedBy?: string;
+  recordedAt?: string;
 };
 
 export type VisitItem = {

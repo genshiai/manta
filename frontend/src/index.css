@@ -4,6 +4,136 @@
 @import './styles/theme.css';
 @import './styles/base.css';
 
+.clinical .lensview,
+.clinical .mock-document-stream {
+  --lens-canvas: var(--surface-page);
+  --lens-card: var(--card);
+  --lens-ink: var(--text-primary);
+  --lens-ink2: var(--text-secondary);
+  --lens-muted: var(--text-tertiary);
+  --lens-line: var(--border);
+  --lens-line-strong: var(--border-strong);
+  --lens-hair: #efece5;
+  --lens-accent: var(--brand);
+  --lens-accent-tint: var(--brand-tint);
+  --lens-lab-high: #b0403a;
+  --lens-lab-low: #2b5f96;
+  --lens-ok: #4c7a5a;
+  --lens-sel: #f0eee8;
+  --dm-med: #2f7268;
+  --dm-med-bg: #e4f1ee;
+  --dm-test: #67589e;
+  --dm-test-bg: #eeebf6;
+  --dm-img: #38788f;
+  --dm-img-bg: #e7f1f5;
+  --dm-proc: #a2612d;
+  --dm-proc-bg: #f7ede2;
+  --dm-reha: #5e7a45;
+  --dm-reha-bg: #edf2e6;
+}
+
+/* workspace-prototype.html の lens views を同じ DOM 名・同じ数値で移植 */
+.clinical .lensview { padding: 16px 20px 20px; color: var(--lens-ink); }
+.clinical .lensview .lv-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.clinical .lensview .lv-title { font-size: 14px; font-weight: 700; }
+.clinical .lensview .lv-sub { font-size: 11.5px; color: var(--lens-muted); }
+.clinical .lensview .lv-nav { margin-left: auto; display: flex; gap: 6px; }
+.clinical .lensview .chip { font-size: 11.5px; font-weight: 600; color: var(--lens-ink2); border: 1px solid var(--lens-line-strong); background: var(--lens-card); border-radius: 7px; padding: 4px 9px; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.clinical .lensview .chip:hover { background: var(--lens-canvas); }
+.clinical .lensview .chip:disabled { opacity: .45; cursor: default; }
+.clinical .lensview .lv-note { font-size: 11.5px; color: var(--lens-muted); margin-top: 10px; }
+
+.clinical .matrix-wrap { overflow-x: auto; border: 1px solid var(--lens-line); border-radius: 10px; }
+.clinical table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
+.clinical .matrix th,
+.clinical .matrix td { padding: 8px 12px; border-bottom: 1px solid var(--lens-hair); white-space: nowrap; text-align: right; }
+.clinical .matrix thead th { font-size: 11px; color: var(--lens-muted); font-weight: 600; background: var(--lens-canvas); position: sticky; top: 0; }
+.clinical .matrix thead th .yy { display: block; font-size: 9.5px; font-weight: 400; }
+.clinical .matrix thead th.matrix-item-head { text-align: left; }
+.clinical .matrix tbody th { text-align: left; font-weight: 600; color: var(--lens-ink2); background: var(--lens-card); position: sticky; left: 0; border-right: 1px solid var(--lens-hair); }
+.clinical .matrix td { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+.clinical .matrix td.high { color: var(--lens-lab-high); }
+.clinical .matrix td.low { color: var(--lens-lab-low); }
+.clinical .matrix td.na { color: var(--lens-line-strong); font-weight: 400; }
+.clinical .matrix tbody tr:last-child td,
+.clinical .matrix tbody tr:last-child th { border-bottom: 0; }
+.clinical .matrix tr.gr th { position: static; background: var(--lens-canvas); font-size: 10.5px; color: var(--lens-muted); letter-spacing: .05em; padding: 6px 12px; }
+.clinical .matrix .refcol { font-size: 10.5px; color: var(--lens-muted); font-weight: 400; white-space: nowrap; text-align: right; }
+.clinical .matrix tbody th .uu { font-size: 10px; color: var(--lens-muted); font-weight: 400; }
+.clinical .matrix .ctag { display: block; font-size: 8.5px; font-weight: 700; color: var(--lens-ink2); letter-spacing: .04em; }
+.clinical .matrix .sparkcell { padding: 4px 10px; }
+.clinical .matrix thead th.sparkhead { text-align: center; }
+.clinical .matrix tbody tr[data-trend] { cursor: pointer; }
+.clinical .matrix tbody tr[data-trend]:hover td,
+.clinical .matrix tbody tr[data-trend]:hover th { background: var(--lens-canvas); }
+.clinical .matrix tbody tr.trend-on th,
+.clinical .matrix tbody tr.trend-on td { background: var(--lens-accent-tint); }
+.clinical .matrix tr.trendrow td { background: var(--lens-canvas); padding: 10px 14px; cursor: default; }
+.clinical .matrix-item-button { display: block; width: 100%; text-align: left; font: inherit; color: inherit; }
+.clinical .matrix-spark { display: block; margin: 0 auto; }
+.clinical .spark-empty { color: var(--lens-line-strong); }
+.clinical .trend-wrap { max-width: 780px; }
+.clinical .trend-head { display: flex; gap: 8px; align-items: baseline; font-size: 12px; margin-bottom: 4px; }
+.clinical .trend-head b { font-size: 12.5px; }
+.clinical .trend-head span { color: var(--lens-muted); font-size: 11px; }
+.clinical .trend-head .trend-ref { color: var(--lens-ink2); }
+.clinical .trend-head .trend-count { margin-left: auto; color: var(--lens-muted); font-size: 10.5px; }
+.clinical .tscope-row { display: inline-flex; gap: 2px; margin-left: 10px; background: var(--lens-sel); border-radius: 7px; padding: 2px; }
+.clinical .tscope { font-size: 10.5px; font-weight: 600; color: var(--lens-ink2); border-radius: 5px; padding: 2px 8px; }
+.clinical .tscope.active { background: var(--lens-card); color: var(--lens-ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.clinical .trend-svg { width: 100%; height: auto; display: block; }
+
+.clinical .lensview .tl { border: 1px solid var(--lens-line); border-radius: 10px; overflow: hidden; }
+.clinical .lensview .tlrow { display: grid; grid-template-columns: 118px 1fr auto; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--lens-hair); align-items: baseline; }
+.clinical .lensview .tlrow:first-child { border-top: 0; }
+.clinical .lensview .tlrow .d { font-size: 11.5px; color: var(--lens-muted); }
+.clinical .lensview .tlrow .w { font-size: 13px; font-weight: 650; min-width: 0; }
+.clinical .lensview .tlrow .w .sub { display: block; font-weight: 400; font-size: 11.5px; color: var(--lens-muted); }
+.clinical .lensview .tlrow .st { font-size: 11.5px; color: var(--lens-muted); text-align: right; }
+.clinical .lensview .tlrow .st.done { color: var(--lens-ok); font-weight: 600; }
+.clinical .lensview .tlrow .st.wait { color: var(--lens-ink); font-weight: 650; }
+.clinical .lensview .tlrow .st.sched { color: var(--lens-ink2); font-weight: 600; }
+.clinical .lensview .tlrow .st.cont { color: var(--lens-accent); font-weight: 650; }
+.clinical .lensview .tlrow .st.stop { color: var(--lens-muted); }
+.clinical .lensview .tlrow .ocat-chip { display: inline-block; font-size: 9.5px; font-weight: 700; color: var(--lens-ink2); background: var(--lens-sel); border-radius: 4px; padding: 1px 6px; margin-right: 7px; vertical-align: 1.5px; }
+.clinical .lensview .dm-med { color: var(--dm-med) !important; background: var(--dm-med-bg) !important; }
+.clinical .lensview .dm-test { color: var(--dm-test) !important; background: var(--dm-test-bg) !important; }
+.clinical .lensview .dm-img { color: var(--dm-img) !important; background: var(--dm-img-bg) !important; }
+.clinical .lensview .dm-proc { color: var(--dm-proc) !important; background: var(--dm-proc-bg) !important; }
+.clinical .lensview .dm-reha { color: var(--dm-reha) !important; background: var(--dm-reha-bg) !important; }
+.clinical .lensview .secdot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 7px; vertical-align: 1px; background: var(--lens-line-strong); }
+.clinical .lensview .secdot.dm-med { background: var(--dm-med) !important; }
+.clinical .lensview .secdot.dm-test { background: var(--dm-test) !important; }
+.clinical .lensview .secdot.dm-img { background: var(--dm-img) !important; }
+.clinical .lensview .secdot.dm-proc { background: var(--dm-proc) !important; }
+.clinical .lensview .secdot.dm-reha { background: var(--dm-reha) !important; }
+.clinical .lensview .ocat-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 12px; }
+.clinical .lensview .ocat { font-size: 11.5px; font-weight: 600; color: var(--lens-ink2); border-radius: 99px; padding: 3.5px 11px; }
+.clinical .lensview .ocat:hover { background: var(--lens-canvas); }
+.clinical .lensview .ocat.active { background: var(--lens-ink); color: var(--lens-card); }
+.clinical .lensview .tl-sec { font-size: 10.5px; font-weight: 700; color: var(--lens-muted); letter-spacing: .05em; padding: 14px 2px 6px; }
+.clinical .lensview .tl-sec:first-of-type { padding-top: 0; }
+.clinical .lensview .tlrow .tag { display: inline-block; font-size: 10px; font-weight: 700; border: 1px solid var(--lens-line-strong); border-radius: 5px; padding: 0 5px; margin-left: 7px; color: var(--lens-ink2); vertical-align: 1px; }
+.clinical .lensview .tlrow.ghost { color: var(--lens-muted); }
+.clinical .lensview .tlrow.ghost .w { font-weight: 400; font-size: 12px; color: var(--lens-muted); }
+.clinical .lensview .btn { font-size: 12.5px; font-weight: 650; color: var(--lens-ink2); background: var(--lens-card); border: 1px solid var(--lens-line-strong); border-radius: 8px; padding: 6.5px 12px; display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
+.clinical .lensview .btn:hover { background: var(--lens-canvas); }
+.clinical .lensview .btn.sm { font-size: 11.5px; padding: 4.5px 10px; border-radius: 7px; }
+.clinical .lensview .btn:disabled { opacity: .45; cursor: default; }
+
+.clinical .mock-document-stream .dayblock { display: grid; grid-template-columns: 112px minmax(0,1fr); }
+.clinical .mock-document-stream .gut { position: relative; padding: 14px 8px 12px 16px; }
+.clinical .mock-document-stream .gut::before { content: ''; position: absolute; top: 0; bottom: 0; right: 13px; width: 1px; background: var(--lens-hair); }
+.clinical .mock-document-stream .gut::after { content: ''; position: absolute; top: 20px; right: 9.5px; width: 8px; height: 8px; border-radius: 50%; background: var(--lens-card); border: 1.5px solid var(--lens-line-strong); }
+.clinical .mock-document-stream .gd { display: block; font-size: 13.5px; font-weight: 700; line-height: 1.4; }
+.clinical .mock-document-stream .gy { display: block; font-size: 10.5px; color: var(--lens-muted); margin-top: 1px; line-height: 1.4; }
+.clinical .mock-document-stream .gk { display: inline-block; font-size: 10px; font-weight: 700; color: var(--lens-muted); letter-spacing: .06em; margin-top: 5px; }
+.clinical .mock-document-stream .bd { min-width: 0; padding-right: 4px; }
+.clinical .mock-document-stream .evrow { display: flex; align-items: center; gap: 8px; padding: 14px 20px 14px 0; border-bottom: 1px solid var(--lens-hair); }
+.clinical .mock-document-stream .ev-text { font-size: 13px; color: var(--lens-ink2); }
+.clinical .mock-document-stream .ev-link { margin-left: auto; color: var(--lens-accent); font-size: 12px; font-weight: 600; }
+.clinical .mock-document-stream .document-original { margin: 0 20px 16px 0; white-space: pre-wrap; border: 1px solid var(--lens-line); border-radius: 8px; background: var(--lens-canvas); padding: 12px; font: inherit; font-size: 11.5px; line-height: 1.7; color: var(--lens-ink2); }
+
 html {
   /* 旧 index.css 由来: 背景はテーマトークンに従う */
   scroll-behavior: smooth;
@@ -11,4 +141,111 @@ html {
 
 #root {
   min-height: 100vh;
+}
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: 56px 288px minmax(560px, 1fr) 308px;
+  grid-template-rows: 100vh;
+}
+
+.workspace-shell[data-aid-open='false'] {
+  grid-template-columns: 56px 288px minmax(560px, 1fr);
+}
+
+.workspace-shell[data-context-open='false'][data-aid-open='true'] {
+  grid-template-columns: 56px minmax(560px, 1fr) 308px;
+}
+
+.workspace-shell[data-context-open='false'][data-aid-open='false'] {
+  grid-template-columns: 56px minmax(560px, 1fr);
+}
+
+.workspace-shell[data-context-compact='true'] {
+  grid-template-columns: 56px 56px minmax(560px, 1fr) 332px;
+}
+
+.workspace-shell > * {
+  min-height: 0;
+  min-width: 0;
+}
+
+.workspace-main-container {
+  container-name: workspace-main;
+  container-type: inline-size;
+}
+
+@container workspace-main (max-width: 760px) {
+  .workspace-main-container [class*='md:grid-cols-'],
+  .workspace-main-container [class*='lg:grid-cols-'],
+  .workspace-main-container [class*='xl:grid-cols-'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .workspace-main-container [class*='lg:flex-row'],
+  .workspace-main-container [class*='xl:flex-row'] {
+    flex-direction: column !important;
+  }
+
+  .workspace-main-container [class*='lg:items-start'],
+  .workspace-main-container [class*='lg:items-center'],
+  .workspace-main-container [class*='xl:items-start'],
+  .workspace-main-container [class*='xl:items-center'] {
+    align-items: stretch !important;
+  }
+}
+
+@media (max-width: 1280px) {
+  .workspace-shell {
+    grid-template-columns: 56px 252px minmax(520px, 1fr) 288px;
+  }
+
+  .workspace-shell[data-aid-open='false'] {
+    grid-template-columns: 56px 252px minmax(520px, 1fr);
+  }
+
+  .workspace-shell[data-context-open='false'][data-aid-open='true'] {
+    grid-template-columns: 56px minmax(520px, 1fr) 288px;
+  }
+
+  .workspace-shell[data-context-compact='true'] {
+    grid-template-columns: 56px 56px minmax(520px, 1fr) 288px;
+  }
+}
+
+@media (max-width: 1149px) {
+  .workspace-shell,
+  .workspace-shell[data-aid-open='false'] {
+    grid-template-columns: 56px 252px minmax(480px, 1fr);
+  }
+
+
+  .workspace-shell[data-context-open='false'][data-aid-open='true'],
+  .workspace-shell[data-context-open='false'][data-aid-open='false'],
+  .workspace-shell[data-context-compact='true'] {
+    grid-template-columns: 56px minmax(480px, 1fr);
+  }
+
+  .workspace-shell > .workspace-aid {
+    display: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .workspace-shell,
+  .workspace-shell[data-aid-open='false'] {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .workspace-shell > .workspace-context {
+    display: none;
+  }
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }

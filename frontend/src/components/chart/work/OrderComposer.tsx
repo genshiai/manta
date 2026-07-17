@@ -1,4 +1,4 @@
-import { TriangleAlert, X } from 'lucide-react';
+import { Maximize2, Minimize2, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PatientRecord } from '../../../data/chartMock';
 import { domainForOrderKind, domainToneClass } from '../../../lib/orderDomains';
@@ -28,6 +28,7 @@ type HistoryItem = {
 
 type OrderComposerProps = {
   open: boolean;
+  initialQuery?: string;
   onClose: () => void;
   orderConfig: ChartOrderConfig;
   patient: PatientRecord;
@@ -48,6 +49,7 @@ type OrderComposerProps = {
 /** ⌘O オーダーコンポーザ。背景のカルテが透け、キーボードで完結、確定は行為列に着地。KARTE_UI_SPEC §6 */
 export function OrderComposer({
   open,
+  initialQuery = '',
   onClose,
   orderConfig,
   patient,
@@ -70,6 +72,7 @@ export function OrderComposer({
   const [days, setDays] = useState('28日分');
   const [addDiagnosis, setAddDiagnosis] = useState(true);
   const [entered, setEntered] = useState(false);
+  const [isWide, setIsWide] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const hits = useMemo(() => searchOrders(query, orderConfig), [query, orderConfig]);
@@ -78,16 +81,17 @@ export function OrderComposer({
   // reset on open
   useEffect(() => {
     if (open) {
-      setQuery('');
+      setQuery(initialQuery);
       setActiveIndex(0);
       setAddDiagnosis(true);
       setEntered(false);
+      setIsWide(false);
       requestAnimationFrame(() => {
         setEntered(true);
         inputRef.current?.focus();
       });
     }
-  }, [open]);
+  }, [initialQuery, open]);
 
   // 選択が薬剤なら用法/日数を初期化 + 選択シグナル記録
   useEffect(() => {
@@ -260,7 +264,8 @@ export function OrderComposer({
         aria-label="オーダーコンポーザ"
         onKeyDown={handleKeyDown}
         className={cn(
-          'absolute inset-y-0 right-0 flex w-[min(560px,94vw)] flex-col border-l border-border bg-popover shadow-[var(--shadow-modal)]',
+          'absolute inset-y-0 right-0 flex flex-col border-l border-border bg-popover shadow-[var(--shadow-modal)]',
+          isWide ? 'w-[min(920px,96vw)]' : 'w-[min(560px,94vw)]',
           'transition-transform duration-[var(--duration-normal)] ease-[var(--ease-default)] motion-reduce:transition-none',
           entered ? 'translate-x-0' : 'translate-x-full',
         )}
@@ -282,6 +287,15 @@ export function OrderComposer({
           />
           <button
             type="button"
+            aria-label={isWide ? '標準幅に戻す' : '広げる'}
+            title={isWide ? '標準幅に戻す' : '広げる'}
+            onClick={() => setIsWide((value) => !value)}
+            className="grid size-7 flex-none place-items-center rounded-md text-text-tertiary hover:bg-surface-subtle hover:text-text-primary"
+          >
+            {isWide ? <Minimize2 size={15} strokeWidth={1.9} /> : <Maximize2 size={15} strokeWidth={1.9} />}
+          </button>
+          <button
+            type="button"
             aria-label="閉じる"
             onClick={onClose}
             className="grid size-7 flex-none place-items-center rounded-md text-text-tertiary hover:bg-surface-subtle"
@@ -291,10 +305,10 @@ export function OrderComposer({
         </div>
 
         {/* body（スクロール領域） */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className={cn('min-h-0 flex-1', isWide ? 'grid grid-cols-[300px_minmax(0,1fr)] overflow-hidden' : 'flex flex-col overflow-y-auto')}>
           {/* history */}
           {history.length > 0 ? (
-            <div className="flex flex-col gap-0.5 border-b border-border bg-surface-subtle p-2">
+            <div className={cn('flex flex-col gap-0.5 bg-surface-subtle p-2', isWide ? 'overflow-y-auto border-r border-border' : 'border-b border-border')}>
               <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] text-text-tertiary">
                 よく使う・履歴（この患者）
               </div>
@@ -313,7 +327,7 @@ export function OrderComposer({
           ) : null}
 
           {/* hits + form + safety */}
-          <div className="flex flex-col gap-2.5 p-4">
+          <div className={cn('flex flex-col gap-2.5 p-4', isWide && 'overflow-y-auto')}>
             {hits.length === 0 ? (
               <p className="py-6 text-center text-[12.5px] text-text-tertiary">
                 {query ? '該当なし。別の語で検索してください。' : '薬剤名・検査名・「XP」などで検索。'}

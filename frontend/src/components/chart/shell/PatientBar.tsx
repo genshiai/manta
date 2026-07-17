@@ -1,52 +1,43 @@
-import { TriangleAlert } from 'lucide-react';
 import type { PatientRecord } from '../../../data/chartMock';
-import { cn } from '../../ui/utils';
 import { Kbd } from '../primitives/Kbd';
 
 type PatientBarProps = {
   patient: PatientRecord;
   metaLine: string;
+  admissionLabel?: string;
+  problemLine?: string;
   saveDot: 'ok' | 'warn' | 'bad';
   saveText: string;
   finishLabel: string;
   writeMode: boolean;
   isMutating: boolean;
   onStartWrite: () => void;
+  onOpenOrder: () => void;
   onFinishVisit: () => void;
   onFinishWriting: () => void;
-};
-
-const chipStyle: Record<'bad' | 'warn' | 'mut', string> = {
-  bad: 'bg-destructive-bg text-destructive',
-  warn: 'bg-warning-bg text-warning',
-  mut: 'bg-muted text-text-secondary',
-};
-
-function alertVariant(color: string): 'bad' | 'warn' | 'mut' {
-  if (['red', 'magenta', 'purple'].includes(color)) return 'bad';
-  if (['orange', 'yellow', 'lime'].includes(color)) return 'warn';
-  return 'mut';
-}
-
-const dotStyle: Record<'ok' | 'warn' | 'bad', string> = {
-  ok: 'bg-success',
-  warn: 'bg-warning',
-  bad: 'bg-destructive',
+  onManageSafety: () => void;
 };
 
 /** PatientBar 50px。氏名・カナ・メタ・アレルギー・保存状態・CTA。KARTE_UI_SPEC §3 */
 export function PatientBar({
   patient,
   metaLine,
-  saveDot,
+  admissionLabel,
+  problemLine,
+  saveDot: _saveDot,
   saveText,
   finishLabel,
   writeMode,
   isMutating,
   onStartWrite,
+  onOpenOrder,
   onFinishVisit,
   onFinishWriting,
+  onManageSafety,
 }: PatientBarProps) {
+  const safetyAlerts = patient.alerts.filter((alert) =>
+    /(アレルギ|同姓同名|副反応|禁忌|回避|リスク|転倒|感染|隔離|妊娠|抗凝固|透析|ペースメーカー)/.test(alert.label),
+  );
   return (
     <>
       <div className="flex items-baseline gap-2.5 whitespace-nowrap">
@@ -55,35 +46,37 @@ export function PatientBar({
         <span className="text-[12px] text-text-tertiary tabular-nums">{metaLine}</span>
       </div>
 
-      {patient.alerts.map((alert) => {
-        const variant = alertVariant(alert.color);
-        return (
-          <span
-            key={alert.label}
-            className={cn(
-              'inline-flex h-[21px] items-center gap-1 rounded-md px-2 text-[11px] font-semibold whitespace-nowrap',
-              chipStyle[variant],
-            )}
-          >
-            {variant === 'bad' ? <TriangleAlert size={12} strokeWidth={1.9} /> : null}
-            {alert.label}
-          </span>
-        );
-      })}
+      {admissionLabel ? (
+        <span className="rounded-[5px] bg-brand-tint px-[7px] py-px text-[10.5px] font-bold text-brand">{admissionLabel}</span>
+      ) : null}
 
-      <div className="flex-1" />
+      {safetyAlerts.slice(0, 2).map((alert) => (
+        <button
+          type='button'
+          key={alert.label}
+          onClick={onManageSafety}
+          className="whitespace-nowrap rounded-[5px] border border-[#ecd6d1] bg-[#faf0ee] px-[7px] py-[1.5px] text-[11.5px] font-semibold text-[#a8453d]"
+          title="患者安全情報。処方・検査時に必ず確認"
+        >
+          {alert.label}
+        </button>
+      ))}
+      {safetyAlerts.length > 2 ? (
+        <button type='button' onClick={onManageSafety} className="text-[10.5px] font-semibold text-text-tertiary hover:text-text-primary">ほか {safetyAlerts.length - 2}</button>
+      ) : null}
+      {!safetyAlerts.length ? <button type='button' onClick={onManageSafety} className='whitespace-nowrap text-[10.5px] font-semibold text-text-tertiary hover:text-text-primary'>安全情報</button> : null}
 
-      <span className="flex items-center gap-1.5 whitespace-nowrap text-[11.5px] text-text-tertiary">
-        <span className={cn('size-1.5 rounded-full', dotStyle[saveDot])} />
-        {saveText}
-      </span>
+      {problemLine ? <span className="min-w-0 truncate text-[12px] text-text-tertiary">{problemLine}</span> : null}
 
-      {writeMode ? (
+      <div className="ms-auto flex items-center gap-2">
+        <span className="me-0.5 whitespace-nowrap text-[11.5px] text-text-tertiary">{saveText}</span>
+
+        {writeMode ? (
         <button
           type="button"
           onClick={onFinishWriting}
           disabled={isMutating}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-brand px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-60"
+          className="inline-flex items-center gap-[7px] rounded-lg border border-brand bg-brand px-3 py-[6.5px] text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-60"
         >
           書き終える <Kbd className="border-white/50 bg-transparent text-white">⌘⏎</Kbd>
         </button>
@@ -91,8 +84,15 @@ export function PatientBar({
         <>
           <button
             type="button"
+            onClick={onOpenOrder}
+            className="inline-flex items-center gap-[7px] rounded-lg border border-border-strong bg-card px-3 py-[6.5px] text-[12.5px] font-semibold text-text-secondary transition-colors hover:bg-surface-page"
+          >
+            ＋ オーダー <Kbd>⌘O</Kbd>
+          </button>
+          <button
+            type="button"
             onClick={onStartWrite}
-            className="inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-border bg-card px-2.5 text-[12px] font-semibold text-text-primary transition-colors hover:bg-surface-subtle"
+            className="inline-flex items-center gap-[7px] rounded-lg border border-border-strong bg-card px-3 py-[6.5px] text-[12.5px] font-semibold text-text-secondary transition-colors hover:bg-surface-page"
           >
             ＋ 本日の記載 <Kbd>E</Kbd>
           </button>
@@ -100,12 +100,13 @@ export function PatientBar({
             type="button"
             onClick={onFinishVisit}
             disabled={isMutating}
-            className="inline-flex h-8 items-center rounded-full bg-brand px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-60"
+            className="inline-flex items-center rounded-lg border border-brand bg-brand px-3 py-[6.5px] text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-60"
           >
             {finishLabel}
           </button>
         </>
       )}
+      </div>
     </>
   );
 }

@@ -20,6 +20,30 @@ export type UserSession = {
   passwordExpiresAt?: string;
 };
 
+export type CommunicationThread = {
+  id: string;
+  kind: 'patient' | 'channel' | string;
+  title: string;
+  patientId?: string;
+  patientName?: string;
+  department?: string;
+  participantLabels: string[];
+  unreadCount: number;
+  lastMessage?: string;
+  lastMessageAt?: string;
+};
+
+export type CommunicationMessage = {
+  id: number;
+  threadId: string;
+  authorUserId?: string;
+  authorName: string;
+  authorRole: string;
+  body: string;
+  isSystem: boolean;
+  createdAt: string;
+};
+
 export type AdminUserSummary = {
   userId: string;
   displayName: string;
@@ -177,6 +201,16 @@ export type InpatientBed = {
   currentPatientId?: string;
   currentPatientName?: string;
   stayDays?: number;
+};
+
+export type InpatientCareAssignment = {
+  id: number;
+  admissionId: number;
+  userId: string;
+  userDisplayName: string;
+  role: string;
+  assignedBy: string;
+  createdAt: string;
 };
 
 export type InpatientInstruction = {

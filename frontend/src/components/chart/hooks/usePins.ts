@@ -10,11 +10,11 @@ export type PinState = { left: boolean; right: boolean };
 function defaultFor(role: string): PinState {
   if (role === '看護師') return { left: false, right: true };
   if (role === '管理者' || role === '事務') return { left: false, right: true };
-  return { left: false, right: false };
+  return { left: true, right: true };
 }
 
 export function usePins(userId: string, role: string) {
-  const key = `manta-panel-pins:${userId}:${role}`;
+  const key = `manta-panel-pins:v2:${userId}:${role}`;
   const [pins, setPins] = useState<PinState>(() => readStorage<PinState>(key, defaultFor(role)));
 
   useEffect(() => {

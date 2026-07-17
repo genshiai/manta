@@ -4,62 +4,62 @@
   --font-size: 16px;
 
   /* === CUSTOMIZE: Brand Colors === */
-  --brand: #0071e3;
-  --primary: #1d1d1f;
+  --brand: #2e6da8;
+  --primary: #26241f;
   --primary-foreground: #ffffff;
 
   /* === Surface & Background === */
-  --background: #f5f5f7;
-  --foreground: #1d1d1f;
-  --card: #ffffff;
-  --card-foreground: #1d1d1f;
-  --popover: #ffffff;
-  --popover-foreground: #1d1d1f;
+  --background: #f6f5f2;
+  --foreground: #26241f;
+  --card: #fffefb;
+  --card-foreground: #26241f;
+  --popover: #fffefb;
+  --popover-foreground: #26241f;
 
   /* === Secondary & Muted === */
-  --secondary: #f5f5f7;
-  --secondary-foreground: #1d1d1f;
-  --muted: #e8e5e1;
-  --muted-foreground: rgba(29,29,31,0.72);
-  --accent: #f5f5f7;
-  --accent-foreground: #1d1d1f;
+  --secondary: #f6f5f2;
+  --secondary-foreground: #26241f;
+  --muted: #efede6;
+  --muted-foreground: #56524a;
+  --accent: #f0eee8;
+  --accent-foreground: #26241f;
 
   /* === Status Colors === */
-  --destructive: #ff3b30;
+  --destructive: #a8453d;
   --destructive-foreground: #ffffff;
-  --success: #34c759;
+  --success: #4c7a5a;
   --success-foreground: #ffffff;
   --warning: #ff9500;
   --warning-foreground: #ffffff;
-  --info: #0071e3;
+  --info: #2e6da8;
   --info-foreground: #ffffff;
 
   /* === Text Hierarchy === */
-  --text-primary: #1d1d1f;
-  --text-secondary: rgba(29,29,31,0.72);
-  --text-tertiary: #6e6e73;
-  --text-disabled: #c4c0bb;
-  --icon-default: rgba(29,29,31,0.72);
+  --text-primary: #26241f;
+  --text-secondary: #56524a;
+  --text-tertiary: #8b8579;
+  --text-disabled: #b9b3a8;
+  --icon-default: #56524a;
 
   /* === Surface Colors === */
-  --surface-page: #f5f5f7;
-  --surface-subtle: #f5f5f7;
-  --surface-muted: #e8e5e1;
-  --brand-tint: #e8f1fc;
-  --alert-badge: #ff3b30;
+  --surface-page: #f6f5f2;
+  --surface-subtle: #f6f5f2;
+  --surface-muted: #efede6;
+  --brand-tint: #edf3f9;
+  --alert-badge: #a8453d;
 
   /* === Borders & Inputs === */
-  --border: #d2d2d7;
+  --border: #e7e3da;
   --input: transparent;
-  --input-background: #f5f5f7;
-  --switch-background: #c4c0bb;
+  --input-background: #f6f5f2;
+  --switch-background: #d3cec2;
 
   /* === Apple HIG 追加トークン === */
-  --brand-hover: #0066cc;
-  --brand-focus-ring: rgba(0,113,227,0.2);
-  --border-strong: #bcbcc2;
+  --brand-hover: #275e91;
+  --brand-focus-ring: rgba(46,109,168,0.2);
+  --border-strong: #d3cec2;
   --warning-bg: #fff4e5;
-  --destructive-bg: #ffe5e3;
+  --destructive-bg: #faf0ee;
   --success-bg: #e5f8ea;
 
   /* === Typography === */
@@ -67,7 +67,7 @@
   --font-weight-normal: 400;
 
   /* === Focus Ring === */
-  --ring: #0071e3;
+  --ring: #2e6da8;
 
   /* === Chart Colors === */
   --chart-1: #0071e3;
@@ -204,49 +204,49 @@
  * カルテ・温度板コンテナに .clinical を付与する。祖先に .dark があっても
  * 下記でライト値を再宣言することで臨床画面は常に白基調になる（モック karte-b.html の .mk と同思想）。 */
 .clinical {
-  --background: #f5f5f7;
-  --foreground: #1d1d1f;
-  --card: #ffffff;
-  --card-foreground: #1d1d1f;
-  --popover: #ffffff;
-  --popover-foreground: #1d1d1f;
-  --primary: #1d1d1f;
+  --background: #f6f5f2;
+  --foreground: #26241f;
+  --card: #fffefb;
+  --card-foreground: #26241f;
+  --popover: #fffefb;
+  --popover-foreground: #26241f;
+  --primary: #26241f;
   --primary-foreground: #ffffff;
-  --secondary: #f5f5f7;
-  --secondary-foreground: #1d1d1f;
-  --muted: #e8e5e1;
-  --muted-foreground: rgba(29, 29, 31, 0.72);
-  --accent: #f5f5f7;
-  --accent-foreground: #1d1d1f;
-  --destructive: #ff3b30;
+  --secondary: #f6f5f2;
+  --secondary-foreground: #26241f;
+  --muted: #efede6;
+  --muted-foreground: #56524a;
+  --accent: #f0eee8;
+  --accent-foreground: #26241f;
+  --destructive: #a8453d;
   --destructive-foreground: #ffffff;
-  --success: #34c759;
+  --success: #4c7a5a;
   --success-foreground: #ffffff;
   --warning: #ff9500;
   --warning-foreground: #ffffff;
-  --info: #0071e3;
+  --info: #2e6da8;
   --info-foreground: #ffffff;
-  --text-primary: #1d1d1f;
-  --text-secondary: rgba(29, 29, 31, 0.72);
-  --text-tertiary: #6e6e73;
-  --text-disabled: #c4c0bb;
-  --icon-default: rgba(29, 29, 31, 0.72);
-  --surface-page: #f5f5f7;
-  --surface-subtle: #f5f5f7;
-  --surface-muted: #e8e5e1;
-  --brand: #0071e3;
-  --brand-tint: #e8f1fc;
-  --brand-hover: #0066cc;
-  --border-strong: #bcbcc2;
+  --text-primary: #26241f;
+  --text-secondary: #56524a;
+  --text-tertiary: #8b8579;
+  --text-disabled: #b9b3a8;
+  --icon-default: #56524a;
+  --surface-page: #f6f5f2;
+  --surface-subtle: #f6f5f2;
+  --surface-muted: #efede6;
+  --brand: #2e6da8;
+  --brand-tint: #edf3f9;
+  --brand-hover: #275e91;
+  --border-strong: #d3cec2;
   --warning-bg: #fff4e5;
-  --destructive-bg: #ffe5e3;
+  --destructive-bg: #faf0ee;
   --success-bg: #e5f8ea;
-  --alert-badge: #ff3b30;
-  --border: #d2d2d7;
+  --alert-badge: #a8453d;
+  --border: #e7e3da;
   --input: transparent;
-  --input-background: #f5f5f7;
-  --switch-background: #c4c0bb;
-  --ring: #0071e3;
+  --input-background: #f6f5f2;
+  --switch-background: #d3cec2;
+  --ring: #2e6da8;
   --vt-temp: #1d4ed8;
   --vt-pulse: #d70015;
   --vt-bp: #5e8468;

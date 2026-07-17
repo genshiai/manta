@@ -25,12 +25,16 @@
 
 body {
   font-family:
-    'Guguru Sans Code 35',
-    "SF Pro JP", "SF Pro Text",
-    "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3",
-    メイリオ, Meiryo, "ＭＳ Ｐゴシック",
-    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: normal;
+}
+
+.num,
+.tabular-nums {
+  font-family: 'Guguru Sans Code 35', "SF Mono", ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }

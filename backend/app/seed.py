@@ -9,10 +9,12 @@ from sqlalchemy.orm import Session
 
 from .modules.auth.models import User
 from .modules.common.models import AuditLog, utcnow
+from .modules.communication.models import CommunicationMessage, CommunicationThread
 from .modules.gateway.orca.models import OrcaAdapterSetting
 from .modules.inpatient.models import (
     Admission,
     BedMaster,
+    InpatientDocument,
     InpatientInstruction,
     InpatientPathwayMaster,
     InpatientPathwayTaskMaster,
@@ -639,6 +641,39 @@ INPATIENT_DEMO_DATA = {
             "note": None,
         },
         {
+            "id": "bed-3w-302-a",
+            "ward_id": "ward-3w",
+            "sort_order": 25,
+            "is_active": True,
+            "room_number": "302",
+            "bed_number": "A",
+            "bed_label": "302-A",
+            "status": "occupied",
+            "note": "嚥下・誤嚥リスク管理。",
+        },
+        {
+            "id": "bed-3w-305-a",
+            "ward_id": "ward-3w",
+            "sort_order": 26,
+            "is_active": True,
+            "room_number": "305",
+            "bed_number": "A",
+            "bed_label": "305-A",
+            "status": "occupied",
+            "note": "退院療養計画書の署名待ち。",
+        },
+        {
+            "id": "bed-5e-508-a",
+            "ward_id": "ward-5e",
+            "sort_order": 9,
+            "is_active": True,
+            "room_number": "508",
+            "bed_number": "A",
+            "bed_label": "508-A",
+            "status": "occupied",
+            "note": "大腸癌術後の離床・食事再開を管理。",
+        },
+        {
             "id": "bed-icu-02",
             "ward_id": "ward-icu",
             "sort_order": 40,
@@ -646,36 +681,62 @@ INPATIENT_DEMO_DATA = {
             "room_number": "ICU",
             "bed_number": "02",
             "bed_label": "ICU-02",
-            "status": "available",
-            "note": "救急受入予備。",
+            "status": "occupied",
+            "note": "PCI後モニタ管理。14:00 一般床へ転棟予定。",
         },
     ],
     "admissions": [
         {
-            "patient_id": "0009900040",
+            "patient_id": "0009305111",
             "status": "active",
-            "requested_at": datetime(2026, 5, 2, 1, 0, tzinfo=timezone.utc),
-            "admitted_at": datetime(2026, 5, 2, 2, 30, tzinfo=timezone.utc),
-            "ward_id": "ward-5e",
-            "bed_id": "bed-5e-512-a",
+            "requested_at": datetime(2026, 7, 4, 1, 0, tzinfo=timezone.utc),
+            "admitted_at": datetime(2026, 7, 5, 2, 30, tzinfo=timezone.utc),
+            "ward_id": "ward-3w",
+            "bed_id": "bed-3w-305-a",
             "attending_doctor": "田中 太郎",
             "team": "内科Aチーム",
-            "primary_diagnosis": "2型糖尿病 教育入院",
+            "primary_diagnosis": "心不全増悪",
             "care_level": "一般",
-            "note": "血糖自己管理と薬剤調整。",
+            "note": "未署名の文書 1件 · 退院予定 7/16。",
         },
         {
-            "patient_id": "0007712301",
+            "patient_id": "0009508111",
             "status": "active",
-            "requested_at": datetime(2026, 5, 5, 0, 30, tzinfo=timezone.utc),
-            "admitted_at": datetime(2026, 5, 5, 3, 0, tzinfo=timezone.utc),
+            "requested_at": datetime(2026, 7, 13, 0, 30, tzinfo=timezone.utc),
+            "admitted_at": datetime(2026, 7, 14, 3, 0, tzinfo=timezone.utc),
+            "ward_id": "ward-5e",
+            "bed_id": "bed-5e-508-a",
+            "attending_doctor": "田中 太郎",
+            "team": "外科チーム",
+            "primary_diagnosis": "大腸癌 術後",
+            "care_level": "一般",
+            "note": "本日の指示 実施済。",
+        },
+        {
+            "patient_id": "0004120388",
+            "status": "active",
+            "requested_at": datetime(2026, 7, 12, 0, 30, tzinfo=timezone.utc),
+            "admitted_at": datetime(2026, 7, 12, 2, 0, tzinfo=timezone.utc),
             "ward_id": "ward-3w",
-            "bed_id": "bed-3w-318-a",
+            "bed_id": "bed-3w-302-a",
+            "attending_doctor": "田中 太郎",
+            "team": "内科Aチーム",
+            "primary_diagnosis": "誤嚥性肺炎",
+            "care_level": "一般",
+            "note": "とろみ付き。食事は姿勢確保のうえ見守り。",
+        },
+        {
+            "patient_id": "0008450902",
+            "status": "active",
+            "requested_at": datetime(2026, 7, 15, 0, 10, tzinfo=timezone.utc),
+            "admitted_at": datetime(2026, 7, 15, 1, 0, tzinfo=timezone.utc),
+            "ward_id": "ward-icu",
+            "bed_id": "bed-icu-02",
             "attending_doctor": "石川 圭介",
             "team": "循環器チーム",
-            "primary_diagnosis": "胸部圧迫感 精査入院",
-            "care_level": "モニタ管理",
-            "note": "心電図・採血フォロー、冠動脈評価予定。",
+            "primary_diagnosis": "急性心筋梗塞（PCI後）",
+            "care_level": "集中治療",
+            "note": "本日 14:00 ICU から 3西病棟へ転棟予定。",
         },
     ],
     "instructions": [
@@ -703,6 +764,22 @@ INPATIENT_DEMO_DATA = {
             "due_at": datetime(2026, 5, 8, 4, 0, tzinfo=timezone.utc),
             "created_by": "石川 圭介",
         },
+        {
+            "patient_id": "0004120388",
+            "category": "注射",
+            "title": "セフトリアキソン 2g 点滴 14:00",
+            "status": "pending",
+            "due_at": datetime(2026, 7, 16, 5, 0, tzinfo=timezone.utc),
+            "created_by": "田中 太郎",
+        },
+        {
+            "patient_id": "0004120388",
+            "category": "リハビリ",
+            "title": "ST 嚥下評価",
+            "status": "pending",
+            "due_at": datetime(2026, 7, 16, 5, 30, tzinfo=timezone.utc),
+            "created_by": "田中 太郎",
+        },
     ],
     "nursing_notes": [
         {
@@ -726,6 +803,28 @@ INPATIENT_DEMO_DATA = {
             "plan": "胸痛再燃時は直ちに医師へ報告。モニタ継続。",
             "recorded_by": "看護師B",
             "recorded_at": datetime(2026, 5, 8, 0, 45, tzinfo=timezone.utc),
+        },
+        {
+            "patient_id": "0004120388",
+            "note_type": "SOAP",
+            "focus": "誤嚥性肺炎 病日5",
+            "subjective": "喀痰は減少。夜間の発熱なし、睡眠良好。",
+            "objective": "体温 36.8℃、SpO2 96%（室内気）。右下肺の crackle ほぼ消失。",
+            "assessment": "誤嚥性肺炎は改善傾向。抗菌薬は予定どおり day7 まで。",
+            "plan": "ST 嚥下評価の結果で食形態を判断。明朝採血でフォロー。",
+            "recorded_by": "看護師 佐々木",
+            "recorded_at": datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        },
+        {
+            "patient_id": "0008450902",
+            "note_type": "SOAP",
+            "focus": "PCI後モニタ管理",
+            "subjective": "胸痛なし。安静を保てている。",
+            "objective": "洞調律、血圧 118/70、SpO2 98%。穿刺部出血なし。",
+            "assessment": "循環動態は安定。一般床へ転棟可能。",
+            "plan": "14:00 3西病棟へ転棟。心臓リハビリを継続。",
+            "recorded_by": "ICU 看護師",
+            "recorded_at": datetime(2026, 7, 16, 0, 20, tzinfo=timezone.utc),
         },
     ],
 }
@@ -2035,6 +2134,333 @@ def backfill_conditions_from_patient_problems(db: Session) -> bool:
     return updated
 
 
+_WORKSPACE_MOCK_LAB_DATES = [
+    "2025/12/16",
+    "2026/04/08",
+    "2026/07/10",
+    "2026/07/11",
+    "2026/07/13",
+]
+
+
+def _workspace_mock_lab_series(
+    item: str,
+    unit: str,
+    baseline: str,
+    values: list[str],
+    flags: list[str],
+) -> dict[str, object]:
+    rendered = [f"{value} {unit}".strip() for value in values]
+    return {
+        "item": item,
+        "result": rendered[-1],
+        "flag": flags[-1],
+        "baseline": baseline,
+        "previous": rendered[-2],
+        "reported_at": _WORKSPACE_MOCK_LAB_DATES[-1],
+        "history": [
+            {"date": day, "value": value, "flag": flag}
+            for day, value, flag in zip(
+                _WORKSPACE_MOCK_LAB_DATES,
+                rendered,
+                flags,
+                strict=True,
+            )
+        ],
+    }
+
+
+def sync_workspace_mock_patients(db: Session) -> bool:
+    """HTMLワークスペースモックの外来・病棟患者を実データとして補完する。"""
+    updated = False
+    workspace_patients = [
+        {
+            "id": "0003310877",
+            "name": "高橋 一郎",
+            "kana": "タカハシ イチロウ",
+            "age": "71歳",
+            "sex": "男性",
+            "department": "腎臓内科",
+            "doctor": "田中 太郎",
+            "reception_number": "13",
+            "reservation_time": "10:30",
+            "reception_time": "10:18",
+            "status": "問診済",
+            "elapsed": "12分",
+            "lab_progress": "結果到着",
+            "same_name_duplicate_count": 0,
+            "comment": "CKD 定期 · eGFR 42（前回44）。結果 1/1 揃いました。",
+            "demographics": [{"label": "生年月日", "value": "1955/06/09 (71歳)"}],
+            "alerts": [{"label": "NSAIDs 回避", "color": "orange"}],
+            "profile_items": [{"label": "かかりつけ", "value": "当院 腎臓内科"}],
+            "problems": [{"name": "CKD G3b", "since": "2023〜", "status": "active", "icd10_code": "N18.3"}],
+            "visit_history": [],
+            "vitals": [
+                {"label": "血圧", "value": "134 / 82", "unit": "mmHg"},
+                {"label": "脈拍", "value": "70", "unit": "bpm"},
+                {"label": "体温", "value": "36.5", "unit": "°C"},
+                {"label": "SpO2", "value": "98", "unit": "%"},
+            ],
+            "lab_results": [{"item": "eGFR", "result": "42", "unit": "", "flag": "low", "baseline": "60以上", "previous": "44", "date": "2026/07/16"}],
+            "chart_history": [{"date": "2026/06/02", "department": "腎臓内科", "title": "CKD 定期", "summary": "eGFR 44 と低下傾向。塩分・蛋白の摂取を再確認。"}],
+            "imaging_orders": [],
+            "procedure_orders": [],
+        },
+        {
+            "id": "0004120388",
+            "name": "山本 清",
+            "kana": "ヤマモト キヨシ",
+            "age": "82歳",
+            "sex": "男性",
+            "department": "3西病棟",
+            "doctor": "田中 太郎",
+            "reception_number": "W302",
+            "reservation_time": "回診",
+            "reception_time": "09:10",
+            "status": "入院中",
+            "elapsed": "入院5日目",
+            "lab_progress": "結果到着",
+            "same_name_duplicate_count": 0,
+            "comment": "誤嚥性肺炎 · 病日5。ST嚥下評価予定。",
+            "demographics": [
+                {"label": "生年月日", "value": "1944/02/18 (82歳)"},
+                {"label": "保険", "value": "後期高齢者医療"},
+            ],
+            "alerts": [{"label": "誤嚥リスク", "color": "orange"}],
+            "profile_items": [
+                {"label": "病棟", "value": "3西 302 · 主治医 田中"},
+                {"label": "食事", "value": "きざみ＋とろみ · 見守り"},
+            ],
+            "problems": [
+                {"name": "誤嚥性肺炎", "since": "2026/07〜", "status": "active", "icd10_code": "J69.0"},
+                {"name": "高血圧", "since": "2019〜", "status": "active", "icd10_code": "I10"},
+            ],
+            "visit_history": [],
+            "vitals": [
+                {"label": "血圧", "value": "118 / 68", "unit": "mmHg"},
+                {"label": "脈拍", "value": "80", "unit": "bpm"},
+                {"label": "体温", "value": "36.8", "unit": "°C"},
+                {"label": "SpO2", "value": "96", "unit": "%"},
+            ],
+            "lab_results": [
+                _workspace_mock_lab_series("CRP", "mg/dL", "≤ 0.14", ["0.08", "0.10", "12.4", "8.9", "3.2"], ["normal", "normal", "high", "high", "high"]),
+                _workspace_mock_lab_series("WBC", "/µL", "3300–8600", ["5900", "6100", "12800", "10400", "8200"], ["normal", "normal", "high", "high", "normal"]),
+                _workspace_mock_lab_series("Hb", "g/dL", "13.7–16.8", ["14.2", "14.0", "13.3", "12.9", "13.1"], ["normal", "normal", "low", "low", "low"]),
+                _workspace_mock_lab_series("PLT", "万/µL", "15.8–34.8", ["22.0", "21.5", "17.8", "19.2", "24.8"], ["normal", "normal", "normal", "normal", "normal"]),
+                _workspace_mock_lab_series("TP", "g/dL", "6.6–8.1", ["7.1", "7.0", "6.6", "6.4", "6.5"], ["normal", "normal", "normal", "low", "low"]),
+                _workspace_mock_lab_series("Alb", "g/dL", "4.1–5.1", ["4.3", "4.2", "3.4", "3.4", "3.5"], ["normal", "normal", "low", "low", "low"]),
+                _workspace_mock_lab_series("AST", "U/L", "13–30", ["25", "24", "31", "33", "29"], ["normal", "normal", "high", "high", "normal"]),
+                _workspace_mock_lab_series("ALT", "U/L", "10–42", ["22", "21", "27", "29", "26"], ["normal", "normal", "normal", "normal", "normal"]),
+                _workspace_mock_lab_series("LDH", "U/L", "124–222", ["190", "198", "255", "268", "242"], ["normal", "normal", "high", "high", "high"]),
+                _workspace_mock_lab_series("BUN", "mg/dL", "8–20", ["15.8", "16.2", "28.5", "26.8", "22.4"], ["normal", "normal", "high", "high", "high"]),
+                _workspace_mock_lab_series("Cr", "mg/dL", "0.65–1.07", ["0.82", "0.84", "1.08", "1.02", "0.92"], ["normal", "normal", "high", "normal", "normal"]),
+                _workspace_mock_lab_series("eGFR", "", "≥ 60", ["68", "66", "49", "52", "58"], ["normal", "normal", "low", "low", "low"]),
+                _workspace_mock_lab_series("Na", "mEq/L", "138–145", ["141", "140", "135", "136", "138"], ["normal", "normal", "low", "low", "normal"]),
+                _workspace_mock_lab_series("K", "mEq/L", "3.6–4.8", ["4.3", "4.2", "3.6", "3.8", "4.0"], ["normal", "normal", "normal", "normal", "normal"]),
+                _workspace_mock_lab_series("Cl", "mEq/L", "101–108", ["104", "104", "99", "100", "102"], ["normal", "normal", "low", "low", "normal"]),
+                _workspace_mock_lab_series("血糖（随時）", "mg/dL", "70–139", ["102", "104", "141", "132", "118"], ["normal", "normal", "high", "normal", "normal"]),
+            ],
+            "chart_history": [
+                {"date": "2026/07/13", "department": "3西病棟", "title": "病日4 回診", "summary": "解熱傾向。酸素離脱。食事はきざみ食＋とろみで安定。"},
+                {"date": "2026/07/11", "department": "3西病棟", "title": "病日2 回診", "summary": "発熱は続くが呼吸状態は安定。CTRX 継続。"},
+                {"date": "2026/07/10", "department": "救急外来", "title": "入院日", "summary": "誤嚥性肺炎として入院、CTRX 開始。とろみ・姿勢指導。"},
+            ],
+            "imaging_orders": [],
+            "procedure_orders": [],
+        },
+        {
+            "id": "0009305111",
+            "name": "井上 幸子",
+            "kana": "イノウエ サチコ",
+            "age": "76歳",
+            "sex": "女性",
+            "department": "3西病棟",
+            "doctor": "田中 太郎",
+            "reception_number": "W305",
+            "reservation_time": "回診",
+            "reception_time": "09:00",
+            "status": "入院中",
+            "elapsed": "入院12日目",
+            "lab_progress": "結果到着",
+            "same_name_duplicate_count": 0,
+            "comment": "心不全増悪 · 退院予定 7/16。",
+            "demographics": [{"label": "生年月日", "value": "1950/03/12 (76歳)"}],
+            "alerts": [],
+            "profile_items": [{"label": "病棟", "value": "3西 305 · 主治医 田中"}],
+            "problems": [{"name": "心不全増悪", "since": "2026/07〜", "status": "active", "icd10_code": "I50.9"}],
+            "visit_history": [],
+            "vitals": [
+                {"label": "血圧", "value": "128 / 72", "unit": "mmHg"},
+                {"label": "脈拍", "value": "76", "unit": "bpm"},
+                {"label": "体温", "value": "36.4", "unit": "°C"},
+                {"label": "SpO2", "value": "97", "unit": "%"},
+            ],
+            "lab_results": [],
+            "chart_history": [{"date": "2026/07/15", "department": "3西病棟", "title": "退院前回診", "summary": "うっ血所見は改善。退院療養計画書の署名待ち。"}],
+            "imaging_orders": [],
+            "procedure_orders": [],
+        },
+        {
+            "id": "0009508111",
+            "name": "森 健二",
+            "kana": "モリ ケンジ",
+            "age": "65歳",
+            "sex": "男性",
+            "department": "5東病棟",
+            "doctor": "田中 太郎",
+            "reception_number": "W508",
+            "reservation_time": "回診",
+            "reception_time": "09:20",
+            "status": "入院中",
+            "elapsed": "入院3日目",
+            "lab_progress": "結果到着",
+            "same_name_duplicate_count": 0,
+            "comment": "大腸癌 術後 · 本日の指示 実施済。",
+            "demographics": [{"label": "生年月日", "value": "1961/09/20 (65歳)"}],
+            "alerts": [],
+            "profile_items": [{"label": "病棟", "value": "5東 508 · 主治医 田中"}],
+            "problems": [{"name": "大腸癌 術後", "since": "2026/07〜", "status": "active", "icd10_code": "C18.9"}],
+            "visit_history": [],
+            "vitals": [
+                {"label": "血圧", "value": "120 / 70", "unit": "mmHg"},
+                {"label": "脈拍", "value": "82", "unit": "bpm"},
+                {"label": "体温", "value": "36.9", "unit": "°C"},
+                {"label": "SpO2", "value": "98", "unit": "%"},
+            ],
+            "lab_results": [],
+            "chart_history": [{"date": "2026/07/16", "department": "5東病棟", "title": "術後3日目", "summary": "離床良好。食事再開後も腹部症状なし。"}],
+            "imaging_orders": [],
+            "procedure_orders": [],
+        },
+        {
+            "id": "0008450902",
+            "name": "岡田 実",
+            "kana": "オカダ ミノル",
+            "age": "74歳",
+            "sex": "男性",
+            "department": "集中治療",
+            "doctor": "田中 太郎",
+            "reception_number": "ICU02",
+            "reservation_time": "回診",
+            "reception_time": "08:50",
+            "status": "入院中",
+            "elapsed": "発症2日目",
+            "lab_progress": "結果到着",
+            "same_name_duplicate_count": 0,
+            "comment": "急性心筋梗塞（PCI後）· 14:00 一般床へ転棟予定。",
+            "demographics": [{"label": "生年月日", "value": "1959/08/02 (67歳)"}],
+            "alerts": [{"label": "PCI後", "color": "red"}],
+            "profile_items": [{"label": "病棟", "value": "ICU-02 · 主治医 石川"}],
+            "problems": [{"name": "急性心筋梗塞", "since": "2026/07〜", "status": "active", "icd10_code": "I21.9"}],
+            "visit_history": [],
+            "vitals": [
+                {"label": "血圧", "value": "118 / 70", "unit": "mmHg"},
+                {"label": "脈拍", "value": "74", "unit": "bpm"},
+                {"label": "体温", "value": "36.7", "unit": "°C"},
+                {"label": "SpO2", "value": "98", "unit": "%"},
+            ],
+            "lab_results": [],
+            "chart_history": [{"date": "2026/07/15", "department": "ICU", "title": "PCI後", "summary": "PCI成功。循環動態安定、穿刺部出血なし。"}],
+            "imaging_orders": [],
+            "procedure_orders": [],
+        },
+    ]
+    for item in workspace_patients:
+        if db.get(Patient, item["id"]) is None:
+            db.add(Patient(**item))
+            updated = True
+    yamamoto = db.get(Patient, "0004120388")
+    yamamoto_seed = next(item for item in workspace_patients if item["id"] == "0004120388")
+    if yamamoto is not None and len(yamamoto.lab_results or []) < len(yamamoto_seed["lab_results"]):
+        yamamoto.lab_results = yamamoto_seed["lab_results"]
+        updated = True
+    okada = db.get(Patient, "0008450902")
+    if okada is not None and (okada.age != "74歳" or okada.doctor != "田中 太郎"):
+        okada.age = "74歳"
+        okada.doctor = "田中 太郎"
+        updated = True
+    if updated:
+        db.flush()
+
+    if db.scalar(select(ChartNote).where(ChartNote.patient_id == "0004120388")) is None:
+        db.add(ChartNote(
+            patient_id="0004120388",
+            subjective="喀痰は減少。夜間の発熱なし、睡眠良好。",
+            objective="体温 36.8℃、SpO2 96%（室内気）。右下肺の crackle ほぼ消失。",
+            assessment="誤嚥性肺炎は改善傾向。抗菌薬は予定どおり day7 まで。",
+            plan="ST 嚥下評価の結果で食形態を判断。明朝採血でフォロー。",
+            version=1,
+            saved_by="田中 太郎",
+            saved_at=datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        ))
+        updated = True
+    if db.scalar(select(PrescriptionOrder).where(
+        PrescriptionOrder.patient_id == "0004120388",
+        PrescriptionOrder.drug_name == "セフトリアキソン 2g 点滴",
+    )) is None:
+        db.add(PrescriptionOrder(
+            patient_id="0004120388",
+            type="注射",
+            days="day 5/7",
+            drug_name="セフトリアキソン 2g 点滴",
+            dosage="2g 1日1回 · 本日14:00",
+            created_at=datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        ))
+        updated = True
+    if db.scalar(select(PrescriptionOrder).where(
+        PrescriptionOrder.patient_id == "0004120388",
+        PrescriptionOrder.drug_name == "アムロジピン錠 5mg（持参薬継続）",
+    )) is None:
+        db.add(PrescriptionOrder(
+            patient_id="0004120388",
+            type="内服",
+            days="入院中 — 病棟管理",
+            drug_name="アムロジピン錠 5mg（持参薬継続）",
+            dosage="1T · 分1 朝食後",
+            created_at=datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        ))
+        updated = True
+    if db.scalar(select(ProcedureOrder).where(
+        ProcedureOrder.patient_id == "0004120388",
+        ProcedureOrder.title == "嚥下評価（ST）",
+    )) is None:
+        db.add(ProcedureOrder(
+            patient_id="0004120388",
+            title="嚥下評価（ST）",
+            status="planned",
+            note="依頼済 · 本日午後",
+            created_at=datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        ))
+        updated = True
+    if db.scalar(select(LabOrder).where(
+        LabOrder.patient_id == "0004120388",
+        LabOrder.category == "採血フォロー",
+    )) is None:
+        db.add(LabOrder(
+            patient_id="0004120388",
+            category="採血フォロー",
+            status="pending",
+            urgency="通常",
+            items=["CRP", "血算"],
+            created_at=datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        ))
+        updated = True
+    if db.scalar(select(ImagingOrder).where(
+        ImagingOrder.patient_id == "0004120388",
+        ImagingOrder.category == "胸部X線 2方向",
+    )) is None:
+        db.add(ImagingOrder(
+            patient_id="0004120388",
+            category="胸部X線 2方向",
+            status="scheduled",
+            scheduled_at="2026/07/16 午後",
+            note="退院前フォロー · 右下肺浸潤影の改善確認",
+            created_at=datetime(2026, 7, 16, 0, 10, tzinfo=timezone.utc),
+        ))
+        updated = True
+    return updated
+
+
 def sync_inpatient_demo_data(db: Session) -> bool:
     updated = False
 
@@ -2070,6 +2496,29 @@ def sync_inpatient_demo_data(db: Session) -> bool:
             updated = True
         admissions_by_patient[patient_id] = existing
 
+    # 旧デモの長期入院患者は、ワークスペースモックの担当患者構成へ移行する。
+    # 対象は固定デモIDだけに限定し、ユーザーが作成した入院には触れない。
+    legacy_demo_admissions = db.scalars(
+        select(Admission).where(
+            Admission.patient_id.in_(["0009900040", "0007712301"]),
+            Admission.status.in_(["active", "admitted"]),
+        )
+    ).all()
+    for admission in legacy_demo_admissions:
+        admission.status = "discharged"
+        admission.discharged_at = datetime(2026, 7, 15, 6, 0, tzinfo=timezone.utc)
+        admission.bed_id = None
+        updated = True
+    for legacy_bed_id in ("bed-5e-512-a", "bed-3w-318-a"):
+        legacy_bed = db.get(BedMaster, legacy_bed_id)
+        if legacy_bed is not None and legacy_bed.status != "available":
+            legacy_bed.status = "available"
+            updated = True
+    okada_admission = admissions_by_patient.get("0008450902")
+    if okada_admission is not None and okada_admission.attending_doctor != "田中 太郎":
+        okada_admission.attending_doctor = "田中 太郎"
+        updated = True
+
     db.flush()
 
     for item in INPATIENT_DEMO_DATA["instructions"]:
@@ -2101,6 +2550,32 @@ def sync_inpatient_demo_data(db: Session) -> bool:
         if exists is None:
             payload = {key: value for key, value in item.items() if key != "patient_id"}
             db.add(NursingNote(admission_id=admission.id, **payload))
+            updated = True
+
+    yamamoto_admission = admissions_by_patient.get("0004120388")
+    if yamamoto_admission is not None:
+        exists = db.scalar(
+            select(InpatientDocument).where(
+                InpatientDocument.admission_id == yamamoto_admission.id,
+                InpatientDocument.document_type == "admission_care_plan",
+            )
+        )
+        if exists is None:
+            db.add(InpatientDocument(
+                admission_id=yamamoto_admission.id,
+                document_type="admission_care_plan",
+                title="入院診療計画書",
+                status="signed",
+                body=(
+                    "主病名: 誤嚥性肺炎\n"
+                    "治療計画: セフトリアキソン投与、呼吸状態と炎症反応を確認する。\n"
+                    "看護・リハビリ: 誤嚥予防の姿勢調整、ST嚥下評価、食形態の再評価。\n"
+                    "退院目標: 解熱と呼吸状態安定、経口摂取の安全確認。"
+                ),
+                created_by="田中 太郎",
+                created_at=datetime(2026, 7, 10, 2, 0, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 7, 10, 2, 20, tzinfo=timezone.utc),
+            ))
             updated = True
 
     return updated
@@ -2148,6 +2623,80 @@ def _demo_password_expiry() -> date:
     return date.today() + timedelta(days=DEMO_PASSWORD_VALID_DAYS)
 
 
+def sync_communication_demo_data(db: Session) -> bool:
+    if db.scalar(select(func.count(CommunicationThread.id))) or 0:
+        return False
+    now = utcnow()
+    threads = [
+        CommunicationThread(
+            id="patient-0007712301-billing",
+            kind="patient",
+            title="佐藤 次郎 — 心電図の病名照会",
+            patient_id="0007712301",
+            department="循環器内科",
+            participant_user_ids=["dr.tanaka", "admin.sato"],
+            created_at=now - timedelta(minutes=35),
+            updated_at=now - timedelta(minutes=2),
+        ),
+        CommunicationThread(
+            id="patient-0009900040-care",
+            kind="patient",
+            title="鈴木 花子 — 検査結果の確認",
+            patient_id="0009900040",
+            department="内科",
+            participant_user_ids=["dr.tanaka", "admin.sato"],
+            created_at=now - timedelta(hours=1),
+            updated_at=now - timedelta(minutes=18),
+        ),
+        CommunicationThread(
+            id="channel-outpatient",
+            kind="channel",
+            title="# 外来",
+            department="外来",
+            participant_user_ids=[],
+            created_at=now - timedelta(hours=4),
+            updated_at=now - timedelta(minutes=25),
+        ),
+    ]
+    db.add_all(threads)
+    db.flush()
+    db.add_all([
+        CommunicationMessage(
+            thread_id="patient-0007712301-billing",
+            author_user_id="admin.sato",
+            author_name="佐藤 美紀",
+            author_role="管理者 · 医事課",
+            body="本日の心電図検査に対応する病名がありません。カルテのA欄を確認いただけますか？",
+            created_at=now - timedelta(minutes=32),
+        ),
+        CommunicationMessage(
+            thread_id="patient-0007712301-billing",
+            author_user_id="dr.tanaka",
+            author_name="田中 太郎",
+            author_role="医師 · 内科",
+            body="確認しました。『労作性狭心症の疑い』を候補として点検してください。確定前に原記録も確認します。",
+            created_at=now - timedelta(minutes=20),
+        ),
+        CommunicationMessage(
+            thread_id="patient-0009900040-care",
+            author_user_id="admin.sato",
+            author_name="佐藤 美紀",
+            author_role="管理者 · 医事課",
+            body="HbA1c の結果が到着しています。次回説明予定の確認をお願いします。",
+            created_at=now - timedelta(minutes=18),
+        ),
+        CommunicationMessage(
+            thread_id="channel-outpatient",
+            author_user_id=None,
+            author_name="受付",
+            author_role="外来",
+            body="本日は同姓同名の患者が2名います。呼び出し時は氏名と患者IDを照合してください。",
+            created_at=now - timedelta(minutes=25),
+        ),
+    ])
+    return True
+
+
 def seed_demo_data(db: Session) -> None:
     existing_users = db.scalars(select(User)).all()
     if existing_users:
@@ -2161,6 +2710,9 @@ def seed_demo_data(db: Session) -> None:
             if user.id in DEMO_USER_IDS and user.password_expires_at <= renew_threshold:
                 user.password_expires_at = _demo_password_expiry()
                 updated = True
+
+        if sync_workspace_mock_patients(db):
+            updated = True
 
         if backfill_patient_workspace(db):
             updated = True
@@ -2199,6 +2751,9 @@ def seed_demo_data(db: Session) -> None:
             updated = True
 
         if backfill_demo_prescription_history(db):
+            updated = True
+
+        if sync_communication_demo_data(db):
             updated = True
 
         if updated:
@@ -2429,7 +2984,9 @@ def seed_demo_data(db: Session) -> None:
     backfill_conditions_from_patient_problems(db)
     backfill_observations_from_patient_json(db)
     sync_patient_order_tables(db)
+    sync_workspace_mock_patients(db)
     sync_inpatient_demo_data(db)
     sync_inpatient_pathway_masters(db)
     sync_receipt_medical_practice_masters(db)
+    sync_communication_demo_data(db)
     db.commit()

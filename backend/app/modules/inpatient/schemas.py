@@ -299,3 +299,19 @@ class AdmissionTransferRequest(BaseModel):
 
 class AdmissionDischargeRequest(BaseModel):
     note: str | None = None
+
+
+class InpatientCareAssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admission_id: int
+    user_id: str
+    user_display_name: str
+    role: str
+    assigned_by: str
+    created_at: datetime
+
+
+class InpatientCareAssignmentCreateRequest(BaseModel):
+    role: str = "担当"

@@ -11,7 +11,7 @@ from ...security import get_current_user
 from ..auth.models import User
 from ..common.audit import log_audit
 from ..common.models import AuditLog
-from ..common.time import TOKYO_TZ
+from ..common.time import TOKYO_TZ, utcnow
 from ..master_data.models import PrescriptionCatalogMaster
 from ..master_data.services import get_reservation_slot_master_or_404
 from .models import ChartNote, ImagingOrder, LabOrder, Observation, Patient, PrescriptionOrder, ProcedureOrder, Reservation
@@ -30,6 +30,7 @@ from .schemas import (
     LabOrderUpdateRequest,
     PatientContextRead,
     PatientContextUpdateRequest,
+    PatientAlertCreateRequest,
     PatientStatusUpdateRequest,
     PatientSummaryRead,
     PrescriptionCopyLastRead,
@@ -71,6 +72,66 @@ from .services import (
 
 
 router = APIRouter()
+
+
+@router.post("/api/patients/{patient_id}/alerts", response_model=PatientSummaryRead)
+def add_patient_alert(
+    patient_id: str,
+    payload: PatientAlertCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PatientSummaryRead:
+    patient = get_patient_or_404(db, patient_id)
+    label = payload.label.strip()
+    if not label:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Alert label is required")
+    alerts = list(patient.alerts or [])
+    alerts.append({
+        "label": label,
+        "color": payload.color,
+        "source": payload.source.strip() or "診療記録",
+        "note": payload.note.strip() if payload.note else None,
+        "recorded_by": current_user.display_name,
+        "recorded_at": utcnow().isoformat(),
+    })
+    patient.alerts = alerts
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="患者安全情報登録",
+        scope="patient",
+        detail=f"{label} を登録しました（{payload.source}）。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(patient)
+    return patient_to_read(patient)
+
+
+@router.delete("/api/patients/{patient_id}/alerts/{alert_index}", response_model=PatientSummaryRead)
+def delete_patient_alert(
+    patient_id: str,
+    alert_index: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PatientSummaryRead:
+    patient = get_patient_or_404(db, patient_id)
+    alerts = list(patient.alerts or [])
+    if alert_index < 0 or alert_index >= len(alerts):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient alert not found")
+    removed = alerts.pop(alert_index)
+    patient.alerts = alerts
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="患者安全情報解除",
+        scope="patient",
+        detail=f"{removed.get('label', '安全情報')} を解除しました。",
+        patient=patient,
+    )
+    db.commit()
+    db.refresh(patient)
+    return patient_to_read(patient)
 
 
 @router.get("/api/masters/chart-order-config", response_model=ChartOrderMasterRead)

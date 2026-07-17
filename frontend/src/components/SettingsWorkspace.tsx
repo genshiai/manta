@@ -76,12 +76,14 @@ import type {
   UserSession,
 } from '../types/workflow';
 import { AuditPanel } from './AuditPanel';
+import type { SettingsSection } from './workspace/WorkspaceContextPane';
 
 type SettingsWorkspaceProps = {
   currentUser: UserSession;
   homeSettings: HomeSettings;
   onAuthExpired: () => void;
   onHomeSettingsChange: (settings: HomeSettings) => void;
+  section: SettingsSection;
 };
 
 type FlashState = {
@@ -686,6 +688,7 @@ export const SettingsWorkspace = ({
   homeSettings,
   onAuthExpired,
   onHomeSettingsChange,
+  section,
 }: SettingsWorkspaceProps) => {
   const isAdmin = currentUser.role === '管理者';
   const [managementTab, setManagementTab] = useState<ManagementTab>('users');
@@ -755,6 +758,15 @@ export const SettingsWorkspace = ({
   const [isLoadingMasters, setIsLoadingMasters] = useState(isAdmin);
   const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(isAdmin);
   const [isMutating, setIsMutating] = useState(false);
+  const [advancedView, setAdvancedView] = useState(false);
+
+  useEffect(() => {
+    setAdvancedView(false);
+    const mapped: Partial<Record<SettingsSection, ManagementTab>> = {
+      users: 'users', rxset: 'rxset', labset: 'labset', slot: 'slot', template: 'template', claimRule: 'claimRule',
+    };
+    if (mapped[section]) setManagementTab(mapped[section]);
+  }, [section]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) {
@@ -2123,8 +2135,74 @@ export const SettingsWorkspace = ({
     onHomeSettingsChange(normalizeHomeSettings({ ...homeSettings, defaultView }));
   };
 
+  if (!advancedView) {
+    const sectionTitles: Record<SettingsSection, string> = {
+      users: '利用者と権限', rxset: '処方セット', labset: '検査セット', slot: '予約枠', template: 'カルテテンプレート', claimRule: '施設ルール', orca: '外部接続', audit: '監査ログ',
+    };
+    const compactRows: Array<{ title: string; detail: string; status: string }> = section === 'users'
+      ? (users.length ? users : [{ userId: currentUser.userId, displayName: currentUser.displayName, department: currentUser.department, role: currentUser.role, passwordExpiresAt: currentUser.passwordExpiresAt ?? '' }]).slice(0, 8).map((user) => ({
+          title: user.displayName || user.userId,
+          detail: `${user.role} · ${user.department}`,
+          status: user.passwordExpiresAt && new Date(user.passwordExpiresAt) < new Date(Date.now() + 14 * 86400000) ? `パスワード期限 ${user.passwordExpiresAt.slice(5, 10).replace('-', '/')}` : '有効',
+        }))
+      : section === 'rxset'
+        ? orderConfig.prescriptionSets.map((item) => ({ title: item.label, detail: `${item.department} · ${item.items.length}剤`, status: item.isActive === false ? '停止中' : '有効' }))
+        : section === 'labset'
+          ? orderConfig.labSetOptions.map((item) => ({ title: item.label, detail: `${item.items.length}項目`, status: item.isActive === false ? '停止中' : '有効' }))
+          : section === 'slot'
+            ? orderConfig.reservationSlots.slice(0, 12).map((item) => ({ title: `${item.date} ${item.time}`, detail: `${item.department} · ${item.doctor}`, status: `残 ${item.remainingCount}/${item.capacity}` }))
+            : section === 'template'
+              ? orderConfig.chartTemplates.map((item) => ({ title: item.label, detail: item.department, status: item.isActive === false ? '停止中' : '有効' }))
+              : section === 'claimRule'
+                ? claimRules.map((item) => ({ title: item.message, detail: `${item.category} · ${item.ruleType}`, status: item.isActive ? '有効' : '停止中' }))
+                : section === 'orca'
+                  ? [
+                      { title: 'ORCA', detail: `${orcaSetting?.mode === 'http' ? '本番接続' : 'モック接続'} · ${orcaSetting?.baseUrl ?? '施設内アダプタ'}`, status: orcaConnectionTest?.ok === false ? '要確認' : '正常' },
+                      { title: 'FHIR', detail: '患者・診察・検査など 9 リソース公開中', status: '正常' },
+                    ]
+                  : systemAuditLogs.slice(0, 12).map((log) => ({ title: log.detail || log.action, detail: `${log.timestamp} · ${log.actor}`, status: log.scope }));
+    const subline = section === 'users'
+      ? `有効な利用者 ${users.length || 1}名 · 最終更新 ${systemAuditLogs[0]?.timestamp?.slice(5, 10).replace('-', '/') ?? '本日'}`
+      : `${compactRows.length}件 · 変更は監査ログへ記録されます`;
+
+    return (
+      <main className="mx-auto w-full max-w-[860px] px-5 pb-12 pt-6">
+        <div className="flex items-start gap-4">
+          <div>
+            <h1 className="text-[20px] font-bold tracking-[-0.01em] text-text-primary">{sectionTitles[section]}</h1>
+            <p className="mt-1 text-[12px] text-text-tertiary">{subline}</p>
+          </div>
+          {isAdmin ? <button className="ms-auto text-[11px] font-semibold text-text-tertiary hover:text-text-primary" onClick={() => setAdvancedView(true)} type="button">詳細を編集 ›</button> : null}
+        </div>
+
+        {flash ? <p className={cn('mt-4 rounded-lg px-3 py-2 text-[12px]', flash.tone === 'success' ? 'bg-success-bg text-success' : 'bg-destructive-bg text-destructive')}>{flash.text}</p> : null}
+        <section className="mt-5 overflow-hidden rounded-xl border border-border bg-card">
+          {isLoadingUsers || isLoadingMasters || isLoadingAuditLogs ? <p className="px-4 py-6 text-[12px] text-text-tertiary">設定を読み込んでいます…</p> : null}
+          {compactRows.map((row) => (
+            <button className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-surface-subtle" key={`${row.title}-${row.detail}`} onClick={() => isAdmin && setAdvancedView(true)} type="button">
+              <span className="text-[13px] font-semibold text-text-primary">{row.title}</span>
+              <span className={cn('row-span-2 self-center text-[11px] font-semibold', row.status.includes('期限') || row.status === '要確認' ? 'text-warning' : 'text-success')}>{row.status}</span>
+              <span className="mt-0.5 text-[11.5px] text-text-tertiary">{row.detail}</span>
+            </button>
+          ))}
+          {!isLoadingUsers && !isLoadingMasters && !isLoadingAuditLogs && compactRows.length === 0 ? <p className="px-4 py-8 text-center text-[12px] text-text-tertiary">登録はありません。</p> : null}
+        </section>
+
+        {section === 'users' && systemAuditLogs.length > 0 ? (
+          <section className="mt-6">
+            <h2 className="mb-2 text-[11px] font-bold tracking-[0.05em] text-text-tertiary">最近の設定変更（監査ログ）</h2>
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              {systemAuditLogs.slice(0, 3).map((log) => <div className="border-b border-border px-4 py-3 last:border-b-0" key={log.id}><p className="text-[12.5px] font-semibold text-text-primary">{log.detail || log.action}</p><p className="mt-0.5 text-[11px] text-text-tertiary">{log.timestamp} · {log.actor}</p></div>)}
+            </div>
+          </section>
+        ) : null}
+      </main>
+    );
+  }
+
   return (
     <main className='mx-auto max-w-[1600px] px-4 py-6 lg:px-6'>
+      <button className='mb-4 text-[12px] font-semibold text-blue-900 hover:underline' onClick={() => setAdvancedView(false)} type='button'>‹ 設定一覧へ戻る</button>
       <section className={cn(surfaceClassName, 'p-5 lg:p-6')}>
         <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
           <div className='space-y-3'>

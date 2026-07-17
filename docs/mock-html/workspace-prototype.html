@@ -1,0 +1,3035 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manta — ワークスペース型 UI モック（意思決定用）</title>
+<!--
+  ワークスペース型シェルの意思決定用モック（2026-07-14 / 第2版: タイムライン拡充）
+  検証すること:
+    1. 業務バーを切り替えても、自分の作業キューへ迷わず戻れるか
+    2. 患者を切り替えてから「本日の記載」を始めるまでが短いか
+    3. 補助ペインを閉じても、安全情報が患者ヘッダーに残るか
+    4. 外来・病棟・医事・設定・連絡が同じシェルで成立するか
+    5. 5年分のタイムライン（診察・検査・画像・文書・ワクチン・健診・入院・キャンセル）が読みやすいか
+    6. 検査は「表」を基本ビューにできるか（レンズ=検査）
+    7. オーダーの発行→実施→結果到着が非同期に追えるか（20秒後に高橋の採血結果が届くデモ）
+  右下のスイッチ: 配色（ミューテッド/現行Apple）・書体（ゴシック/等幅）・職種（医師/看護/医事 → レール剪定）
+  データはすべて架空。実在の人物・医療機関とは関係ない。
+-->
+<style>
+/* ============ font ============ */
+@font-face {
+  font-family: "Guguru Sans Code 35";
+  src: url("../../frontend/public/fonts/GuguruSansCode35-Regular.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Guguru Sans Code 35";
+  src: url("../../frontend/public/fonts/GuguruSansCode35-Bold.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+/* ============ palette ============ */
+body.pal-muted {
+  --canvas:#f6f5f2; --card:#fffefb; --ink:#26241f; --ink2:#56524a; --muted:#8b8579;
+  --line:#e7e3da; --line-strong:#d3cec2; --hair:#efece5;
+  --accent:#2e6da8; --accent-deep:#275e91; --accent-tint:#edf3f9; --accent-line:#c9dbeb;
+  --safe:#a8453d; --safe-bg:#faf0ee; --safe-line:#ecd6d1;
+  --lab-high:#b0403a; --lab-low:#2b5f96; --ok:#4c7a5a;
+  --sel:#f0eee8; --kbg:#efede6;
+  --sh-pop:0 10px 34px rgba(38,36,31,.13);
+}
+body.pal-apple {
+  --canvas:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --ink2:#48484c; --muted:#6e6e73;
+  --line:#e5e5ea; --line-strong:#d2d2d7; --hair:#ededf0;
+  --accent:#0071e3; --accent-deep:#0066cc; --accent-tint:#e8f1fc; --accent-line:#c4dcf5;
+  --safe:#d70015; --safe-bg:#ffecea; --safe-line:#f5cfcb;
+  --lab-high:#d70015; --lab-low:#0a5dc2; --ok:#34833f;
+  --sel:#f0f0f3; --kbg:#f0f0f2;
+  --sh-pop:0 10px 34px rgba(0,0,0,.14);
+}
+
+/* ============ type ============ */
+body.font-sans {
+  --f-body:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --f-num:"Guguru Sans Code 35","SF Mono",ui-monospace,Menlo,monospace;
+}
+body.font-mono {
+  --f-body:"PlemolJP","Guguru Sans Code 35",ui-monospace,Menlo,monospace;
+  --f-num:"PlemolJP","Guguru Sans Code 35",ui-monospace,Menlo,monospace;
+}
+
+/* オーダー種別の意味色（P0-2 一元対応表の系譜 — 小チップ・ドット専用、行や本文は塗らない） */
+body {
+  --dm-med:#2f7268;  --dm-med-bg:#e4f1ee;
+  --dm-test:#67589e; --dm-test-bg:#eeebf6;
+  --dm-img:#38788f;  --dm-img-bg:#e7f1f5;
+  --dm-proc:#a2612d; --dm-proc-bg:#f7ede2;
+  --dm-reha:#5e7a45; --dm-reha-bg:#edf2e6;
+}
+
+* { box-sizing:border-box; }
+html,body { height:100%; }
+body {
+  margin:0; background:var(--canvas); color:var(--ink);
+  font-family:var(--f-body); font-size:14px; line-height:1.6;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-radius:6px; }
+.num { font-family:var(--f-num); font-variant-numeric:tabular-nums; letter-spacing:0; }
+
+/* ============ app grid ============ */
+#app { display:grid; grid-template-columns:56px 288px minmax(560px,1fr) 308px; grid-template-rows:100vh; height:100vh; }
+#app > * { min-height:0; min-width:0; }
+#app.aid-closed { grid-template-columns:56px 288px minmax(560px,1fr); }
+#app.aid-closed #aid { display:none; }
+
+/* ============ rail ============ */
+#rail { background:var(--card); border-right:1px solid var(--line); display:flex; flex-direction:column; align-items:center; padding:12px 0 14px; gap:6px; }
+.mark { width:32px; height:32px; display:grid; place-items:center; margin-bottom:12px; user-select:none; }
+.mark img { width:27px; height:auto; display:block; }
+.rail-btn { width:46px; padding:7px 0 6px; border-radius:9px; display:grid; justify-items:center; gap:2px; color:var(--muted); position:relative; }
+.rail-btn svg { width:18px; height:18px; stroke:currentColor; stroke-width:1.7; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.rail-btn span { font-size:10px; font-weight:600; letter-spacing:.02em; }
+.rail-btn:hover { background:var(--sel); color:var(--ink2); }
+.rail-btn.active { background:var(--accent-tint); color:var(--accent); }
+.rail-badge { position:absolute; top:2px; right:4px; min-width:15px; height:15px; border-radius:8px; background:var(--accent); color:#fff; font-size:9.5px; font-weight:700; display:grid; place-items:center; padding:0 4px; }
+.rail-bottom { margin-top:auto; display:grid; gap:6px; justify-items:center; }
+.rail-avatar { width:28px; height:28px; border-radius:50%; background:var(--kbg); color:var(--ink2); font-size:12px; font-weight:700; display:grid; place-items:center; }
+
+/* ============ context pane ============ */
+#context { background:var(--card); border-right:1px solid var(--line); min-width:0; display:flex; flex-direction:column; }
+.ctx-head { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
+.eyebrow { font-size:11px; color:var(--muted); letter-spacing:.03em; }
+.ctx-title { font-size:16.5px; font-weight:700; letter-spacing:-.01em; margin:2px 0 10px; }
+.ctx-search { height:32px; border:1px solid var(--line-strong); background:var(--canvas); border-radius:8px; display:flex; align-items:center; gap:7px; color:var(--muted); padding:0 10px; font-size:12px; width:100%; }
+.ctx-search .kbd { margin-left:auto; }
+.ctx-body { overflow-y:auto; padding:6px 8px 18px; flex:1; }
+.ctx-section { padding:12px 0 2px; }
+.ctx-label { padding:0 10px 6px; color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.05em; }
+.prow { width:100%; text-align:left; border-radius:8px; padding:8px 10px; display:grid; grid-template-columns:30px 1fr auto; gap:10px; align-items:start; position:relative; }
+.prow:hover { background:var(--canvas); }
+.prow.active { background:var(--accent-tint); }
+.prow.active::before { content:""; position:absolute; left:0; top:8px; bottom:8px; width:2.5px; border-radius:2px; background:var(--accent); }
+.pavatar { width:30px; height:30px; border-radius:50%; background:var(--kbg); color:var(--ink2); font-size:12px; font-weight:700; display:grid; place-items:center; margin-top:1px; }
+.prow.active .pavatar { background:var(--card); color:var(--accent); }
+.pname { display:block; font-size:13.5px; font-weight:650; line-height:1.4; }
+.pmeta { display:block; font-size:11.5px; color:var(--muted); line-height:1.5; margin-top:1px; }
+.pstate { display:block; font-size:11.5px; line-height:1.5; margin-top:1px; color:var(--ink2); }
+.pstate.safety { color:var(--safe); font-weight:600; }
+.pstate.att { color:var(--ink); font-weight:600; }
+.pstate.att .sdot { background:var(--ink); }
+.pstate.accent { color:var(--accent); font-weight:600; }
+.pstate.accent .sdot { background:var(--accent); }
+.pstate.done { color:var(--muted); }
+.pstate .sdot { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--ink2); vertical-align:2px; margin-right:5px; }
+.pstate.quiet .sdot { display:none; }
+.ptime { font-size:11px; color:var(--muted); margin-top:2px; }
+.prow.done .pname { color:var(--ink2); font-weight:500; }
+.ctx-foot { border-top:1px solid var(--line); padding:10px 16px; font-size:11.5px; color:var(--muted); }
+
+.brow { width:100%; text-align:left; border-radius:8px; padding:9px 10px; display:grid; gap:2px; }
+.brow:hover { background:var(--canvas); }
+.brow.active { background:var(--accent-tint); }
+.brow .l1 { display:flex; gap:8px; align-items:baseline; font-size:13px; font-weight:650; }
+.brow .l1 .room { font-size:11.5px; color:var(--muted); font-weight:600; }
+.brow .l1 .when { margin-left:auto; font-size:10.5px; color:var(--muted); font-weight:400; }
+.brow .l2 { font-size:11.5px; color:var(--muted); }
+.brow .l2 b { color:var(--ink2); font-weight:600; }
+.brow .l2 .att { color:var(--safe); font-weight:600; }
+.brow .unread { display:inline-block; min-width:15px; height:15px; border-radius:8px; background:var(--accent); color:#fff; font-size:9.5px; font-weight:700; text-align:center; line-height:15px; padding:0 4px; margin-left:6px; vertical-align:1px; }
+
+/* ============ main ============ */
+#main { min-width:0; display:flex; flex-direction:column; background:var(--canvas); }
+#topbar { height:52px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:14px; padding:0 18px 0 20px; flex:none; }
+.crumbs { font-size:12px; color:var(--muted); white-space:nowrap; display:flex; gap:7px; align-items:center; min-width:0; }
+.crumbs .sep { color:var(--line-strong); }
+.crumbs .here { color:var(--ink); font-weight:600; }
+.crumbs button:hover { color:var(--ink2); text-decoration:underline; }
+.top-search { flex:1; max-width:400px; margin:0 auto; height:32px; background:var(--canvas); border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; gap:7px; padding:0 10px; color:var(--muted); font-size:12px; }
+.top-search .kbd { margin-left:auto; }
+.top-actions { display:flex; gap:8px; align-items:center; margin-left:auto; }
+
+#patientbar { min-height:54px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; padding:8px 20px; flex:none; flex-wrap:wrap; }
+.pb-name { font-size:16px; font-weight:700; letter-spacing:.01em; }
+.pb-kana { font-size:10.5px; color:var(--muted); }
+.pb-meta { font-size:12px; color:var(--ink2); }
+.pb-meta .num { color:var(--muted); }
+.safety-label { font-size:11.5px; font-weight:650; color:var(--safe); background:var(--safe-bg); border:1px solid var(--safe-line); border-radius:5px; padding:1.5px 7px; }
+.pb-problems { font-size:12px; color:var(--muted); }
+.pb-right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.pb-save { font-size:11.5px; color:var(--muted); margin-right:2px; }
+
+#aistrip { min-height:32px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; padding:5px 20px; flex:none; font-size:12.5px; }
+.ai-mark { color:var(--accent); font-size:12px; flex:none; }
+.ai-line { color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.ai-link { color:var(--accent); font-size:12px; font-weight:600; white-space:nowrap; }
+.ai-link:hover { text-decoration:underline; }
+.ai-meta { margin-left:auto; color:var(--muted); font-size:11px; white-space:nowrap; }
+
+#lensbar { min-height:40px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:4px; padding:0 20px; flex:none; flex-wrap:wrap; position:relative; }
+.lens { font-size:12.5px; font-weight:600; color:var(--ink2); border-radius:99px; padding:4.5px 12px; }
+.lens:hover { background:var(--canvas); }
+.lens.active { background:var(--ink); color:var(--card); }
+.lens-right { margin-left:auto; display:flex; gap:6px; }
+.chip { font-size:11.5px; font-weight:600; color:var(--ink2); border:1px solid var(--line-strong); background:var(--card); border-radius:7px; padding:4px 9px; display:flex; gap:6px; align-items:center; }
+.chip:hover { background:var(--canvas); }
+
+#content { flex:1; overflow-y:auto; min-height:0; }
+.sheet-wrap { padding:20px 28px 60px; position:relative; }
+.sheet { max-width:860px; margin:0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.month-float { position:sticky; top:0; z-index:5; width:max-content; margin:0 0 -30px auto; background:var(--card); border:1px solid var(--line-strong); border-radius:99px; padding:3px 12px; font-size:11.5px; font-weight:650; color:var(--ink2); box-shadow:0 2px 10px rgba(0,0,0,.05); }
+
+/* calendar popover */
+#calpop { position:absolute; right:20px; top:44px; z-index:30; width:330px; background:var(--card); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--sh-pop); padding:12px 14px; }
+#calpop .cp-head { display:flex; align-items:center; font-size:12px; font-weight:700; margin-bottom:8px; }
+#calpop .cp-head .x { margin-left:auto; color:var(--muted); padding:2px 6px; border-radius:6px; }
+#calpop .cp-head .x:hover { background:var(--canvas); }
+.cp-year { display:grid; grid-template-columns:44px 1fr; gap:8px; align-items:baseline; padding:5px 0; border-top:1px solid var(--hair); }
+.cp-year:first-of-type { border-top:0; }
+.cp-y { font-size:12px; font-weight:700; color:var(--ink2); }
+.cp-months { display:flex; flex-wrap:wrap; gap:4px; }
+.cp-m { font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-tint); border-radius:6px; padding:2px 8px; }
+.cp-m:hover { background:var(--accent-line); }
+.cp-m.fold { color:var(--ink2); background:var(--sel); }
+#calpop .cp-note { font-size:10.5px; color:var(--muted); margin-top:8px; }
+
+/* ai card */
+.ai-card { margin:16px 18px 4px; border:1px solid var(--accent-line); border-radius:11px; background:linear-gradient(180deg,var(--accent-tint),var(--card) 72%); padding:14px 18px 12px; }
+.ai-card-head { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; }
+.ai-card-head .meta { font-weight:400; color:var(--muted); font-size:11px; }
+.ai-card-head .fold { margin-left:auto; font-size:11.5px; color:var(--muted); }
+.ai-card-head .fold:hover { color:var(--ink2); }
+.ai-card-grid { display:grid; grid-template-columns:1fr 224px; gap:18px; margin-top:8px; }
+.ai-card-body p { margin:0 0 8px; font-size:13px; line-height:1.8; }
+.ai-card-body b { font-weight:650; }
+.ai-ev-label { font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:.05em; margin-bottom:6px; }
+.ai-ev { display:block; width:100%; text-align:left; border:1px solid var(--line); background:var(--card); border-radius:8px; padding:7px 10px; margin-bottom:6px; }
+.ai-ev:hover { border-color:var(--line-strong); background:var(--canvas); }
+.ai-ev .d { display:block; font-size:11px; color:var(--muted); }
+.ai-ev .t { font-size:12px; font-weight:600; line-height:1.5; }
+.ai-card-foot { display:flex; align-items:center; gap:10px; border-top:1px solid var(--hair); margin-top:6px; padding-top:9px; font-size:11px; color:var(--muted); }
+.ai-card-foot .ask { margin-left:auto; color:var(--accent); font-weight:600; font-size:12px; white-space:nowrap; }
+
+/* day blocks */
+.dayblock { border-top:1px solid var(--line); }
+.dayblock:first-child { border-top:0; }
+.dayblock.today { border-left:3px solid var(--accent); }
+.day-h { display:flex; align-items:baseline; gap:9px; padding:12px 20px 0; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+.day-h .date { font-size:13.5px; font-weight:700; color:var(--ink); }
+.day-h .today-tag { font-size:10.5px; font-weight:700; color:var(--accent); background:var(--accent-tint); border-radius:5px; padding:1px 7px; }
+.day-h .dots { margin-left:auto; color:var(--muted); }
+.day-grid { display:grid; grid-template-columns:1fr 232px; gap:0 18px; padding:10px 20px 14px; }
+.day-main { min-width:0; display:grid; gap:9px; align-content:start; }
+.krow { display:grid; grid-template-columns:20px 1fr; gap:11px; }
+.kkey { width:20px; height:20px; border-radius:6px; background:var(--kbg); color:var(--ink2); font-size:10.5px; font-weight:700; display:grid; place-items:center; margin-top:3px; }
+.ktext { font-size:14px; line-height:1.75; min-width:0; }
+.kplaceholder { color:var(--muted); }
+.datachip { display:inline-block; font-size:12px; font-weight:650; background:var(--sel); border:1px solid var(--line); border-radius:6px; padding:0 7px; line-height:1.7; white-space:nowrap; }
+.datachip .src { font-weight:400; font-size:10px; color:var(--muted); margin-left:4px; }
+.day-acts { border-left:1px solid var(--line); padding-left:16px; display:grid; gap:7px; align-content:start; }
+.acts-label { font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:.05em; display:flex; align-items:center; }
+.acts-label .add { margin-left:auto; color:var(--muted); font-size:13px; padding:0 3px; border-radius:5px; }
+.acts-label .add:hover { background:var(--canvas); color:var(--ink2); }
+.act .a1 { font-size:12px; font-weight:650; line-height:1.5; }
+.act .a2 { font-size:11px; color:var(--muted); line-height:1.5; }
+.act .a2.done { color:var(--ok); }
+.act .a2.wait { color:var(--ink2); font-weight:600; }
+.points { border-top:1px dashed var(--line-strong); padding-top:8px; margin-top:2px; font-size:11px; color:var(--muted); }
+.points .total-line { display:flex; justify-content:flex-end; align-items:baseline; gap:6px; width:100%; text-align:right; font-size:12px; font-weight:700; color:var(--ink2); }
+.points .total-line:hover { color:var(--ink); }
+.points .detail { margin-top:5px; line-height:1.7; display:none; }
+.points.open .detail { display:block; }
+.addline { border-top:1px dashed var(--line); margin:0 20px; padding:9px 0 11px; font-size:12px; color:var(--muted); display:flex; gap:8px; align-items:center; }
+.addline .slash { width:20px; height:20px; border:1px dashed var(--line-strong); border-radius:6px; display:grid; place-items:center; font-size:11px; }
+.compose { margin:0 20px 16px; border:1px dashed var(--line-strong); border-radius:10px; padding:13px 16px; display:flex; align-items:center; gap:12px; background:var(--card); }
+.compose .c1 { font-size:13.5px; font-weight:650; }
+.compose .c2 { font-size:12px; color:var(--muted); margin-top:1px; }
+.compose .btn { margin-left:auto; }
+
+/* lab block */
+.labgrid { display:grid; gap:6px; padding:10px 20px 14px; }
+.labrow { display:grid; grid-template-columns:minmax(120px,1fr) auto; gap:12px; align-items:baseline; border:1px solid var(--hair); border-radius:8px; padding:7px 12px; background:var(--card); }
+.labrow .ln { font-size:12.5px; color:var(--ink2); }
+.labrow .lv { font-size:13px; font-weight:700; }
+.labrow .lv .u { font-size:11px; color:var(--muted); font-weight:400; margin-left:3px; }
+.labrow .lv .ref { font-size:10.5px; color:var(--muted); font-weight:400; margin-left:8px; }
+.lv.high { color:var(--lab-high); }
+.lv.low { color:var(--lab-low); }
+.labcat { font-size:10.5px; font-weight:700; color:var(--muted); letter-spacing:.05em; padding:8px 2px 2px; }
+.labmini { display:grid; grid-template-columns:1fr 1fr; gap:2px 20px; }
+.labmini-row { display:grid; grid-template-columns:minmax(60px,auto) 1fr auto; gap:8px; align-items:baseline; font-size:12px; padding:2.5px 0; border-bottom:1px solid var(--hair); }
+.labmini-row .mn { color:var(--ink2); }
+.labmini-row .mv { font-weight:650; text-align:right; }
+.labmini-row .mv i { font-style:normal; font-size:10px; color:var(--muted); font-weight:400; }
+.labmini-row .mr { font-size:10px; color:var(--muted); text-align:right; min-width:58px; }
+@media (max-width:1240px){ .labmini { grid-template-columns:1fr; } }
+
+/* compact event rows on stream */
+.evrow { display:flex; gap:10px; align-items:baseline; padding:10px 20px 12px; }
+.evrow .ev-kind { flex:none; font-size:10.5px; font-weight:700; color:var(--ink2); background:var(--sel); border-radius:5px; padding:1.5px 7px; }
+.evrow .ev-text { font-size:13px; color:var(--ink2); min-width:0; }
+.evrow .ev-text b { color:var(--ink); font-weight:650; }
+.evrow .ev-link { margin-left:auto; flex:none; font-size:11.5px; color:var(--accent); font-weight:600; }
+
+/* image block */
+.imgblock { display:flex; gap:14px; padding:10px 20px 14px; align-items:flex-start; }
+.thumb { width:64px; height:64px; flex:none; border:1px solid var(--line); border-radius:8px; background:var(--sel); display:grid; place-items:center; color:var(--muted); font-size:20px; }
+.imgblock .finding { font-size:13px; line-height:1.7; }
+.imgblock .finding .rep { font-size:11px; color:var(--muted); display:block; margin-top:2px; }
+
+/* admission period block */
+.dayblock.adm { border-left:3px solid var(--line-strong); background:linear-gradient(180deg, color-mix(in srgb, var(--kbg) 42%, var(--card)), var(--card) 80%); }
+.adm-body { padding:6px 20px 14px; font-size:13px; color:var(--ink2); line-height:1.75; }
+.adm-body .adm-link { display:inline-block; margin-top:6px; font-size:12px; color:var(--accent); font-weight:600; }
+
+/* year fold */
+.yearfold { width:100%; text-align:left; display:flex; gap:10px; align-items:baseline; padding:11px 20px; font-size:12.5px; color:var(--ink2); border-top:1px solid var(--line); background:var(--card); }
+.yearfold:hover { background:var(--canvas); }
+.yearfold .y { font-size:13px; font-weight:700; color:var(--ink); }
+.yearfold .cnt { color:var(--muted); }
+.yearfold .arr { margin-left:auto; color:var(--muted); font-size:11px; }
+
+/* --- timeline gutter --- */
+.dayblock { display:grid; grid-template-columns:112px minmax(0,1fr); }
+.gut { position:relative; padding:14px 8px 12px 16px; }
+.gut::before { content:""; position:absolute; top:0; bottom:0; right:13px; width:1px; background:var(--hair); }
+.gut::after { content:""; position:absolute; top:20px; right:9.5px; width:8px; height:8px; border-radius:50%; background:var(--card); border:1.5px solid var(--line-strong); }
+.dayblock.today .gut::after { background:var(--accent); border-color:var(--accent); }
+.dayblock.t-adm .gut::after { background:var(--ink2); border-color:var(--ink2); }
+.dayblock.in-adm .gut::before { width:3px; right:12px; background:color-mix(in srgb, var(--ink2) 22%, var(--hair)); }
+.dayblock.in-adm .gut::after { border-color:var(--ink2); }
+.gd { display:block; font-size:13.5px; font-weight:700; letter-spacing:.01em; line-height:1.4; }
+.gy { display:block; font-size:10.5px; color:var(--muted); margin-top:1px; line-height:1.4; }
+.gk { display:inline-block; font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.06em; margin-top:5px; }
+.dayblock.today .gk { color:var(--accent); }
+.bd { min-width:0; padding-right:4px; }
+.bd .day-h, .bd .labgrid, .bd .past-sum, .bd .evrow, .bd .imgblock, .bd .adm-body { padding-left:0; }
+.bd .day-grid { padding-left:0; }
+.bd .addline, .bd .compose { margin-left:0; }
+.taskrow { display:flex; gap:10px; align-items:center; font-size:13px; padding:6px 0; border-top:1px solid var(--hair); }
+.taskrow:first-child { border-top:0; }
+.taskrow .tdone { color:var(--ok); font-size:12px; font-weight:600; }
+.taskrow .act-btn { margin-left:auto; }
+
+/* past block */
+.past-sum { padding:2px 20px 12px; }
+.fold-btn { font-size:11.5px; color:var(--muted); padding:2px 0; }
+.fold-btn:hover { color:var(--ink2); }
+.stream-end { text-align:center; font-size:11.5px; color:var(--muted); padding:18px 0 4px; }
+
+/* lens views: matrix / rx / orders */
+.lensview { padding:16px 20px 20px; }
+.lensview .lv-head { display:flex; align-items:baseline; gap:10px; margin-bottom:12px; }
+.lensview .lv-title { font-size:14px; font-weight:700; }
+.lensview .lv-sub { font-size:11.5px; color:var(--muted); }
+.lensview .lv-nav { margin-left:auto; display:flex; gap:6px; }
+.matrix-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+table.matrix { border-collapse:separate; border-spacing:0; width:100%; font-size:12.5px; }
+.matrix th, .matrix td { padding:8px 12px; border-bottom:1px solid var(--hair); white-space:nowrap; text-align:right; }
+.matrix thead th { font-size:11px; color:var(--muted); font-weight:600; background:var(--canvas); position:sticky; top:0; }
+.matrix thead th .yy { display:block; font-size:9.5px; font-weight:400; }
+.matrix tbody th { text-align:left; font-weight:600; color:var(--ink2); background:var(--card); position:sticky; left:0; border-right:1px solid var(--hair); }
+.matrix td { font-family:var(--f-num); font-variant-numeric:tabular-nums; font-weight:600; }
+.matrix td.high { color:var(--lab-high); }
+.matrix td.low { color:var(--lab-low); }
+.matrix td.na { color:var(--line-strong); font-weight:400; }
+.matrix tbody tr:last-child td, .matrix tbody tr:last-child th { border-bottom:0; }
+.matrix tr.gr th { position:static; background:var(--canvas); font-size:10.5px; color:var(--muted); letter-spacing:.05em; padding:6px 12px; }
+.matrix .refcol { font-size:10.5px; color:var(--muted); font-weight:400; white-space:nowrap; text-align:right; }
+.matrix tbody th .uu { font-size:10px; color:var(--muted); font-weight:400; }
+.matrix .ctag { display:block; font-size:8.5px; font-weight:700; color:var(--ink2); letter-spacing:.04em; }
+.matrix .sparkcell { padding:4px 10px; }
+.matrix thead th.sparkhead { text-align:center; }
+.matrix tbody tr[data-trend] { cursor:pointer; }
+.matrix tbody tr[data-trend]:hover td, .matrix tbody tr[data-trend]:hover th { background:var(--canvas); }
+.matrix tbody tr.trend-on th, .matrix tbody tr.trend-on td { background:var(--accent-tint); }
+.matrix tr.trendrow td { background:var(--canvas); padding:10px 14px; cursor:default; }
+.trend-wrap { max-width:780px; }
+.trend-head { display:flex; gap:8px; align-items:baseline; font-size:12px; margin-bottom:4px; }
+.trend-head b { font-size:12.5px; }
+.trend-head span { color:var(--muted); font-size:11px; }
+.trend-head .trend-ref { color:var(--ink2); }
+.tscope-row { display:inline-flex; gap:2px; margin-left:10px; background:var(--sel); border-radius:7px; padding:2px; }
+.tscope { font-size:10.5px; font-weight:600; color:var(--ink2); border-radius:5px; padding:2px 8px; }
+.tscope.active { background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+
+/* 温度板 固定バンド（入院中の患者のみ — 患者に固定、タイムライン外） */
+#vitalsbar { background:var(--card); border-bottom:1px solid var(--line); padding:7px 20px 8px; flex:none; }
+.vb-head { display:flex; align-items:baseline; gap:10px; font-size:12px; }
+.vb-head b { font-size:12.5px; }
+.vb-meta { color:var(--muted); font-size:11px; }
+.vb-now { margin-left:auto; color:var(--ink2); font-weight:600; font-size:12px; }
+.vb-chart { max-width:860px; margin:6px auto 0; }
+.vb-legend { display:flex; gap:14px; font-size:10.5px; color:var(--muted); padding-top:3px; }
+
+/* ⌘O オーダーコンポーザ（右ドロワー — カルテを隠さない） */
+#composer { position:fixed; top:0; right:0; bottom:0; width:440px; background:var(--card); border-left:1px solid var(--line-strong); box-shadow:var(--sh-pop); z-index:45; display:flex; flex-direction:column; }
+.comp-head { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--line); }
+.comp-head input { flex:1; border:1px solid var(--line-strong); background:var(--canvas); border-radius:8px; padding:7px 10px; font:inherit; font-size:12.5px; color:var(--ink); }
+.comp-head input:focus { outline:2px solid var(--accent); outline-offset:0; }
+.comp-body { flex:1; overflow-y:auto; padding:10px 0 12px; }
+.comp-sec-title { padding:8px 14px 5px; font-size:10.5px; font-weight:700; letter-spacing:.05em; color:var(--muted); }
+.comp-row { display:grid; grid-template-columns:40px 1fr auto; gap:4px 10px; width:100%; text-align:left; padding:8px 14px; border-bottom:1px solid var(--hair); align-items:baseline; }
+.comp-row:hover { background:var(--canvas); }
+.comp-row.sel { background:var(--accent-tint); }
+.comp-row .cr-cat { font-size:9.5px; font-weight:700; color:var(--ink2); background:var(--sel); border-radius:4px; text-align:center; padding:1px 0; }
+.comp-row .cr-n { font-size:13px; font-weight:650; }
+.comp-row .cr-kbd { grid-column:3; }
+.comp-row .cr-sub { grid-column:2/4; font-size:11px; color:var(--muted); }
+.comp-form { margin:10px 14px 0; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:12px; color:var(--muted); }
+.comp-form .cf-name { font-size:14px; font-weight:700; color:var(--ink); }
+.comp-form .cf-sub { font-size:12px; color:var(--ink2); margin-top:2px; }
+.comp-form .cf-safe { font-size:11.5px; color:var(--ok); margin:8px 0 10px; line-height:1.6; }
+.comp-form .cf-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.cf-dose { font-size:13px; font-weight:700; color:var(--ink); margin:8px 0 6px; }
+.cf-chips { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:6px; }
+.cf-checks { display:grid; gap:5px; margin:9px 0 4px; }
+.cf-checks > div { font-size:11.5px; line-height:1.65; border-radius:7px; padding:6px 9px; }
+.cf-block { color:var(--safe); background:var(--safe-bg); border:1px solid var(--safe-line); font-weight:600; }
+.cf-warnrow { color:#8a5c14; background:#faf3e3; border:1px solid #eadfc0; }
+.cf-okrow { color:var(--ok); background:var(--ok-tint, #eef4ef); border:1px solid var(--hair); }
+.cf-inforow { color:var(--muted); background:var(--canvas); border:1px solid var(--hair); }
+.rxf { padding:14px 16px 8px; }
+.rxf-name { font-size:15px; font-weight:700; line-height:1.5; }
+.rxf-sub { font-size:11.5px; color:var(--muted); margin:2px 0 10px; }
+.rx-preview { border:1.5px solid var(--line-strong); background:var(--canvas); border-radius:10px; padding:11px 14px; font-size:14px; font-weight:700; margin:6px 0 12px; line-height:1.6; }
+.rx-preview .tot { font-weight:600; color:var(--accent); font-size:11.5px; margin-left:10px; }
+.rx-row { display:grid; grid-template-columns:44px 1fr; gap:8px; align-items:baseline; margin:8px 0; }
+.rx-lab { font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:.04em; }
+.rx-actions { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+#composer.wide { width:920px; }
+.comp-cols { display:grid; grid-template-columns:300px 1fr; height:100%; min-height:0; }
+.comp-side { border-right:1px solid var(--line); background:var(--canvas); overflow-y:auto; }
+.comp-side .comp-row { background:var(--card); border:1px solid var(--line); border-radius:9px; margin:0 12px 6px; padding:8px 12px; }
+.comp-side .comp-row:hover { background:var(--card); border-color:var(--line-strong); }
+.comp-maincol { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.comp-maincol .comp-body { flex:1; }
+.cart-row { display:flex; gap:8px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:9px; margin:0 12px 6px; padding:8px 10px 8px 12px; }
+.cart-row .cart-main { min-width:0; font-size:12px; line-height:1.55; }
+.cart-row .cart-main b { display:block; font-size:12.5px; }
+.cart-row .cart-main span { color:var(--muted); font-size:11px; }
+.cart-row .aid-close { font-size:12px; margin-left:auto; }
+.comp-side .comp-row.myset { display:flex; align-items:flex-start; gap:4px; padding:0; }
+.comp-side .myset-apply { flex:1; text-align:left; display:grid; grid-template-columns:40px 1fr; gap:4px 10px; padding:8px 0 8px 12px; align-items:baseline; }
+.comp-side .myset-apply .cr-sub { grid-column:2; }
+.comp-side .comp-row.myset .aid-close { margin:8px 8px 0 0; font-size:11px; }
+.setsave-row { display:flex; gap:6px; }
+.setsave-row input { flex:1; border:1px solid var(--line-strong); background:var(--card); border-radius:8px; padding:6px 9px; font:inherit; font-size:12px; min-width:0; }
+.setsave-row input:focus { outline:2px solid var(--accent); outline-offset:0; }
+#report { position:fixed; top:0; right:0; bottom:0; width:480px; background:var(--card); border-left:1px solid var(--line-strong); box-shadow:var(--sh-pop); z-index:46; display:flex; flex-direction:column; }
+.rep-chain { margin:12px 0 4px; }
+.rep-step { position:relative; display:grid; grid-template-columns:96px 1fr; gap:10px; padding:0 0 14px 14px; font-size:12px; }
+.rep-step::before { content:""; position:absolute; left:0; top:5px; bottom:-2px; width:1px; background:var(--hair); }
+.rep-step::after { content:""; position:absolute; left:-3px; top:4px; width:7px; height:7px; border-radius:50%; background:var(--card); border:1.5px solid var(--line-strong); }
+.rep-step.last::before { display:none; }
+.rep-step.last::after { background:var(--ok); border-color:var(--ok); }
+.rep-step .rep-t { color:var(--muted); font-size:11px; }
+.rep-step .rep-x { color:var(--ink2); line-height:1.6; }
+.rep-step.last .rep-x { color:var(--ink); font-weight:600; }
+.tlrow.has-rep { cursor:pointer; }
+.tlrow.has-rep:hover { background:var(--canvas); }
+.comp-foot { border-top:1px solid var(--line); padding:9px 14px; font-size:11px; color:var(--muted); display:flex; gap:12px; }
+.lv-note { font-size:11.5px; color:var(--muted); margin-top:10px; }
+
+.tl { border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.tlrow { display:grid; grid-template-columns:118px 1fr auto; gap:12px; padding:10px 14px; border-top:1px solid var(--hair); align-items:baseline; }
+.tlrow:first-child { border-top:0; }
+.tlrow .d { font-size:11.5px; color:var(--muted); }
+.tlrow .w { font-size:13px; font-weight:650; min-width:0; }
+.tlrow .w .sub { display:block; font-weight:400; font-size:11.5px; color:var(--muted); }
+.tlrow .st { font-size:11.5px; color:var(--muted); text-align:right; }
+.tlrow .st.done { color:var(--ok); font-weight:600; }
+.tlrow .st.wait { color:var(--ink); font-weight:650; }
+.tlrow .st.sched { color:var(--ink2); font-weight:600; }
+.tlrow .st.cont { color:var(--accent); font-weight:650; }
+.tlrow .st.stop { color:var(--muted); }
+.tlrow .ocat-chip { display:inline-block; font-size:9.5px; font-weight:700; color:var(--ink2); background:var(--sel); border-radius:4px; padding:1px 6px; margin-right:7px; vertical-align:1.5px; }
+.dm-med  { color:var(--dm-med)  !important; background:var(--dm-med-bg)  !important; }
+.dm-test { color:var(--dm-test) !important; background:var(--dm-test-bg) !important; }
+.dm-img  { color:var(--dm-img)  !important; background:var(--dm-img-bg)  !important; }
+.dm-proc { color:var(--dm-proc) !important; background:var(--dm-proc-bg) !important; }
+.dm-reha { color:var(--dm-reha) !important; background:var(--dm-reha-bg) !important; }
+.secdot { display:inline-block; width:7px; height:7px; border-radius:2px; margin-right:7px; vertical-align:1px; background:var(--line-strong); }
+.secdot.dm-med{background:var(--dm-med)} .secdot.dm-test{background:var(--dm-test)}
+.secdot.dm-img{background:var(--dm-img)} .secdot.dm-proc{background:var(--dm-proc)} .secdot.dm-reha{background:var(--dm-reha)}
+.ocat-row { display:flex; gap:4px; flex-wrap:wrap; margin:2px 0 12px; }
+.ocat { font-size:11.5px; font-weight:600; color:var(--ink2); border-radius:99px; padding:3.5px 11px; }
+.ocat:hover { background:var(--canvas); }
+.ocat.active { background:var(--ink); color:var(--card); }
+.tl-sec { font-size:10.5px; font-weight:700; color:var(--muted); letter-spacing:.05em; padding:14px 2px 6px; }
+.tl-sec:first-of-type { padding-top:0; }
+.tlrow .tag { display:inline-block; font-size:10px; font-weight:700; border:1px solid var(--line-strong); border-radius:5px; padding:0 5px; margin-left:7px; color:var(--ink2); vertical-align:1px; }
+.tlrow.ghost { color:var(--muted); }
+.tlrow.ghost .w { font-weight:400; font-size:12px; color:var(--muted); }
+
+/* home & workspace views */
+.view { max-width:920px; margin:0 auto; padding:26px 32px 60px; }
+.view h1 { font-size:20px; font-weight:700; letter-spacing:-.01em; margin:0; }
+.view .vlead { font-size:12.5px; color:var(--muted); margin:3px 0 20px; }
+.vsection { margin-bottom:26px; }
+.vlabel { font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--muted); margin-bottom:8px; }
+.vcard { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.arow { display:flex; align-items:center; gap:14px; padding:11px 16px; border-top:1px solid var(--hair); }
+.arow:first-child { border-top:0; }
+.arow .who { font-size:13.5px; font-weight:650; white-space:nowrap; }
+.arow .what { font-size:12.5px; color:var(--ink2); min-width:0; }
+.arow .what .num { color:var(--ink); }
+.arow .act-btn { margin-left:auto; }
+.arow.safety-row .who { color:var(--safe); }
+.arow .mark-safe { width:3px; align-self:stretch; border-radius:2px; background:var(--safe); margin:-11px 0; flex:none; }
+.trow { display:grid; grid-template-columns:52px 1fr auto auto; gap:14px; align-items:baseline; width:100%; text-align:left; padding:10px 16px; border-top:1px solid var(--hair); }
+.trow:first-child { border-top:0; }
+.trow:hover { background:var(--canvas); }
+.trow .t { font-size:12px; color:var(--muted); }
+.trow .n { font-size:13.5px; font-weight:650; }
+.trow .n .sub { font-weight:400; font-size:11.5px; color:var(--muted); margin-left:8px; }
+.trow .st { font-size:12px; color:var(--ink2); }
+.trow .st.att { font-weight:650; }
+.trow .st.safe { color:var(--safe); font-weight:650; }
+.trow .st.done { color:var(--muted); }
+.trow .dept { font-size:11.5px; color:var(--muted); }
+
+.wrow { display:flex; gap:14px; align-items:center; padding:12px 16px; border-top:1px solid var(--hair); }
+.wrow:first-child { border-top:0; }
+.wrow .wmain { min-width:0; }
+.wrow .w1 { font-size:13.5px; font-weight:650; display:flex; gap:8px; align-items:baseline; }
+.wrow .w1 .room { font-size:11.5px; color:var(--muted); font-weight:600; }
+.wrow .w2 { font-size:12px; color:var(--muted); margin-top:1px; }
+.wrow .w2 b { color:var(--ink2); font-weight:600; }
+.wrow .w2 .att { color:var(--safe); font-weight:600; }
+.wrow .act-btn { margin-left:auto; flex:none; }
+
+.bill-lines { padding:4px 0; }
+.bline { display:grid; grid-template-columns:1fr auto; gap:12px; padding:8px 16px; border-top:1px solid var(--hair); font-size:13px; }
+.bline:first-child { border-top:0; }
+.bline .pt { font-weight:650; }
+.bline.total { border-top:1px dashed var(--line-strong); font-weight:700; }
+.issue { display:flex; gap:12px; align-items:flex-start; padding:12px 16px; border-top:1px solid var(--hair); }
+.issue .imark { width:3px; align-self:stretch; border-radius:2px; background:var(--safe); flex:none; }
+.issue.resolved .imark { background:var(--ok); }
+.issue .i1 { font-size:13px; font-weight:650; line-height:1.6; }
+.issue .i2 { font-size:12px; color:var(--ink2); margin-top:1px; }
+.issue .i2 .cand { font-weight:650; color:var(--ink); }
+.issue .iact { margin-left:auto; display:flex; gap:8px; flex:none; }
+.issue .solved { font-size:12px; color:var(--ok); font-weight:650; }
+.bill-foot { display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid var(--line); background:var(--canvas); font-size:12px; color:var(--ink2); border-radius:0 0 10px 10px; }
+.bill-foot .spacer { flex:1; }
+
+/* messages (連絡) */
+.msg-day { text-align:center; font-size:10.5px; color:var(--muted); padding:14px 0 6px; }
+.msg { display:grid; grid-template-columns:30px 1fr; gap:10px; padding:7px 16px; }
+.msg .mava { width:30px; height:30px; border-radius:8px; background:var(--kbg); color:var(--ink2); display:grid; place-items:center; font-size:12px; font-weight:700; }
+.msg .mh { font-size:12px; }
+.msg .mh b { font-size:12.5px; }
+.msg .mh .role { color:var(--muted); font-size:10.5px; margin-left:5px; }
+.msg .mh .tm { color:var(--muted); font-size:10.5px; margin-left:7px; }
+.msg .mb { font-size:13px; line-height:1.75; }
+.msg-quote { border:1px solid var(--line); border-left:3px solid var(--line-strong); background:var(--canvas); border-radius:8px; padding:8px 12px; margin-top:6px; font-size:12px; }
+.msg-quote .q1 { font-weight:650; }
+.msg-quote .q2 { color:var(--muted); font-size:11px; margin-top:1px; }
+.msg-quote a, .msg-quote .qlink { color:var(--accent); font-weight:600; font-size:11.5px; }
+.msg-sys { text-align:center; font-size:11px; color:var(--muted); padding:8px 0; }
+.msg-sys .okmark { color:var(--ok); font-weight:700; }
+.msg-actions { display:flex; gap:8px; padding:4px 16px 4px 56px; }
+.composer { margin:12px 16px 16px; border:1px solid var(--line-strong); border-radius:10px; background:var(--card); padding:10px 12px; font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+.composer .kbd { margin-left:auto; }
+.msg-note { font-size:11px; color:var(--muted); text-align:center; padding-bottom:14px; }
+
+/* aid pane */
+#aid { background:var(--card); border-left:1px solid var(--line); overflow-y:auto; min-width:0; }
+.aid-head { display:flex; align-items:center; padding:14px 16px 10px; }
+.aid-head h2 { font-size:13px; font-weight:700; margin:0; }
+.aid-close { margin-left:auto; color:var(--muted); font-size:15px; padding:2px 6px; border-radius:6px; }
+.aid-close:hover { background:var(--canvas); color:var(--ink2); }
+.aid-sec { margin:0 12px 12px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.aid-sec-title { padding:9px 12px; font-size:11.5px; font-weight:700; border-bottom:1px solid var(--hair); display:flex; align-items:baseline; }
+.aid-sec-title .m { margin-left:auto; font-weight:400; font-size:10.5px; color:var(--muted); }
+.aid-row { padding:8px 12px; border-bottom:1px solid var(--hair); }
+.aid-row:last-child { border-bottom:0; }
+.aid-row .r1 { font-size:12px; font-weight:600; line-height:1.5; display:flex; gap:8px; align-items:baseline; }
+.aid-row .r1 .v { margin-left:auto; font-weight:700; }
+.aid-row .r1 .v.high { color:var(--lab-high); }
+.aid-row .r1 .v.low { color:var(--lab-low); }
+.aid-row .r1 .v .u { font-size:10.5px; color:var(--muted); font-weight:400; }
+.aid-row .r2 { font-size:11px; color:var(--muted); line-height:1.5; }
+.aid-row .r1 .safe-ink { color:var(--safe); }
+.aid-empty { padding:10px 12px; font-size:11.5px; color:var(--muted); }
+
+/* buttons */
+.btn { font-size:12.5px; font-weight:650; color:var(--ink2); background:var(--card); border:1px solid var(--line-strong); border-radius:8px; padding:6.5px 12px; display:inline-flex; gap:7px; align-items:center; white-space:nowrap; }
+.btn:hover { background:var(--canvas); }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.primary:hover { background:var(--accent-deep); }
+.btn.sm { font-size:11.5px; padding:4.5px 10px; border-radius:7px; }
+.btn[disabled] { opacity:.45; cursor:default; }
+.btn[disabled]:hover { background:var(--card); }
+.kbd { font-family:var(--f-num); font-size:10px; color:var(--muted); border:1px solid var(--line-strong); border-radius:4px; padding:0 4px; line-height:1.5; background:var(--card); }
+.btn.primary .kbd { color:rgba(255,255,255,.85); border-color:rgba(255,255,255,.4); background:transparent; }
+.ghost-ai { font-size:12px; font-weight:650; color:var(--ink2); border:1px solid var(--line-strong); border-radius:8px; padding:5.5px 10px; display:inline-flex; gap:6px; align-items:center; }
+.ghost-ai .s { color:var(--accent); }
+.ghost-ai:hover { background:var(--canvas); }
+
+/* toast / switches */
+#toast { position:fixed; left:50%; bottom:56px; transform:translate(-50%,16px); background:var(--ink); color:var(--card); border-radius:8px; padding:8px 14px; font-size:12px; opacity:0; pointer-events:none; transition:.18s ease; z-index:60; max-width:70vw; }
+#toast.show { opacity:1; transform:translate(-50%,0); }
+#switches { position:fixed; right:14px; bottom:10px; display:flex; gap:8px; align-items:center; z-index:50; }
+.swnote { font-size:10px; color:var(--muted); margin-right:4px; }
+.swgroup { display:flex; align-items:center; gap:0; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:2px; font-size:10.5px; color:var(--muted); }
+.swgroup .swlabel { padding:0 6px 0 8px; }
+.swgroup button { padding:3px 8px; border-radius:6px; font-size:10.5px; font-weight:600; color:var(--muted); }
+.swgroup button.on { background:var(--sel); color:var(--ink); }
+
+@media (max-width:1280px) { #app { grid-template-columns:56px 252px minmax(520px,1fr) 288px; } }
+@media (max-width:1150px) { #app, #app.aid-closed { grid-template-columns:56px 252px minmax(480px,1fr); } #aid { display:none; } }
+@media (max-width:900px) { #app, #app.aid-closed { grid-template-columns:56px minmax(0,1fr); } #context { display:none; } }
+</style>
+</head>
+<body class="pal-muted font-sans">
+<div id="app">
+  <nav id="rail" aria-label="業務ワークスペース"></nav>
+  <aside id="context" aria-label="コンテキスト"></aside>
+  <main id="main"></main>
+  <aside id="aid" aria-label="補助情報"></aside>
+</div>
+<div id="toast" role="status"></div>
+<div id="switches">
+  <span class="swnote">Manta ワークスペースモック · 架空のデモデータ · 2026-07-14（火）</span>
+  <div class="swgroup"><span class="swlabel">職種</span>
+    <button id="sw-role-doctor" class="on">医師</button><button id="sw-role-nurse">看護</button><button id="sw-role-clerk">医事</button><button id="sw-role-tech">技師</button>
+  </div>
+  <div class="swgroup"><span class="swlabel">配色</span>
+    <button id="sw-pal-muted" class="on">ミューテッド</button><button id="sw-pal-apple">現行 Apple</button>
+  </div>
+  <div class="swgroup"><span class="swlabel">書体</span>
+    <button id="sw-font-sans" class="on">ゴシック</button><button id="sw-font-mono">等幅</button>
+  </div>
+</div>
+
+<script>
+/* ================= icons ================= */
+const ICONS = {
+  outpatient:'<svg viewBox="0 0 24 24"><path d="M3 10.8 12 3.5l9 7.3"/><path d="M5.5 9.8V20.5h13V9.8"/><path d="M12 20.5v-5h0"/></svg>',
+  ward:'<svg viewBox="0 0 24 24"><path d="M3 6.5v12"/><path d="M3 16h18"/><path d="M3 12.5h18v3.5"/><path d="M6.2 9.5a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0"/><path d="M11.5 12.5V9.5h6a3.5 3.5 0 0 1 3.5 3"/></svg>',
+  billing:'<svg viewBox="0 0 24 24"><path d="M6.5 3.5h11v17l-2.2-1.6-2.1 1.6-1.2-1-1.2 1-2.1-1.6L6.5 20.5z"/><path d="M9.5 8.5h5M9.5 12h5"/></svg>',
+  messages:'<svg viewBox="0 0 24 24"><path d="M4 5.5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>',
+  lab:'<svg viewBox="0 0 24 24"><path d="M9.5 3h5"/><path d="M10.5 3v5.2L5.8 16.8A2.9 2.9 0 0 0 8.4 21h7.2a2.9 2.9 0 0 0 2.6-4.2L13.5 8.2V3"/><path d="M7.6 14.5h8.8"/></svg>',
+  settings:'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.9" fill="var(--card)"/><circle cx="15" cy="12" r="1.9" fill="var(--card)"/><circle cx="7.5" cy="17" r="1.9" fill="var(--card)"/></svg>'
+};
+const WS_LABEL = { outpatient:'外来', ward:'病棟', billing:'医事', lab:'検査室', messages:'連絡', settings:'設定' };
+const ROLES = {
+  doctor:{ label:'医師', spaces:['outpatient','ward','messages'], home:'outpatient' },
+  nurse:{ label:'看護', spaces:['ward','messages'], home:'ward' },
+  clerk:{ label:'医事', spaces:['billing','messages'], home:'billing' },
+  tech:{ label:'技師', spaces:['lab','messages'], home:'lab' }
+};
+
+/* ================= patients ================= */
+/* タイムラインに乗るブロック種別:
+   visit(診察SOAP) / lab(検査結果) / image(画像+レポート) / event(文書・ワクチン・健診・取込・予約イベント)
+   / adm(入院 期間ブロック) / yearfold(年ダイジェスト) — すべて同じ1本のストリーム */
+const PATIENTS = {
+  sato: {
+    name:'佐藤 次郎', kana:'サトウ ジロウ', ini:'佐', age:'58歳 男性', pid:'0007712301',
+    dept:'循環器内科', doctor:'田中 太郎', time:'09:30', arrive:'09:12',
+    status:'active', stateText:'診察中', stateKind:'accent',
+    reason:'胸部圧迫感 · 定期再診',
+    safety:[{label:'造影剤副反応歴', desc:'2019年 造影CTで蕁麻疹。前投薬の要否を確認'}],
+    problems:'高血圧（2021〜）・脂質異常症',
+    save:'保存済み v2 · 10:04',
+    oneLiner:'#1 労作性狭心症の疑い · #2 高血圧。BNP 42→46 pg/mL と微増、本日の心電図は ST-T 変化なし。造影検査の前に副反応歴の対応を確認。',
+    aiParas:[
+      '労作時の前胸部圧迫感で精査中。<b>BNP 42→46 pg/mL</b> と軽度上昇が続くが、本日の12誘導心電図は安静時 ST-T 変化なし。次回の心エコーで器質的評価を行う方針。',
+      '降圧は本日 142/88 mmHg。<b>造影剤副反応歴</b>があるため、造影検査をオーダーする場合は前投薬の要否を先に確認する。'
+    ],
+    aiEv:[
+      {d:'本日 09:48', t:'心電図 — ST-T 変化なし'},
+      {d:'2026/04/16', t:'検査 BNP 46 pg/mL ↑'},
+      {d:'2026/04/16', t:'受診 — 胸部圧迫感の初回評価'}
+    ],
+    today: {
+      written:true, ver:'v2', at:'10:04', title:'定期再診',
+      rows:[
+        {k:'S', t:'階段昇降で前胸部の圧迫感。数分の休息で消失。頻度は週2回程度で前回から不変。'},
+        {k:'O', t:'血圧 <span class="num">142/88</span> mmHg · 脈拍 <span class="num">76</span> /分 整。心音 整、雑音なし。12誘導心電図：安静時 ST-T 変化なし。'},
+        {k:'A', t:'労作性狭心症の疑い。安静時心電図は正常範囲で、症状再現時の評価が必要。'},
+        {k:'P', t:'ビソプロロール継続。次回 心エコーで器質的評価。安静時胸痛・増悪時は救急受診を指導。'}
+      ],
+      acts:[
+        {a1:'心電図 12誘導', a2:'実施済 09:48', done:true},
+        {a1:'ビソプロロール錠 2.5mg', a2:'1T · 分1 朝食後 · 28日分'},
+        {a1:'次回予約 7/28（火）', a2:'心エコー · 予約枠 確保済'}
+      ],
+      points:{lines:'再診 75 · 特定疾患管理 225 · 心電図 130 · 処方箋 60', total:'概算 490点'}
+    },
+    blocks:[
+      {type:'lab', ym:'2026-04', date:'2026 4/16（木）', sub:'検査結果 · 院内採血 · 生化学セット＋BNP',
+        labs:[
+          {n:'BNP ★', v:'46', u:'pg/mL', flag:'high', ref:'基準 18.4 以下'},
+          {n:'トロポニン I ★', v:'0.011', u:'ng/mL', ref:'基準 0.026 以下'},
+          {n:'LDL-C ★', v:'136', u:'mg/dL', flag:'high', ref:'管理目標 <120'}
+        ],
+        more:'生化学・血算 ほか 19項目 — すべて基準内',
+        moreGroups:[
+          {g:'生化学', items:[
+            ['TP','7.2','g/dL','6.6–8.1'],['Alb','4.3','g/dL','4.1–5.1'],
+            ['AST','24','U/L','13–30'],['ALT','22','U/L','10–42'],
+            ['γ-GTP','38','U/L','13–64'],['BUN','15.2','mg/dL','8–20'],
+            ['Cr','0.98','mg/dL','0.65–1.07'],['eGFR','61','','≥ 60'],
+            ['Na','141','mEq/L','138–145'],['K','4.2','mEq/L','3.6–4.8'],
+            ['Cl','104','mEq/L','101–108'],['血糖（随時）','102','mg/dL','70–139'],
+            ['TG','128','mg/dL','30–149'],['HDL-C','52','mg/dL','40–90']
+          ]},
+          {g:'血算', items:[
+            ['WBC','6800','/µL','3300–8600'],['RBC','468','万/µL','435–555'],
+            ['Hb','14.6','g/dL','13.7–16.8'],['Ht','43.1','%','40.7–50.1'],
+            ['PLT','22.4','万/µL','15.8–34.8']
+          ]}
+        ]},
+      {type:'visit', ym:'2026-04', date:'2026 4/16（木）', sub:'胸部圧迫感の初回評価 · 循環器内科 · 石川 圭介',
+        a:'労作時の圧迫感を初回評価。安静時心電図と採血を実施し、後日結果説明とした。',
+        fold:'S/O 全文 · 処方 2剤',
+        rows:[
+          {k:'S', t:'2週間ほど前から、坂道や階段で胸の圧迫感。安静で軽快。'},
+          {k:'O', t:'血圧 <span class="num">146/90</span> mmHg · 脈拍 <span class="num">80</span> /分。心音 整。'},
+          {k:'P', t:'採血・心電図。ビソプロロール 2.5mg を開始、アムロジピンは継続。次回結果説明。'}
+        ]},
+      {type:'visit', ym:'2026-03', date:'2026 3/12（木）', sub:'高血圧 定期 · 循環器内科 · 石川 圭介',
+        a:'家庭血圧 平均 136/84。内服継続、減塩の再指導。',
+        fold:'S/O 全文 · 処方 1剤',
+        rows:[
+          {k:'S', t:'自宅測定は朝晩とも安定。自覚症状なし。'},
+          {k:'O', t:'血圧 <span class="num">138/86</span> mmHg。体重 <span class="num">71.8</span> kg（不変）。'}
+        ]},
+      {type:'visit', ym:'2025-12', date:'2025 12/16（火）', sub:'高血圧 定期 · 循環器内科 · 石川 圭介',
+        a:'血圧安定。年1回の採血で LDL-C 142 と高め、食事指導を強化。',
+        fold:'S/O 全文 · 処方 1剤',
+        rows:[
+          {k:'S', t:'変わりなし。間食は減らせている。'},
+          {k:'O', t:'血圧 <span class="num">134/82</span> mmHg · 体重 <span class="num">72.4</span> kg。'}
+        ]},
+      {type:'lab', ym:'2025-12', date:'2025 12/16（火）', sub:'検査結果 · 院内採血（年1回フォロー）',
+        labs:[
+          {n:'LDL-C', v:'142', u:'mg/dL', flag:'high', ref:'管理目標 <120'},
+          {n:'HbA1c', v:'5.9', u:'%', ref:'基準 4.9–6.0'},
+          {n:'eGFR', v:'71', u:'mL/min/1.73m²', ref:''}
+        ]},
+      {type:'event', ym:'2025-10', date:'2025 10/15（水）', kind:'ワクチン', cat:'life',
+        text:'インフルエンザワクチン 接種（左上腕 · ロット <b class="num">FLU25-114</b>）'},
+      {type:'image', ym:'2025-09', date:'2025 9/2（火）', sub:'胸部X線 2方向 · 放射線科',
+        finding:'心胸郭比 52%。肺野に活動性病変なし。', report:'読影レポート 9/3 確定 · 高木（放射線科）'},
+      {type:'event', ym:'2025-08', date:'2025 8/19（火）', kind:'予約', cat:'life',
+        text:'予約 <b>無断キャンセル</b> → 電話で 9/2 に再調整（受付 記録）'},
+      {type:'visit', ym:'2025-06', date:'2025 6/17（火）', sub:'高血圧 定期 · 循環器内科 · 石川 圭介',
+        a:'血圧・体重とも安定。処方継続。',
+        fold:'S/O 全文 · 処方 1剤',
+        rows:[
+          {k:'S', t:'変わりなし。'},
+          {k:'O', t:'血圧 <span class="num">132/80</span> mmHg。'}
+        ]},
+      {type:'yearfold', ym:'2024-12', year:'2024年', counts:'受診 4回 · 検査 1回 · 文書 1件 · 健診取込 1件',
+        blocks:[
+          {type:'visit', ym:'2024-12', date:'2024 12/10（火）', sub:'高血圧 定期 · 循環器内科 · 石川 圭介',
+            a:'血圧安定。処方継続（Do）。', fold:'S/O 全文',
+            rows:[{k:'S', t:'変わりなし。'},{k:'O', t:'血圧 <span class="num">130/78</span> mmHg。'}]},
+          {type:'event', ym:'2024-05', date:'2024 5/22（水）', kind:'文書', cat:'doc',
+            text:'生命保険 診断書を発行（控えは文書レンズに保管）', link:'文書を開く'},
+          {type:'event', ym:'2024-04', date:'2024 4/9（火）', kind:'健診', cat:'doc',
+            text:'特定健診 結果を取込（LDL-C 128 ↑ 以外は基準内）', link:'結果を開く'}
+        ]},
+      {type:'adm', ym:'2023-02', gd:'2/7–14', gy:'2023 · 7日間', date:'2023 2/7（火）– 2/14（火）', days:'7日間', dx:'市中肺炎',
+        place:'3西病棟 302 · 主治医 石川',
+        summary:'発熱・咳嗽で外来受診し即日入院。セフトリアキソンで解熱、7日目に軽快退院。退院サマリ確定済み。',
+        blocks:[
+          {type:'vitals', ym:'2023-02', gd:'2/7–14', gy:'経過 8日分', sub:'入院期間全体 · 1日1検（代表値）',
+            temp:[38.9,38.4,38.2,37.8,37.4,37.1,36.9,36.7], pulse:[104,100,96,92,88,84,80,78], bps:[[108,62],[110,64],[112,64],[114,66],[116,68],[118,68],[120,70],[122,70]]},
+          {type:'visit', ym:'2023-02', gd:'2/14', gy:'病日8 · 火', date:'2023 2/14（火）', sub:'退院日 · 内科 · 石川 圭介',
+            a:'解熱と炎症改善（CRP 1.1）を確認し退院。内服に切替え、1週間後に外来フォロー。',
+            fold:'S/O 全文 · 退院処方 1剤',
+            rows:[
+              {k:'S', t:'咳嗽ほぼ消失。食事は全量摂取。'},
+              {k:'O', t:'体温 <span class="num">36.7</span> ℃ · SpO2 <span class="num">97</span> %（室内気）。右下肺の crackle 消失。'},
+              {k:'P', t:'AMPC/CVA 内服 5日分。2/21 外来再診で胸部X線フォロー。'}
+            ]},
+          {type:'visit', ym:'2023-02', gd:'2/10', gy:'病日4 · 金', date:'2023 2/10（金）', sub:'病日4 · 内科 · 石川 圭介',
+            a:'解熱傾向。酸素を離脱。抗菌薬は day7 まで継続の方針。',
+            fold:'S/O 全文',
+            rows:[
+              {k:'S', t:'食欲が戻ってきた。咳は湿性から乾性へ。'},
+              {k:'O', t:'体温 <span class="num">37.4</span> ℃ · SpO2 <span class="num">96</span> %（室内気）。'}
+            ]},
+          {type:'event', ym:'2023-02', gd:'2/9', gy:'病日3 · 木', date:'2023 2/9（木）', kind:'看護', cat:'life',
+            text:'夜間に喀痰多く吸引 2回。食事はきざみ食 5割。転倒なし。（看護記録より）'},
+          {type:'visit', ym:'2023-02', gd:'2/8', gy:'病日2 · 水', date:'2023 2/8（水）', sub:'病日2 · 内科 · 石川 圭介',
+            a:'38℃台が持続するが全身状態は安定。CTRX 継続、補液を維持。',
+            fold:'S/O 全文',
+            rows:[
+              {k:'S', t:'咳嗽・喀痰続く。夜間の呼吸苦なし。'},
+              {k:'O', t:'体温 <span class="num">38.4</span> ℃ · SpO2 <span class="num">94</span> %（O2 1L）。'}
+            ]},
+          {type:'lab', ym:'2023-02', gd:'2/7', gy:'病日1 · 火', date:'2023 2/7（火）', sub:'入院時採血',
+            labs:[
+              {n:'CRP', v:'12.4', u:'mg/dL', flag:'high', ref:'基準 0.14 以下'},
+              {n:'WBC', v:'11200', u:'/µL', flag:'high', ref:'基準 3300–8600'},
+              {n:'Alb', v:'3.6', u:'g/dL', flag:'low', ref:'基準 4.1–5.1'}
+            ]},
+          {type:'visit', ym:'2023-02', gd:'2/7', gy:'病日1 · 火', date:'2023 2/7（火）', sub:'入院日 · 救急外来 → 3西病棟 · 石川 圭介',
+            a:'発熱・咳嗽、右下肺野に浸潤影。市中肺炎（A-DROP 2点）として入院、CTRX を開始。',
+            fold:'S/O 全文 · オーダー 3件',
+            rows:[
+              {k:'S', t:'3日前から発熱と咳嗽。昨夜から食事がとれない。'},
+              {k:'O', t:'体温 <span class="num">38.9</span> ℃ · SpO2 <span class="num">92</span> %（室内気）· 右下肺野 coarse crackle。X線で右下肺浸潤影。'},
+              {k:'P', t:'セフトリアキソン 2g/日 開始。血液培養 2セット・喀痰培養を提出。補液・酸素 1L。'}
+            ]}
+        ]},
+      {type:'yearfold', ym:'2022-12', year:'2022年', counts:'受診 6回 · 検査 1回',
+        blocks:[
+          {type:'visit', ym:'2022-06', date:'2022 6/14（火）', sub:'高血圧 定期 · 内科 · 田中 太郎',
+            a:'家庭血圧やや高め。減塩指導。', fold:'S/O 全文',
+            rows:[{k:'S', t:'仕事が繁忙。外食が続く。'},{k:'O', t:'血圧 <span class="num">142/88</span> mmHg。'}]}
+        ]},
+      {type:'visit', ym:'2021-08', date:'2021 8/24（火）', sub:'初診 · 内科 · 田中 太郎',
+        a:'健診で血圧高値（150/96）を指摘され受診。本態性高血圧としてアムロジピン開始、生活指導。',
+        fold:'S/O 全文 · 処方 1剤',
+        rows:[
+          {k:'S', t:'自覚症状なし。健診で指摘。父に高血圧の家族歴。'},
+          {k:'O', t:'血圧 <span class="num">152/94</span> mmHg（再測定 148/92）· BMI <span class="num">25.8</span>。'},
+          {k:'P', t:'アムロジピン 5mg 開始。家庭血圧測定を指導、1か月後再診。'}
+        ]},
+      {type:'event', ym:'2021-08', date:'2021 8/24（火）', kind:'取込', cat:'doc',
+        text:'お薬手帳・健診結果を取込（持参 2件） — 他院の常用薬なし', link:'原本を開く'}
+    ],
+    labSeries: {
+      cols:[
+        {y:'2026', d:'4/16', key:true},{y:'2025', d:'12/16', key:true},{y:'2024', d:'12/10'},{y:'2024', d:'4/9', tag:'健診', key:true},
+        {y:'2023', d:'2/14', tag:'退院時'},{y:'2023', d:'2/10', tag:'入院'},{y:'2023', d:'2/7', tag:'入院', key:true},
+        {y:'2022', d:'6/14'},{y:'2021', d:'8/24', tag:'初診', key:true}
+      ],
+      groups:[
+        {g:'心筋マーカー', rows:[
+          {n:'★ BNP', u:'pg/mL', ref:'≤ 18.4', v:[['46','high'],['42','high'],['—','na'],['—','na'],['—','na'],['—','na'],['—','na'],['—','na'],['—','na']]},
+          {n:'★ トロポニン I', u:'ng/mL', ref:'≤ 0.026', v:[['0.011',''],['0.010',''],['—','na'],['—','na'],['—','na'],['—','na'],['—','na'],['—','na'],['—','na']]}
+        ]},
+        {g:'炎症', rows:[
+          {n:'CRP', u:'mg/dL', ref:'≤ 0.14', v:[['0.06',''],['0.10',''],['0.08',''],['0.12',''],['1.1','high'],['6.8','high'],['12.4','high'],['0.09',''],['—','na']]},
+          {n:'WBC', u:'/µL', ref:'3300–8600', v:[['6800',''],['6200',''],['5900',''],['6400',''],['7200',''],['9800','high'],['11200','high'],['5800',''],['5900','']]}
+        ]},
+        {g:'脂質・糖代謝', rows:[
+          {n:'★ LDL-C', u:'mg/dL', ref:'< 120', v:[['136','high'],['142','high'],['138','high'],['128','high'],['—','na'],['—','na'],['118',''],['146','high'],['154','high']]},
+          {n:'HDL-C', u:'mg/dL', ref:'40–90', v:[['52',''],['49',''],['50',''],['47',''],['—','na'],['—','na'],['45',''],['43',''],['41','']]},
+          {n:'TG', u:'mg/dL', ref:'30–149', v:[['128',''],['141',''],['133',''],['152','high'],['—','na'],['—','na'],['96',''],['171','high'],['168','high']]},
+          {n:'HbA1c', u:'%', ref:'4.9–6.0', v:[['—','na'],['5.9',''],['5.8',''],['5.8',''],['—','na'],['—','na'],['5.8',''],['5.7',''],['5.7','']]},
+          {n:'血糖（随時）', u:'mg/dL', ref:'70–139', v:[['102',''],['108',''],['104',''],['99',''],['110',''],['118',''],['131',''],['104',''],['118','']]}
+        ]},
+        {g:'腎機能・電解質', rows:[
+          {n:'Cr', u:'mg/dL', ref:'0.65–1.07', v:[['0.98',''],['0.96',''],['0.94',''],['0.92',''],['1.00',''],['1.04',''],['1.02',''],['0.92',''],['0.90','']]},
+          {n:'eGFR', u:'', ref:'≥ 60', v:[['61',''],['63',''],['66',''],['68',''],['64',''],['62',''],['63',''],['74',''],['78','']]},
+          {n:'Na', u:'mEq/L', ref:'138–145', v:[['141',''],['140',''],['141',''],['142',''],['139',''],['138',''],['138',''],['141',''],['142','']]},
+          {n:'K', u:'mEq/L', ref:'3.6–4.8', v:[['4.2',''],['4.3',''],['4.1',''],['4.2',''],['4.4',''],['4.3',''],['4.1',''],['4.2',''],['4.2','']]}
+        ]},
+        {g:'肝機能', rows:[
+          {n:'AST', u:'U/L', ref:'13–30', v:[['24',''],['26',''],['23',''],['25',''],['31','high'],['38','high'],['29',''],['22',''],['21','']]},
+          {n:'ALT', u:'U/L', ref:'10–42', v:[['22',''],['24',''],['20',''],['23',''],['28',''],['35',''],['26',''],['20',''],['19','']]},
+          {n:'γ-GTP', u:'U/L', ref:'13–64', v:[['38',''],['41',''],['36',''],['40',''],['44',''],['52',''],['47',''],['35',''],['33','']]}
+        ]},
+        {g:'血算', rows:[
+          {n:'Hb', u:'g/dL', ref:'13.7–16.8', v:[['14.6',''],['14.8',''],['14.5',''],['14.9',''],['13.9',''],['13.6','low'],['13.9',''],['15.0',''],['15.2','']]},
+          {n:'PLT', u:'万/µL', ref:'15.8–34.8', v:[['22.4',''],['23.1',''],['21.8',''],['24.0',''],['31.2',''],['18.9',''],['20.5',''],['22.0',''],['23.5','']]}
+        ]}
+      ]
+    },
+    activeMeds:[
+      {n:'ビソプロロール錠 2.5mg', u:'1T · 分1 朝食後', since:'4/16 開始', rest:'本日 Do 済（28日分）'},
+      {n:'アムロジピン錠 5mg', u:'1T · 分1 朝食後', since:'2021/8 開始', rest:'本日 Do 済（28日分）'}
+    ],
+    rxTimeline:[
+      {d:'2026 7/14', drug:'ビソプロロール錠 2.5mg', sub:'1T · 分1 朝食後 · 28日分', tag:'Do 2回目'},
+      {d:'2026 4/16', drug:'ビソプロロール錠 2.5mg', sub:'1T · 分1 朝食後 · 28日分', tag:'開始'},
+      {d:'2026 4/16', drug:'アムロジピン錠 5mg', sub:'1T · 分1 朝食後 · 28日分', tag:'Do 17回目'},
+      {d:'2026 3/12', drug:'アムロジピン錠 5mg', sub:'1T · 分1 朝食後 · 28日分', tag:'Do 16回目'},
+      {ghost:true, d:'…', drug:'2021/9 〜 2025/12 の Do 14回分を省略（クリックで展開）', sub:'', tag:''},
+      {d:'2021 8/24', drug:'アムロジピン錠 5mg', sub:'1T · 分1 朝食後 · 28日分', tag:'開始'}
+    ],
+    orderTimeline:[
+      {cat:'内服', d:'本日', w:'ビソプロロール錠 2.5mg', sub:'1T · 分1 朝食後 · 28日分 — 院外処方箋 発行済', st:'発行済', k:'done'},
+      {cat:'内服', d:'本日', w:'アムロジピン錠 5mg', course:'Do 17回目', sub:'1T · 分1 朝食後 · 28日分', st:'発行済', k:'done'},
+      {cat:'検査', d:'7/28 予定', w:'心エコー', sub:'生理検査 · 予約枠 確保済', st:'予約済', k:'sched'},
+      {cat:'検査', d:'本日 09:48', w:'心電図 12誘導', sub:'院内 · 本日ブロックに記録', st:'実施済', k:'done'},
+      {cat:'検査', d:'4/16', w:'採血（BNP · トロポニン · 脂質）', sub:'院内検査室 · 09:20 発行 → 11:02 到着', st:'結果到着', k:'done', report:'sato-lab416'},
+      {cat:'検査', d:'2025 12/16', w:'採血（生化学 · 年1回フォロー）', sub:'院内検査室', st:'結果到着', k:'done'},
+      {cat:'画像', d:'2025 9/2', w:'胸部X線 2方向', sub:'放射線科 · 読影 9/3 確定', st:'レポート到着', k:'done'}
+    ],
+    aid: {
+      labs:[
+        {n:'BNP', v:'46', u:'pg/mL', flag:'high', d:'4/16'},
+        {n:'トロポニン I', v:'0.011', u:'ng/mL', d:'4/16'},
+        {n:'LDL-C', v:'136', u:'mg/dL', flag:'high', d:'4/16'}
+      ],
+      history:[
+        {t:'高血圧', d:'2021年〜 · 内服加療中'},
+        {t:'脂質異常症', d:'2024年〜 · 食事療法'},
+        {t:'市中肺炎で入院', d:'2023年2月 · 7日間'}
+      ],
+      basics:[
+        {t:'かかりつけ', d:'当院 循環器内科（主治医 石川）'},
+        {t:'保険', d:'国保 · 3割'}
+      ]
+    }
+  },
+
+  suzuki: {
+    name:'鈴木 花子', kana:'スズキ ハナコ', ini:'鈴', age:'68歳 女性', pid:'0009900040',
+    dept:'内科', doctor:'田中 太郎', time:'10:00', arrive:'09:42',
+    status:'waiting', stateText:'診察可 · 結果 1/1', stateKind:'attention',
+    stateDetail:'採血 09:10 → 結果 09:35 ✓（HbA1c 7.2 ↑ を含む）',
+    reason:'2型糖尿病 定期 · 結果 1/1 揃いました',
+    safety:[
+      {label:'ペニシリンアレルギー', desc:'2015年 サワシリンで全身発疹'},
+      {label:'同姓同名 2名', desc:'ID と生年月日を照合してから開く'}
+    ],
+    problems:'2型糖尿病（2018〜）・高血圧',
+    save:'本日の記載なし',
+    oneLiner:'#1 2型糖尿病。HbA1c 7.0→7.2 % と微増、本日結果到着。ペニシリンアレルギー・同姓同名 2名に注意。',
+    aiParas:[
+      '2型糖尿病で通院中。<b>HbA1c 7.0→7.2 %</b> と微増、空腹時血糖 138 mg/dL。まず食事内容の確認と生活調整で経過を見る段階。',
+      '<b>ペニシリンアレルギー</b>（発疹）。抗菌薬をオーダーする場合は系統に注意。院内に<b>同姓同名が 2名</b>いる。'
+    ],
+    aiEv:[
+      {d:'本日 09:35', t:'検査 HbA1c 7.2 % ↑'},
+      {d:'2026/06/16', t:'受診 — 糖尿病定期 HbA1c 7.0'},
+      {d:'処方中', t:'メトホルミン錠 500mg 2T'}
+    ],
+    today: {
+      written:false,
+      draft:{
+        ver:'v1', at:'10:22', title:'糖尿病 定期',
+        rows:[
+          {k:'S', t:'変わりなく経過。口渇・多飲なし。低血糖症状なし。'},
+          {k:'O', t:'<span class="datachip num">HbA1c 7.2 % ↑<span class="src">@本日</span></span> <span class="datachip num">空腹時血糖 138 mg/dL ↑<span class="src">@本日</span></span> 体重 <span class="num">58.2</span> kg（+0.4）。'},
+          {k:'A', t:'血糖コントロールやや悪化。まず食事内容を確認し、生活調整で経過観察。'},
+          {k:'P', t:'メトホルミン継続。栄養指導を予約。次回 8/12 採血。'}
+        ],
+        acts:[
+          {a1:'メトホルミン錠 500mg', a2:'2T · 分2 朝夕食後 · 28日分'},
+          {a1:'栄養指導', a2:'予約 7/22（水）'}
+        ],
+        points:{lines:'再診 75 · 特定疾患管理 225 · 処方箋 60', total:'概算 360点'}
+      }
+    },
+    blocks:[
+      {type:'lab', ym:'2026-07', date:'本日 09:35', sub:'検査結果 · 院内採血 · 糖尿病フォローセット',
+        labs:[
+          {n:'HbA1c ★', v:'7.2', u:'%', flag:'high', ref:'目標 <7.0'},
+          {n:'空腹時血糖 ★', v:'138', u:'mg/dL', flag:'high', ref:'基準 109 以下'},
+          {n:'eGFR ★', v:'62', u:'mL/min/1.73m²', ref:''}
+        ],
+        more:'生化学・血算 ほか 15項目 — すべて基準内',
+        moreGroups:[
+          {g:'生化学', items:[
+            ['AST','21','U/L','13–30'],['ALT','19','U/L','10–42'],
+            ['γ-GTP','24','U/L','9–32'],['Cr','0.68','mg/dL','0.46–0.79'],
+            ['Na','140','mEq/L','138–145'],['K','4.1','mEq/L','3.6–4.8'],
+            ['TG','104','mg/dL','30–117'],['LDL-C','108','mg/dL','< 120']
+          ]},
+          {g:'血算', items:[
+            ['WBC','5400','/µL','3300–8600'],['Hb','12.8','g/dL','11.6–14.8'],
+            ['PLT','25.6','万/µL','15.8–34.8']
+          ]}
+        ]},
+      {type:'visit', ym:'2026-06', date:'2026 6/16（火）', sub:'糖尿病 定期 · 内科 · 田中 太郎',
+        a:'HbA1c 7.0 で横ばい。食事療法の再確認、運動は継続。',
+        fold:'S/O 全文 · 処方 1剤',
+        rows:[
+          {k:'S', t:'間食が増えている自覚あり。運動は週2回の散歩を継続。'},
+          {k:'O', t:'HbA1c <span class="num">7.0</span> % · 体重 <span class="num">57.8</span> kg。'}
+        ]},
+      {type:'visit', ym:'2026-05', date:'2026 5/19（火）', sub:'糖尿病 定期 · 内科 · 田中 太郎',
+        a:'コントロール安定。処方継続。',
+        fold:'S/O 全文',
+        rows:[
+          {k:'S', t:'変わりなし。'},
+          {k:'O', t:'HbA1c <span class="num">6.9</span> %。'}
+        ]}
+    ],
+    labSeries: {
+      cols:[{y:'2026', d:'7/14'},{y:'2026', d:'6/16'},{y:'2026', d:'5/19'},{y:'2026', d:'4/14'}],
+      groups:[
+        {g:'糖代謝', rows:[
+          {n:'★ HbA1c', u:'%', ref:'目標 < 7.0', v:[['7.2','high'],['7.0','high'],['6.9',''],['6.9','']]},
+          {n:'★ 空腹時血糖', u:'mg/dL', ref:'70–109', v:[['138','high'],['126','high'],['118','high'],['121','high']]}
+        ]},
+        {g:'腎機能', rows:[
+          {n:'★ eGFR', u:'', ref:'≥ 60', v:[['62',''],['—','na'],['—','na'],['64','']]},
+          {n:'尿アルブミン/Cr', u:'mg/gCr', ref:'< 30', v:[['24',''],['—','na'],['—','na'],['28','']]}
+        ]}
+      ]
+    },
+    activeMeds:[
+      {n:'メトホルミン錠 500mg', u:'2T · 分2 朝夕食後', since:'2018/4 開始', rest:'残 2日 — 本日 Do 予定'}
+    ],
+    rxTimeline:[
+      {d:'2026 6/16', drug:'メトホルミン錠 500mg', sub:'2T · 分2 朝夕食後 · 28日分', tag:'Do 22回目'},
+      {d:'2018 4/10', drug:'メトホルミン錠 500mg', sub:'開始時 1T → 2T へ増量（2019/2）', tag:'開始'}
+    ],
+    orderTimeline:[
+      {cat:'検査', d:'本日 09:10 → 09:35', w:'採血（HbA1c · 血糖 · 腎機能）', sub:'院内検査室', st:'結果到着', k:'done'},
+      {cat:'食事', d:'7/22 予定', w:'栄養指導', sub:'管理栄養士', st:'予約済', k:'sched'}
+    ],
+    aid: {
+      labs:[
+        {n:'HbA1c', v:'7.2', u:'%', flag:'high', d:'本日'},
+        {n:'空腹時血糖', v:'138', u:'mg/dL', flag:'high', d:'本日'},
+        {n:'eGFR', v:'62', u:'', d:'本日'}
+      ],
+      history:[
+        {t:'2型糖尿病', d:'2018年〜 · メトホルミン'},
+        {t:'高血圧', d:'2020年〜 · 内服加療中'}
+      ],
+      basics:[
+        {t:'かかりつけ', d:'当院 内科（主治医 田中）'},
+        {t:'保険', d:'後期高齢 · 1割'}
+      ]
+    }
+  },
+
+  takahashi: {
+    name:'高橋 一郎', kana:'タカハシ イチロウ', ini:'高', age:'71歳 男性', pid:'0003310877',
+    dept:'腎臓内科', doctor:'田中 太郎', time:'10:30', arrive:'10:18',
+    status:'waiting', stateText:'検査中 · 結果 0/1', stateKind:'normal',
+    stateDetail:'採血 10:20 受付 — 処理中（院内 約45分）',
+    reason:'CKD 定期 · 採血処理中',
+    safety:[{label:'NSAIDs 回避', desc:'CKD G3b — 解熱鎮痛はアセトアミノフェン第一'}],
+    problems:'CKD G3b（2023〜）・高血圧',
+    save:'本日の記載なし',
+    oneLiner:'#1 CKD G3b。eGFR 48→44 と緩徐に低下。本日の採血結果はまだ未着。NSAIDs は回避。',
+    aiParas:[
+      'CKD G3b で 3か月ごとに経過観察。<b>eGFR 48→44</b> と緩徐な低下傾向。本日の採血は処理中で、結果到着後に診察予定。',
+      '<b>NSAIDs 回避</b>。疼痛時はアセトアミノフェンを第一選択に。'
+    ],
+    aiEv:[
+      {d:'2026/06/02', t:'検査 eGFR 44 ↓ · Cr 1.28 ↑'},
+      {d:'2026/06/02', t:'受診 — CKD 定期'},
+      {d:'本日 10:20', t:'採血 受付済（結果待ち）'}
+    ],
+    today: { written:false },
+    blocks:[
+      {type:'lab', ym:'2026-06', date:'2026 6/2（火）', sub:'検査結果 · 院内採血',
+        labs:[
+          {n:'eGFR', v:'44', u:'mL/min/1.73m²', flag:'low', ref:'前回 48'},
+          {n:'クレアチニン', v:'1.28', u:'mg/dL', flag:'high', ref:'基準 1.07 以下'},
+          {n:'カリウム', v:'4.6', u:'mEq/L', ref:'基準 3.6–4.8'}
+        ]},
+      {type:'visit', ym:'2026-06', date:'2026 6/2（火）', sub:'CKD 定期 · 腎臓内科 · 田中 太郎',
+        a:'eGFR 44 と低下傾向。塩分・蛋白の摂取を再確認し、3か月後に再評価。',
+        fold:'S/O 全文',
+        rows:[
+          {k:'S', t:'自覚症状なし。浮腫なし。'},
+          {k:'O', t:'血圧 <span class="num">134/82</span> mmHg · 体重 <span class="num">66.0</span> kg。'}
+        ]}
+    ],
+    labSeries: {
+      cols:[{y:'2026', d:'6/2'},{y:'2026', d:'3/3'},{y:'2025', d:'12/2'},{y:'2025', d:'9/2'}],
+      groups:[
+        {g:'腎機能・電解質', rows:[
+          {n:'★ eGFR', u:'', ref:'≥ 60', v:[['44','low'],['46','low'],['48','low'],['48','low']]},
+          {n:'★ Cr', u:'mg/dL', ref:'0.65–1.07', v:[['1.28','high'],['1.24','high'],['1.19','high'],['1.18','high']]},
+          {n:'K', u:'mEq/L', ref:'3.6–4.8', v:[['4.6',''],['4.5',''],['4.4',''],['4.6','']]}
+        ]}
+      ]
+    },
+    activeMeds:[
+      {n:'テルミサルタン錠 40mg', u:'1T · 分1 朝食後', since:'2023/9 開始', rest:'残 47日（90日処方）'}
+    ],
+    rxTimeline:[
+      {d:'2026 6/2', drug:'テルミサルタン錠 40mg', sub:'1T · 分1 朝食後 · 90日分', tag:'Do 11回目'}
+    ],
+    orderTimeline:[
+      {cat:'検査', d:'本日 10:20 →', w:'採血（腎機能 · 電解質）', sub:'院内検査室 · 処理中', st:'結果待ち — 到着したら通知', k:'wait'},
+      {cat:'検査', d:'2026 6/2', w:'採血（腎機能）', sub:'院内検査室', st:'結果到着', k:'done'}
+    ],
+    aid: {
+      labs:[
+        {n:'eGFR', v:'44', u:'', flag:'low', d:'6/2'},
+        {n:'Cr', v:'1.28', u:'mg/dL', flag:'high', d:'6/2'},
+        {n:'K', v:'4.6', u:'mEq/L', d:'6/2'}
+      ],
+      history:[
+        {t:'CKD G3b', d:'2023年〜 · 腎臓内科で経過観察'},
+        {t:'高血圧', d:'2015年〜 · ARB 内服'}
+      ],
+      basics:[
+        {t:'処方時の注意', d:'NSAIDs 回避 · 造影剤は腎機能を確認', safe:true}
+      ]
+    }
+  },
+
+  tamura: {
+    name:'田村 恵', kana:'タムラ メグミ', ini:'田', age:'34歳 女性', pid:'0012077543',
+    dept:'内科', doctor:'田中 太郎', time:'11:00', arrive:'10:40',
+    status:'paused', stateText:'中断 · X線撮影中', stateKind:'attention',
+    stateDetail:'胸部X線 2方向 10:55 撮影中 — 画像が戻り次第、診察を再開',
+    reason:'咳嗽 3週間',
+    safety:[],
+    problems:'特記事項なし',
+    save:'保存済み v1 · 10:52',
+    oneLiner:'3週間続く乾性咳嗽。発熱なし・SpO2 98%。胸部X線を撮影中 — 戻り次第、診察を再開。',
+    aiParas:[
+      '3週間続く<b>乾性咳嗽</b>の精査。発熱なし、SpO2 98%、聴診清。器質的疾患の除外目的で胸部X線を撮影中。',
+      '喫煙歴なし。アレルギー性・感染後咳嗽・GERD の鑑別を想定。'
+    ],
+    aiEv:[
+      {d:'本日 10:52', t:'記載 v1 — 咳嗽の問診・診察'},
+      {d:'本日 10:55', t:'胸部X線 2方向 — 撮影中'}
+    ],
+    today: {
+      written:true, ver:'v1', at:'10:52', title:'咳嗽 精査',
+      rows:[
+        {k:'S', t:'3週間続く乾いた咳。夜間に強い。発熱・喀痰・血痰なし。喫煙歴なし。'},
+        {k:'O', t:'SpO2 <span class="num">98</span> % · 体温 <span class="num">36.4</span> ℃。聴診 清、wheeze なし。'},
+        {k:'A', t:'遷延性咳嗽。まず X線で器質的疾患を除外する。'},
+        {k:'P', t:'胸部X線 撮影後に再評価。結果により鑑別をすすめる。'}
+      ],
+      acts:[
+        {a1:'胸部X線 2方向', a2:'撮影中 10:55—', wait:true}
+      ],
+      points:{lines:'初診 291 · 画像（撮影・診断）210', total:'概算 501点'}
+    },
+    blocks:[],
+    labSeries:null,
+    rxTimeline:[],
+    orderTimeline:[
+      {cat:'画像', d:'本日 10:55 →', w:'胸部X線 2方向', sub:'放射線科 · 撮影中', st:'実施中', k:'wait'}
+    ],
+    aid: {
+      labs:[],
+      history:[{t:'既往なし', d:'健診指摘なし'}],
+      basics:[{t:'アレルギー', d:'申告なし'}]
+    }
+  },
+
+  kobayashi: {
+    name:'小林 絵美', kana:'コバヤシ エミ', ini:'小', age:'45歳 女性', pid:'0008233190',
+    dept:'内科', doctor:'田中 太郎', time:'09:00', arrive:'08:52',
+    status:'done', stateText:'診察終了 · 会計待ち', stateKind:'done',
+    reason:'気管支喘息 定期',
+    safety:[],
+    problems:'気管支喘息（2010〜）',
+    save:'確定済み v1 · 09:24',
+    oneLiner:'#1 気管支喘息。コントロール良好、発作なし。ICS/LABA を継続し、次回 3か月後。',
+    aiParas:[
+      '気管支喘息はコントロール良好。直近3か月で発作・夜間症状なし。<b>ICS/LABA 継続</b>で 3か月後フォロー。'
+    ],
+    aiEv:[
+      {d:'本日 09:24', t:'記載 v1 — 喘息定期'},
+      {d:'2026/04/14', t:'受診 — 発作なし'}
+    ],
+    today: {
+      written:true, ver:'v1', at:'09:24', title:'喘息 定期',
+      rows:[
+        {k:'S', t:'発作なし。夜間症状なし。吸入は継続できている。'},
+        {k:'O', t:'SpO2 <span class="num">99</span> %。聴診 清。'},
+        {k:'A', t:'喘息コントロール良好。'},
+        {k:'P', t:'ICS/LABA 継続。次回 3か月後。'}
+      ],
+      acts:[
+        {a1:'フルチカゾン/ホルモテロール', a2:'1日2回 · 28日分'}
+      ],
+      points:{lines:'再診 75 · 処方箋 60', total:'概算 135点'}
+    },
+    blocks:[
+      {type:'visit', ym:'2026-04', date:'2026 4/14（火）', sub:'喘息 定期 · 内科 · 田中 太郎',
+        a:'発作なし。吸入継続。',
+        fold:'S/O 全文',
+        rows:[{k:'S', t:'変わりなし。'},{k:'O', t:'SpO2 <span class="num">99</span> %。'}]}
+    ],
+    labSeries:null,
+    activeMeds:[
+      {n:'フルチカゾン/ホルモテロール 吸入', u:'1日2回', since:'2010〜', rest:'本日 Do 済（28日分）'}
+    ],
+    rxTimeline:[
+      {d:'2026 7/14', drug:'フルチカゾン/ホルモテロール', sub:'1日2回 · 28日分', tag:'Do 12回目'}
+    ],
+    orderTimeline:[],
+    aid: {
+      labs:[],
+      history:[{t:'気管支喘息', d:'2010年〜 · ICS/LABA'}],
+      basics:[{t:'保険', d:'社保 · 3割'}]
+    }
+  }
+};
+const ORDER = ['kobayashi','sato','suzuki','takahashi','tamura'];
+
+/* 医師は病棟横断で受け持つ（3西・5東・ICU）。看護は病棟単位（3西のみ、担当医に関係なく全床） */
+const WARD_BEDS = [
+  {key:'yamamoto', ward:'3西', room:'302', name:'山本 清', age:'82歳 男性', dx:'誤嚥性肺炎', day:'入院5日目', attending:'田中',
+   note:'未実施の指示 2件', att:true,
+   temp:[38.8,38.4,37.9,37.6,37.2,36.9,36.8], pulse:[102,98,94,90,86,82,80], bps:[[128,72],[124,70],[122,68],[118,68],[120,70],[116,66],[118,68]],
+   items:[{t:'指示', x:'セフトリアキソン 点滴 14:00', act:'実施'},{t:'指示', x:'嚥下評価（ST 依頼済）', act:'実施'}]},
+  {key:'inoue', ward:'3西', room:'305', name:'井上 幸子', age:'76歳 女性', dx:'心不全増悪', day:'入院12日目', attending:'田中',
+   note:'未署名の文書 1件 · 退院予定 7/16', att:true,
+   temp:[36.7,36.6,36.8,36.5,36.6,36.5,36.4], pulse:[88,86,84,82,80,78,76], bps:[[142,80],[138,78],[136,76],[134,76],[132,74],[130,74],[128,72]],
+   items:[{t:'文書', x:'退院療養計画書 — 署名待ち', act:'開く'}]},
+  {key:'mori', ward:'5東', room:'508', name:'森 健二', age:'65歳 男性', dx:'大腸癌 術後', day:'入院3日目', attending:'田中',
+   note:'本日の指示 実施済', att:false,
+   temp:[37.4,37.1,36.9], pulse:[92,86,82], bps:[[126,74],[122,72],[120,70]],
+   items:[]},
+  {key:'okada', ward:'ICU', room:'ICU-2', name:'岡田 実', age:'74歳 男性', dx:'急性心筋梗塞（PCI後）', day:'発症2日目', attending:'田中',
+   note:'本日 14:00 一般床へ転棟予定', att:true,
+   temp:[37.8,37.2,36.9], pulse:[96,88,82], bps:[[96,58],[106,64],[112,66]],
+   items:[{t:'指示', x:'一般床への転棟指示 — 14:00 3西 306 へ', act:'確認'}]},
+  {key:'nakamura', ward:'3西', room:'310', name:'中村 ハル', age:'88歳 女性', dx:'大腿骨頸部骨折 術後', day:'入院9日目', attending:'石川',
+   note:'リハ進行中 · 離床時 見守り', att:false,
+   temp:[36.6,36.5,36.7,36.5,36.4,36.6,36.5], pulse:[76,74,75,73,74,72,74], bps:[[126,72],[124,70],[126,72],[122,70],[124,72],[122,70],[124,70]],
+   items:[{t:'指示', x:'離床時 見守り（リハ後の歩行練習）', act:'実施'}]}
+];
+function wardPool(){
+  return S.role==='nurse' ? WARD_BEDS.filter(b=>b.ward==='3西')
+                          : WARD_BEDS.filter(b=>b.attending==='田中');
+}
+
+/* 病棟の患者もカルテを持つ — キュークリックで外来と同じフローで開く（中間画面なし） */
+function makeInpatient(b){
+  return {
+    name:b.name, kana:'', ini:b.name[0], age:b.age, pid:'0009'+(b.room.replace(/\D/g,'')||'900')+'11',
+    dept:b.ward+'病棟', doctor:`主治医 ${b.attending}`,
+    inpatient:{ward:b.ward, room:b.room, day:b.day},
+    status:'inpatient', stateText:b.day, stateKind:'normal', reason:b.dx,
+    safety:[], problems:b.dx, save:'本日の記載なし',
+    oneLiner:`#1 ${b.dx} · ${b.day}。経過は温度板と時系列を参照。`,
+    aiParas:[`${b.dx}で入院中（${b.day} · ${b.ward} ${b.room}）。詳細な経過はストリームを参照。`],
+    aiEv:[{d:'本日', t:'温度板 更新'}],
+    today:{written:false},
+    vitals:{temp:b.temp, pulse:b.pulse, bps:b.bps},
+    blocks:[
+      {type:'visit', ym:'2026-07', gd:'入院日', gy:'', date:'', sub:`入院日 · ${b.dx} · ${b.attending}`,
+        a:`${b.dx}のため入院。（デモは代表ブロックのみ）`, fold:'S/O 全文',
+        rows:[{k:'O', t:'入院時所見 — デモでは省略'}]}
+    ],
+    labSeries:null, rxTimeline:[], orderTimeline:[],
+    aid:{ labs:[], history:[{t:b.dx, d:b.day}],
+      basics:[{t:'病棟', d:`${b.ward} ${b.room} · 主治医 ${b.attending}`}] }
+  };
+}
+WARD_BEDS.forEach(b=>{ if(!PATIENTS[b.key]) PATIENTS[b.key]=makeInpatient(b); });
+
+/* 山本 清（既定選択）はフルデータ — 入院カルテの見本 */
+Object.assign(PATIENTS.yamamoto, {
+  kana:'ヤマモト キヨシ', pid:'0004120388',
+  safety:[{label:'誤嚥リスク', desc:'とろみ付き · 食事は姿勢確保のうえ見守り'}],
+  problems:'誤嚥性肺炎（入院中）・高血圧・陳旧性脳梗塞',
+  save:'保存済み v1 · 09:10',
+  oneLiner:'#1 誤嚥性肺炎 病日5。38.8→36.8 と解熱、CRP 12.4→3.2 と改善。本日 ST嚥下評価、CTRX は day7 終了見込み。',
+  aiParas:[
+    '誤嚥性肺炎で入院 <b>病日5</b>。体温は 38.8→36.8 ℃ と解熱し、<b>CRP 12.4→3.2</b>・WBC も正常化傾向。CTRX は day7 での終了を見込む。',
+    '本日 <b>ST の嚥下評価</b>を実施予定。結果により食形態の引き上げを判断する。<b>誤嚥リスク</b>のため食事は見守り継続。'
+  ],
+  aiEv:[
+    {d:'7/13', t:'検査 CRP 3.2 ↓（ピーク 12.4）'},
+    {d:'本日 09:10', t:'回診記録 v1 — 解熱・喀痰減少'},
+    {d:'本日 14:00', t:'指示 — 嚥下評価（ST 依頼済）'}
+  ],
+  today:{
+    written:true, ver:'v1', at:'09:10', title:'回診 · 病日5',
+    rows:[
+      {k:'S', t:'喀痰は減少。夜間の発熱なし、睡眠良好。'},
+      {k:'O', t:'体温 <span class="num">36.8</span> ℃ · SpO2 <span class="num">96</span> %（室内気）。右下肺の crackle ほぼ消失。'},
+      {k:'A', t:'誤嚥性肺炎は改善傾向。抗菌薬は予定どおり day7 まで。'},
+      {k:'P', t:'ST 嚥下評価の結果で食形態を判断。明朝 採血でフォロー。'}
+    ],
+    acts:[
+      {a1:'セフトリアキソン 2g 点滴', a2:'本日 14:00 — 未実施', wait:true},
+      {a1:'嚥下評価（ST）', a2:'依頼済 · 本日午後', wait:true},
+      {a1:'採血（CRP · 血算）', a2:'明朝 予定'}
+    ],
+    points:null
+  },
+  vitals:{temp:[38.8,38.4,37.9,37.6,37.2,36.9,36.8], pulse:[102,98,94,90,86,82,80],
+    bps:[[128,72],[124,70],[122,68],[118,68],[120,70],[116,66],[118,68]]},
+  blocks:[
+    {type:'visit', ym:'2026-07', gd:'7/13', gy:'病日4 · 月', date:'', sub:'病日4 · 回診 · 田中 太郎',
+      a:'解熱傾向。酸素離脱。食事はきざみ食＋とろみで安定。',
+      fold:'S/O 全文',
+      rows:[
+        {k:'S', t:'咳嗽は残るが喀痰は減少。'},
+        {k:'O', t:'体温 <span class="num">37.2</span> ℃ · SpO2 <span class="num">95</span> %（室内気）。'}
+      ]},
+    {type:'lab', ym:'2026-07', gd:'7/13', gy:'病日4', date:'', sub:'採血フォロー',
+      labs:[
+        {n:'CRP', v:'3.2', u:'mg/dL', flag:'high', ref:'ピーク 12.4（7/10）'},
+        {n:'WBC', v:'8200', u:'/µL', ref:'基準 3300–8600'}
+      ]},
+    {type:'event', ym:'2026-07', gd:'7/12', gy:'病日3 · 日', date:'', kind:'看護', cat:'life',
+      text:'夜間 喀痰吸引 1回。きざみ食＋とろみ 7割摂取。ふらつきなし。（看護記録より）'},
+    {type:'visit', ym:'2026-07', gd:'7/11', gy:'病日2 · 土', date:'', sub:'病日2 · 回診 · 田中 太郎',
+      a:'発熱は続くが呼吸状態は安定。CTRX 継続。',
+      fold:'S/O 全文',
+      rows:[
+        {k:'S', t:'倦怠感あり。食欲低下。'},
+        {k:'O', t:'体温 <span class="num">38.4</span> ℃ · SpO2 <span class="num">94</span> %（O2 1L）。'}
+      ]},
+    {type:'lab', ym:'2026-07', gd:'7/10', gy:'病日1', date:'', sub:'入院時採血',
+      labs:[
+        {n:'CRP', v:'12.4', u:'mg/dL', flag:'high', ref:'基準 0.14 以下'},
+        {n:'WBC', v:'12800', u:'/µL', flag:'high', ref:'基準 3300–8600'},
+        {n:'Alb', v:'3.4', u:'g/dL', flag:'low', ref:'基準 4.1–5.1'}
+      ]},
+    {type:'visit', ym:'2026-07', gd:'7/10', gy:'病日1 · 金', date:'', sub:'入院日 · 救急外来 → 3西病棟 · 田中 太郎',
+      a:'発熱と湿性咳嗽、右下肺野に浸潤影。誤嚥性肺炎として入院、CTRX 開始。とろみ・姿勢指導。',
+      fold:'S/O 全文 · オーダー 3件',
+      rows:[
+        {k:'S', t:'2日前から発熱。食事でむせることが増えていた。'},
+        {k:'O', t:'体温 <span class="num">38.8</span> ℃ · SpO2 <span class="num">92</span> %（室内気）· 右下肺 coarse crackle。'},
+        {k:'P', t:'CTRX 2g/日 開始。血液培養 2セット · 喀痰培養。嚥下評価を ST に依頼。'}
+      ]},
+    {type:'visit', ym:'2026-04', gd:'4/8', gy:'2026 · 水', date:'2026 4/8（水）', sub:'高血圧 定期 · 外来 · 石川 圭介',
+      a:'血圧安定。処方継続。（入院前の直近外来）',
+      fold:'S/O 全文',
+      rows:[{k:'O', t:'血圧 <span class="num">136/78</span> mmHg。'}]}
+  ],
+  labSeries:{
+    cols:[
+      {y:'2026', d:'7/13', tag:'病日4'},{y:'2026', d:'7/11', tag:'病日2'},{y:'2026', d:'7/10', tag:'入院時'},
+      {y:'2026', d:'4/8'},{y:'2025', d:'12/16'}
+    ],
+    groups:[
+      {g:'炎症', rows:[
+        {n:'★ CRP', u:'mg/dL', ref:'≤ 0.14', v:[['3.2','high'],['8.9','high'],['12.4','high'],['0.10',''],['0.08','']]},
+        {n:'★ WBC', u:'/µL', ref:'3300–8600', v:[['8200',''],['10400','high'],['12800','high'],['6100',''],['5900','']]}
+      ]},
+      {g:'血算', rows:[
+        {n:'Hb', u:'g/dL', ref:'13.7–16.8', v:[['13.1','low'],['12.9','low'],['13.3','low'],['14.0',''],['14.2','']]},
+        {n:'PLT', u:'万/µL', ref:'15.8–34.8', v:[['24.8',''],['19.2',''],['17.8',''],['21.5',''],['22.0','']]}
+      ]},
+      {g:'蛋白・肝機能', rows:[
+        {n:'TP', u:'g/dL', ref:'6.6–8.1', v:[['6.5','low'],['6.4','low'],['6.6',''],['7.0',''],['7.1','']]},
+        {n:'Alb', u:'g/dL', ref:'4.1–5.1', v:[['3.5','low'],['3.4','low'],['3.4','low'],['4.2',''],['4.3','']]},
+        {n:'AST', u:'U/L', ref:'13–30', v:[['29',''],['33','high'],['31','high'],['24',''],['25','']]},
+        {n:'ALT', u:'U/L', ref:'10–42', v:[['26',''],['29',''],['27',''],['21',''],['22','']]},
+        {n:'LDH', u:'U/L', ref:'124–222', v:[['242','high'],['268','high'],['255','high'],['198',''],['190','']]}
+      ]},
+      {g:'腎機能・電解質', rows:[
+        {n:'BUN', u:'mg/dL', ref:'8–20', v:[['22.4','high'],['26.8','high'],['28.5','high'],['16.2',''],['15.8','']]},
+        {n:'Cr', u:'mg/dL', ref:'0.65–1.07', v:[['0.92',''],['1.02',''],['1.08','high'],['0.84',''],['0.82','']]},
+        {n:'★ eGFR', u:'', ref:'≥ 60', v:[['58','low'],['52','low'],['49','low'],['66',''],['68','']]},
+        {n:'Na', u:'mEq/L', ref:'138–145', v:[['138',''],['136','low'],['135','low'],['140',''],['141','']]},
+        {n:'K', u:'mEq/L', ref:'3.6–4.8', v:[['4.0',''],['3.8',''],['3.6',''],['4.2',''],['4.3','']]},
+        {n:'Cl', u:'mEq/L', ref:'101–108', v:[['102',''],['100','low'],['99','low'],['104',''],['104','']]}
+      ]},
+      {g:'糖代謝', rows:[
+        {n:'血糖（随時）', u:'mg/dL', ref:'70–139', v:[['118',''],['132',''],['141','high'],['104',''],['102','']]}
+      ]}
+    ]
+  },
+  orderTimeline:[
+    {cat:'注射', d:'7/10 開始', w:'セフトリアキソン 2g · 1日1回', course:'day 5/7 · 7/16 終了予定', sub:'本日分 14:00 — 未実施', st:'継続中', k:'cont'},
+    {cat:'内服', d:'7/10 継続', w:'アムロジピン錠 5mg（持参薬継続）', sub:'1T · 分1 朝食後', st:'継続中', k:'cont'},
+    {cat:'検査', d:'明朝 6:00', w:'採血（CRP · 血算）', sub:'定時採血', st:'予定', k:'sched'},
+    {cat:'検査', d:'7/13', w:'採血（CRP · 血算 · 生化学）', sub:'院内検査室', st:'結果到着', k:'done', report:'yam-lab713'},
+    {cat:'検査', d:'7/10 → 7/13', w:'血液培養 2セット', sub:'最終報告: 陰性', st:'結果到着', k:'done', report:'yam-bcx'},
+    {cat:'検査', d:'7/10 → 7/12', w:'喀痰培養', sub:'中間報告: 常在菌叢 — 最終報告待ち', st:'中間報告', k:'wait'},
+    {cat:'画像', d:'7/16 予定', w:'胸部X線 2方向', sub:'退院前フォロー', st:'予定', k:'sched'},
+    {cat:'画像', d:'7/10', w:'胸部X線 2方向', sub:'右下肺浸潤影 — 読影確定', st:'レポート到着', k:'done', report:'yam-xr710'},
+    {cat:'処置', d:'7/10 → 7/13', w:'酸素投与 1L 鼻カニュラ', sub:'SpO2 安定のため離脱', st:'中止（離脱）', k:'stop'},
+    {cat:'処置', d:'7/10 開始', w:'喀痰吸引 適宜', sub:'夜間中心 · 看護実施', st:'継続中', k:'cont'},
+    {cat:'リハビリ', d:'本日 依頼', w:'ST 嚥下評価・訓練', sub:'本日午後 初回 — 結果で食形態を判断', st:'依頼済', k:'wait'},
+    {cat:'リハビリ', d:'7/12 開始', w:'PT 離床・歩行訓練', course:'週5回', sub:'病棟内 · 転倒注意', st:'継続中', k:'cont'},
+    {cat:'食事', d:'7/11 開始', w:'きざみ食＋とろみ', sub:'ST 評価後に形態を再評価', st:'継続中', k:'cont'},
+    {cat:'指示', d:'7/13 改訂', w:'安静度: 病棟内フリー · バイタル 1日2検', sub:'転倒注意は継続', st:'継続中', k:'cont'},
+    {cat:'指示', d:'7/10 設定', w:'入院時指示セット v2（頓用・コール基準 6項目）', sub:'発熱時・不眠時・疼痛時・SpO2・血圧・血糖 — 詳細は補助情報に常設', st:'継続中', k:'cont'}
+  ],
+  activeMeds:[
+    {n:'アムロジピン錠 5mg（持参薬継続）', u:'1T · 分1 朝食後', since:'入院時 継続', rest:'入院中 — 病棟管理'}
+  ],
+  standing:[
+    {t:'発熱時（38.5℃ 以上）', d:'カロナール 500mg 1回 — 4時間あけて 1日3回まで'},
+    {t:'疼痛時', d:'カロナール 500mg（発熱時と合算で 1日3回まで）'},
+    {t:'不眠時', d:'ラメルテオン 8mg 1回 — 転倒注意のため BZ系は使わない'},
+    {t:'SpO2 92% 未満', d:'酸素 0.5L から開始し、当直医コール'},
+    {t:'血圧 180/110 以上 または 収縮期 90 未満', d:'当直医コール'},
+    {t:'血糖 70 未満', d:'ブドウ糖 10g 内服 → 30分後に再検'}
+  ],
+  aid:{
+    labs:[
+      {n:'CRP', v:'3.2', u:'mg/dL', flag:'high', d:'7/13'},
+      {n:'WBC', v:'8200', u:'/µL', d:'7/13'}
+    ],
+    history:[
+      {t:'高血圧', d:'2019年〜 · 内服加療中'},
+      {t:'陳旧性脳梗塞', d:'2022年 · 後遺症なし'}
+    ],
+    basics:[
+      {t:'病棟', d:'3西 302 · 主治医 田中'},
+      {t:'食事', d:'きざみ＋とろみ · 見守り', safe:true}
+    ]
+  }
+});
+/* 温度板ミニチャート — 標準配色（体温=青 #1d4ed8 · 脈拍=赤 #d70015 · 血圧=緑 ∨∧ #5e8468、変更禁止） */
+function miniVitals(temps, pulses, bps){
+  const W=640, H=132, P=10, LX=30;
+  const n=temps.length;
+  const tx=i=>LX+P+i*(W-LX-2*P)/Math.max(1,n-1);
+  const ty=v=>H-P-((v-35.5)/(39.5-35.5))*(H-2*P);
+  const py=v=>H-P-((v-40)/(140-40))*(H-2*P);
+  const line=(vals,fy)=>vals.map((v,i)=>`${i?'L':'M'}${tx(i).toFixed(1)},${fy(v).toFixed(1)}`).join(' ');
+  const bpMarks=(bps||[]).map((bp,i)=>{
+    const x=tx(i).toFixed(1), ys=py(bp[0]), yd=py(bp[1]);
+    return `<line x1="${x}" x2="${x}" y1="${ys.toFixed(1)}" y2="${yd.toFixed(1)}" stroke="#5e8468" stroke-width="1.2" opacity=".8"/>
+      <text x="${x}" y="${(ys+3).toFixed(1)}" font-size="9" text-anchor="middle" fill="#5e8468">∨</text>
+      <text x="${x}" y="${(yd+3.5).toFixed(1)}" font-size="9" text-anchor="middle" fill="#5e8468">∧</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block" role="img" aria-label="温度板ミニチャート">
+    ${[36,37,38,39].map(t=>`<line x1="${LX}" x2="${W-P}" y1="${ty(t).toFixed(1)}" y2="${ty(t).toFixed(1)}" stroke="var(--hair)"/><text x="2" y="${(ty(t)+3).toFixed(1)}" font-size="9" fill="var(--muted)">${t}℃</text>`).join('')}
+    ${bpMarks}
+    <path d="${line(pulses,py)}" fill="none" stroke="#d70015" stroke-width="1.5" opacity=".7"/>
+    ${pulses.map((v,i)=>`<circle cx="${tx(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="2" fill="#d70015" opacity=".7"/>`).join('')}
+    <path d="${line(temps,ty)}" fill="none" stroke="#1d4ed8" stroke-width="2"/>
+    ${temps.map((v,i)=>`<circle cx="${tx(i).toFixed(1)}" cy="${ty(v).toFixed(1)}" r="2.8" fill="#1d4ed8"/><text x="${tx(i).toFixed(1)}" y="${(ty(v)-7).toFixed(1)}" font-size="9.5" font-weight="700" text-anchor="middle" fill="#1d4ed8">${v.toFixed(1)}</text>`).join('')}
+  </svg>`;
+}
+/* 検査行の推移スパークライン（左=古い → 右=新しい） */
+function spark(vs){
+  const seq = vs.slice().reverse().map(([v])=>parseFloat(String(v).replace(/,/g,''))).filter(x=>!isNaN(x));
+  if(seq.length<2) return '<span style="color:var(--line-strong)">·</span>';
+  const min=Math.min(...seq), max=Math.max(...seq), r=(max-min)||1;
+  const W=64, H=16;
+  const px=i=>(2+i*(W-6)/(seq.length-1));
+  const py=v=>(H-2.5-((v-min)/r)*(H-5));
+  const pts=seq.map((v,i)=>`${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block; margin:0 auto">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.3" opacity=".7"/>
+    <circle cx="${px(seq.length-1).toFixed(1)}" cy="${py(seq[seq.length-1]).toFixed(1)}" r="1.9" fill="var(--accent)"/></svg>`;
+}
+/* 基準値文字列 → 数値帯（≤/</≥/>/a–b をゆるくパース） */
+function refBand(ref){
+  let m;
+  if(m=/([\d.]+)\s*[–-]\s*([\d.]+)/.exec(ref||'')) return {lo:+m[1], hi:+m[2]};
+  if(m=/[≤<]\s*([\d.]+)/.exec(ref||'')) return {hi:+m[1]};
+  if(m=/[≥>]\s*([\d.]+)/.exec(ref||'')) return {lo:+m[1]};
+  return null;
+}
+/* 行クリックで開く 推移の詳細チャート（インライン展開 — モーダルにしない）
+   スコープはドラッグではなく「名前のある期間」チップ: 全期間 / 直近1年 / この入院 */
+function colDate(c){
+  const [m,d] = c.d.split(' ')[0].split('/').map(Number);
+  return new Date(+c.y, (m||1)-1, d||1).getTime();
+}
+function trendScopeKeep(c, cols, scope){
+  if(scope==='1年'){
+    const latest = Math.max(...cols.map(colDate));
+    return colDate(c) >= latest - 366*864e5;
+  }
+  if(scope==='入院') return /入院|病日|退院/.test(c.tag||'');
+  return true;
+}
+function trendChart(r, cols){
+  const scope = S.trendScope||'全期間';
+  const hasAdm = cols.some(c=>/入院|病日|退院/.test(c.tag||''));
+  const useCols = [], useVals = [];
+  cols.forEach((c,i)=>{ if(trendScopeKeep(c, cols, scope)){ useCols.push(c); useVals.push(r.v[i]); } });
+  const pts = [];
+  useCols.slice().reverse().forEach((c,i)=>{
+    const [v,f] = useVals.slice().reverse()[i] || ['—','na'];
+    const num = parseFloat(String(v).replace(/,/g,''));
+    if(!isNaN(num)) pts.push({x:pts.length, label:`${c.y.slice(2)}/${c.d.split(' ')[0]}`, tag:c.tag||'', v:num, f});
+  });
+  const scopeChips = `<span class="tscope-row">${['全期間','1年'].concat(hasAdm?['入院']:[]).map(sc=>
+    `<button class="tscope ${scope===sc?'active':''}" data-tscope="${sc}">${sc==='入院'?'この入院':sc==='1年'?'直近1年':sc}</button>`).join('')}</span>`;
+  if(pts.length<2) return `<div class="trend-wrap"><div class="trend-head"><b>${r.n}</b>${scopeChips}</div><div class="lv-note">この期間には数値が2点未満です — スコープを広げてください。</div></div>`;
+  const band = refBand(r.ref);
+  let lo = Math.min(...pts.map(p=>p.v)), hi = Math.max(...pts.map(p=>p.v));
+  if(band){ if(band.lo!=null) lo=Math.min(lo,band.lo); if(band.hi!=null) hi=Math.max(hi,band.hi); }
+  const pad=(hi-lo)*0.15||1; lo-=pad; hi+=pad;
+  const W=760, H=150, L=26, R=26, T=18, B=26;
+  const X=i=>L+i*(W-L-R)/(pts.length-1);
+  const Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  const colr=f=>f==='high'?'var(--lab-high)':f==='low'?'var(--lab-low)':'var(--accent)';
+  let bandSvg='';
+  if(band){
+    const bh=band.hi!=null?Y(band.hi):T, bl=band.lo!=null?Y(band.lo):H-B;
+    bandSvg=`<rect x="${L}" y="${Math.min(bh,bl).toFixed(1)}" width="${W-L-R}" height="${Math.abs(bl-bh).toFixed(1)}" fill="#edf3ea" opacity=".85"/>
+      ${band.hi!=null?`<line x1="${L}" x2="${W-R}" y1="${bh.toFixed(1)}" y2="${bh.toFixed(1)}" stroke="#9db894" stroke-dasharray="3 3"/>`:''}
+      ${band.lo!=null?`<line x1="${L}" x2="${W-R}" y1="${bl.toFixed(1)}" y2="${bl.toFixed(1)}" stroke="#9db894" stroke-dasharray="3 3"/>`:''}`;
+  }
+  return `<div class="trend-wrap">
+    <div class="trend-head"><b>${r.n}</b><span>${r.u||''}</span><span class="trend-ref">基準 ${r.ref||'—'}（緑帯）</span>${scopeChips}<span style="margin-left:auto; color:var(--muted); font-size:10.5px">${pts.length} 時点${scope==='全期間'?' — 列の表示モードに関わらず全データ':''}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block">
+      ${bandSvg}
+      <polyline points="${pts.map(p=>`${X(p.x).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="1.8" opacity=".8"/>
+      ${pts.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="3.2" fill="${colr(p.f)}"/>
+        <text x="${X(p.x).toFixed(1)}" y="${(Y(p.v)-8).toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="${colr(p.f)}">${p.v}</text>
+        <text x="${X(p.x).toFixed(1)}" y="${H-8}" font-size="9" text-anchor="middle" fill="var(--muted)">${p.label}${p.tag?'·'+p.tag:''}</text>`).join('')}
+    </svg>
+  </div>`;
+}
+
+/* ================= order composer (⌘O) ================= */
+/* 薬剤マスタ（デモ） — 実装では YJ コード・薬価・PMDA 添付文書 API に接続 */
+const DRUG_DB = [
+  {n:'ビソプロロール錠 2.5mg「サワイ」', kana:'びそぷろろーる', cls:'β遮断薬', sub:'後発 · 先発: メインテート', usage:'1T · 分1 朝食後', cat:'処方', beta:true},
+  {n:'アムロジピン錠 5mg「トーワ」', kana:'あむろじぴん', cls:'Ca拮抗薬', sub:'後発 · 先発: アムロジン/ノルバスク', usage:'1T · 分1 朝食後', cat:'処方', ccb:true},
+  {n:'ベラパミル錠 40mg（ワソラン）', kana:'べらぱみる わそらん', cls:'Ca拮抗薬（非DHP）', sub:'先発', usage:'3T · 分3 毎食後', cat:'処方', nonDhpCcb:true},
+  {n:'ロキソプロフェンNa錠 60mg', kana:'ろきそぷろふぇん', cls:'NSAIDs', sub:'後発 · 先発: ロキソニン', usage:'3T · 分3 毎食後', cat:'処方', nsaid:true},
+  {n:'セレコキシブ錠 100mg「サワイ」', kana:'せれこきしぶ', cls:'NSAIDs（COX-2）', sub:'後発 · 先発: セレコックス', usage:'2T · 分2 朝夕食後', cat:'処方', nsaid:true},
+  {n:'アセトアミノフェン錠 500mg（カロナール）', kana:'あせとあみのふぇん かろなーる', cls:'解熱鎮痛', sub:'先発', usage:'3T · 分3 毎食後', cat:'処方', acetaminophen:true},
+  {n:'アモキシシリンカプセル 250mg（サワシリン）', kana:'あもきししりん さわしりん', cls:'ペニシリン系抗菌薬', sub:'先発', usage:'3C · 分3 毎食後', cat:'処方', penicillin:true},
+  {n:'セフカペンピボキシル錠 100mg（フロモックス）', kana:'せふかぺん ふろもっくす', cls:'セフェム系抗菌薬', sub:'先発', usage:'3T · 分3 毎食後', cat:'処方', cephem:true},
+  {n:'メトホルミン錠 500mg（メトグルコ）', kana:'めとほるみん めとぐるこ', cls:'ビグアナイド', sub:'先発', usage:'2T · 分2 朝夕食後', cat:'処方', metformin:true},
+  {n:'エチゾラム錠 0.5mg（デパス）', kana:'えちぞらむ でぱす', cls:'BZ系抗不安薬', sub:'先発 · 向精神薬', usage:'1T · 頓用（不眠時）', cat:'処方', bz:true},
+  {n:'ラメルテオン錠 8mg（ロゼレム）', kana:'らめるておん ろぜれむ', cls:'メラトニン受容体作動薬', sub:'先発', usage:'1T · 分1 就寝前', cat:'処方', ramelteon:true}
+];
+/* 患者ごとの薬剤文脈（実装では処方歴・検査・アレルギー・年齢から自動導出） */
+const MED_CTX = {
+  sato:{ onBeta:true, onCcb:true, age:58 },
+  suzuki:{ penicillinAllergy:true, onMetformin:true, age:68, egfr:62 },
+  takahashi:{ egfr:44, avoidNsaids:true, age:71 },
+  tamura:{ age:34 },
+  kobayashi:{ age:45 },
+  yamamoto:{ age:82, fallRisk:true, egfr:58, onCcb:true }
+};
+/* PMDA 添付文書ベースの安全チェック（デモ実装 — 実装では PMDA API + 相互作用マスタ） */
+function drugSafetyFor(k, drug){
+  const c = MED_CTX[k]||{};
+  const out = [];
+  if(drug.penicillin && c.penicillinAllergy)
+    out.push({lv:'block', t:'禁忌 — ペニシリンアレルギー歴（2015年 全身発疹）。本剤の成分に対し過敏症の既往歴のある患者［添付文書 2. 禁忌］', alt:'アセトアミノフェン錠 500mg（カロナール）'});
+  if(drug.cephem && c.penicillinAllergy)
+    out.push({lv:'warn', t:'注意 — ペニシリン過敏症の既往。セフェム系との交差反応（低頻度）に留意［添付文書 8. 重要な基本的注意］'});
+  if(drug.nsaid && c.avoidNsaids)
+    out.push({lv:'block', t:'回避 — CKD G3b（eGFR 44）。NSAIDs は腎血流低下により腎機能悪化のおそれ。この患者は NSAIDs 回避方針［添付文書 9.2 腎機能障害患者］', alt:'アセトアミノフェン錠 500mg（カロナール）'});
+  if(drug.nsaid && !c.avoidNsaids && c.egfr && c.egfr<60)
+    out.push({lv:'warn', t:`注意 — eGFR ${c.egfr}。腎機能低下患者では短期・最小量に［添付文書 9.2］`});
+  if(drug.metformin && c.egfr!=null){
+    if(c.egfr<30) out.push({lv:'block', t:'禁忌 — eGFR 30 未満［添付文書 2. 禁忌］'});
+    else if(c.egfr<45) out.push({lv:'warn', t:`用量注意 — eGFR ${c.egfr}（45未満）: 最大 1,000mg/日 に減量を推奨。定期的な腎機能モニタリング［添付文書 7. 用法及び用量に関連する注意］`, dose:'2T · 分2（＝1,000mg/日 上限）'});
+  }
+  if(drug.nonDhpCcb && c.onBeta)
+    out.push({lv:'warn', t:'併用注意 — ビソプロロール（β遮断薬）投与中。徐脈・房室ブロック・心不全増悪のおそれ。心拍数を確認［添付文書 10.2 併用注意］'});
+  if(drug.bz && (c.age>=75 || c.fallRisk))
+    out.push({lv:'warn', t:`高齢者注意 — ${c.age}歳${c.fallRisk?'・転倒リスクあり':''}。BZ系は転倒・せん妄リスク増。非BZ系（ラメルテオン等）を優先検討［高齢者の安全な薬物療法GL］`, alt:'ラメルテオン錠 8mg（ロゼレム）'});
+  if(drug.ccb && c.onCcb)
+    out.push({lv:'warn', t:'重複注意 — 同効薬（Ca拮抗薬）をすでに服用中: アムロジピン錠 5mg。意図した増量・切替か確認'});
+  if(drug.beta && c.onBeta)
+    out.push({lv:'warn', t:'重複注意 — ビソプロロールをすでに服用中（前回 Do あり）。二重処方でないか確認'});
+  if(!out.length)
+    out.push({lv:'ok', t:'相互作用・禁忌・重複 該当なし（服用中: '+(c.onBeta?'ビソプロロール · ':'')+(c.onCcb?'アムロジピン · ':'')+(c.onMetformin?'メトホルミン · ':'')+'ほか）— PMDA 添付文書チェック（デモ）'});
+  if(c.egfr!=null && !out.some(o=>/eGFR/.test(o.t)))
+    out.push({lv:'info', t:`腎機能 eGFR ${c.egfr} — 用量調整の必要なし`});
+  return out;
+}
+const DEMO_ORDERS = [
+  {n:'ビソプロロール錠 2.5mg', sub:'1T · 分1 朝食後 · 28日分', cat:'処方', hint:'前回 Do', drug:DRUG_DB[0]},
+  {n:'生化学＋BNP セット', sub:'院内採血 · 12項目', cat:'検査', hint:'この患者 ×3回'},
+  {n:'心電図 12誘導', sub:'院内 · 即時', cat:'検査', hint:'本日実施済'},
+  {n:'HbA1c · 血糖', sub:'院内採血', cat:'検査'},
+  {n:'胸部X線 2方向', sub:'放射線科', cat:'画像'},
+  {n:'心エコー', sub:'生理検査 · 要予約', cat:'画像'},
+  {n:'特定疾患療養管理料', sub:'算定 · 毎月', cat:'算定'}
+];
+let COMP_LIST = [];
+const RX_SETS = [
+  {name:'高血圧 定期セット', desc:'ビソプロロール + アムロジピン · 28日', items:[[0,28],[1,28]]},
+  {name:'解熱鎮痛 頓用セット', desc:'カロナール · 10回分', items:[[5,10]]},
+  {name:'不眠時（高齢者配慮）', desc:'ラメルテオン · 14日 — BZ回避', items:[[10,14]]}
+];
+function cartPane(k){
+  const cart = S.rxCart;
+  const shortfall = (k==='sato') && cart.some(c=>c.days && c.days<14);
+  return `<div class="comp-side-inner">
+    <div class="comp-sec-title">自分のセット — その場で保存・管理</div>
+    ${S.mySets.length?S.mySets.map((st,i)=>`<div class="comp-row myset"><button class="myset-apply" data-myset="${i}">
+      <span class="cr-cat dm-med">セット</span><span class="cr-n">${st.name}</span>
+      <span class="cr-sub">${st.desc}</span></button>
+      <button class="aid-close" data-myset-rm="${i}" title="削除">✕</button></div>`).join('')
+      :'<div class="aid-empty" style="padding:2px 14px 8px">まだありません — カートを組んで下の「セットとして保存」</div>'}
+    <div class="comp-sec-title">施設のセット<span class="m" style="font-weight:400; letter-spacing:0"> — 設定ワークスペースで管理</span></div>
+    ${RX_SETS.map((st,i)=>`<button class="comp-row" data-rxset="${i}">
+      <span class="cr-cat">施設</span><span class="cr-n">${st.name}</span>
+      <span class="cr-sub">${st.desc}</span></button>`).join('')}
+    <div class="comp-sec-title">開始日</div>
+    <div class="cf-chips" style="padding:0 14px 4px">${['本日','明日','7/28（次回）'].map(d=>`
+      <button class="tscope ${S.rxStart===d?'active':''}" data-rx-start="${d}">${d}</button>`).join('')}</div>
+    <div class="comp-sec-title">処方カート · ${cart.length}剤</div>
+    ${cart.length?cart.map((c,i)=>`<div class="cart-row"><div class="cart-main"><b>${c.n}</b><span>${c.line}</span></div>
+      <button class="aid-close" data-cart-rm="${i}">✕</button></div>`).join('')
+      :'<div class="aid-empty" style="padding:6px 14px 10px">空です — 薬剤の「カートに追加」やセットで積みます</div>'}
+    ${shortfall?'<div class="cf-warnrow" style="margin:4px 14px 8px">⚠ 次回受診 7/28（14日後）— 日数が足りない薬があります</div>':''}
+    <div style="padding:8px 14px 14px; display:grid; gap:8px">
+      <button class="btn primary" data-cart-commit ${cart.length?'':'disabled'} style="width:100%">まとめて処方（${cart.length}剤）</button>
+      ${S.savingSet?`<div class="setsave-row">
+        <input id="set-name" placeholder="セット名（例: 循環器 定期）" autocomplete="off">
+        <button class="btn sm primary" id="set-save">保存</button>
+        <button class="btn sm" id="set-cancel">やめる</button></div>`
+      :`<button class="btn" data-save-set ${cart.length?'':'disabled'} style="width:100%">☆ カートをセットとして保存</button>`}
+      <div style="font-size:10px; color:var(--muted); line-height:1.6">自分のセットは個人設定に保存（実装では /me/preferences）。施設のセットは管理者が設定ワークスペースで配布。</div>
+    </div>
+  </div>`;
+}
+function composerHtml(p, k){
+  const drugRows = DRUG_DB.map(d=>({n:d.n, sub:`${d.cls} · ${d.sub}`, cat:'処方', kana:d.kana, drug:d}));
+  const others = DEMO_ORDERS.slice(1);
+  const hist = S.compCat==='処方' ? [DEMO_ORDERS[0]] : DEMO_ORDERS.slice(0,3);
+  const cands = S.compCat==='処方' ? drugRows : others.filter(o=>o.cat!=='処方').concat(drugRows);
+  COMP_LIST = hist.concat(cands);
+  const wideBtn = `<button class="chip" id="comp-wide">${S.compWide?'⇤ 戻す':'⤢ 広げる'}</button>`;
+  if(S.compView==='form' && COMP_LIST[S.compSelIdx]!=null){
+    const inner = compFormPane(k, S.compSelIdx, wideBtn);
+    return `<aside id="composer" class="${S.compWide?'wide':''}" aria-label="オーダーコンポーザ">${
+      S.compWide?`<div class="comp-cols"><div class="comp-side">${cartPane(k)}</div><div class="comp-maincol">${inner}</div></div>`:inner}</aside>`;
+  }
+  const row=(o,i,kbd)=>`<button class="comp-row" data-i="${i}" data-txt="${o.n}${o.kana||''}${o.drug?o.drug.kana:''}">
+    <span class="cr-cat ${dmClass(o.cat)}">${o.cat}</span><span class="cr-n">${o.n}</span>${kbd?`<span class="kbd cr-kbd">${kbd}</span>`:''}
+    <span class="cr-sub">${o.sub}${o.hint?' · '+o.hint:''}</span></button>`;
+  const listInner = `
+    <div class="comp-head"><span class="kbd">⌘O</span>
+      <input id="comp-q" placeholder="${S.compCat==='処方'?'薬剤名・カナで検索（例: ろき / せれこ / さわしりん）':'処方・検査・画像・処置・セットを横断検索'}" autocomplete="off">
+      ${S.compCat==='処方'?'<button class="chip" id="comp-cat-clear">処方のみ ✕</button>':''}
+      ${wideBtn}
+      <button class="aid-close" id="comp-close">✕</button></div>
+    <div class="comp-body">
+      <div class="comp-sec-title">よく使う・履歴（この患者）— 数字キーで即選択</div>
+      ${hist.map((o,i)=>row(o,i,['1','2','3'][i])).join('')}
+      <div class="comp-sec-title">候補${S.compCat==='処方'?' — 薬剤マスタ（PMDA 添付文書チェック付き）':''}</div>
+      <div id="comp-hits">${cands.map((o,i)=>row(o,i+hist.length)).join('')}</div>
+    </div>
+    <div class="comp-foot"><span>クリック / 数字キーで選択 → 内容画面へ</span><span style="margin-left:auto"><span class="kbd">esc</span> 閉じる</span></div>`;
+  return `<aside id="composer" class="${S.compWide?'wide':''}" aria-label="オーダーコンポーザ">${
+    S.compWide?`<div class="comp-cols"><div class="comp-side">${cartPane(k)}</div><div class="comp-maincol">${listInner}</div></div>`:listInner}</aside>`;
+}
+const USAGES = ['分1 朝食後','分2 朝夕食後','分3 毎食後','分1 就寝前','頓用'];
+const DAYS = [7,14,28,56];
+const USAGE_TIMES = {'分1 朝食後':1,'分2 朝夕食後':2,'分3 毎食後':3,'分1 就寝前':1,'頓用':null};
+function compFormPane(k, i, wideBtn){
+  const o = COMP_LIST[i];
+  const head = (title)=>`<div class="comp-head">
+    <button class="btn sm" id="comp-back">‹ 候補</button>
+    <span style="font-weight:700; font-size:13px">${title}</span>
+    <span style="margin-left:auto; display:flex; gap:8px; align-items:center">${wideBtn||''}<button class="aid-close" id="comp-close">✕</button></span></div>`;
+  if(o.drug){
+    const d = o.drug;
+    if(S.compFormFor !== d.n){
+      S.compFormFor = d.n;
+      const m = /^([\d.]+)([A-Za-zＴＣ]+)/.exec(d.usage) || [null,'1','T'];
+      S.rxDoseN = parseFloat(m[1])||1; S.rxUnit = (m[2]||'T').toUpperCase();
+      S.rxUsage = (d.usage.split('·').slice(1).join('·')||'').trim()||USAGES[0];
+      S.rxDays = 28;
+    }
+    const checks = drugSafetyFor(k, d);
+    const blocked = checks.some(c=>c.lv==='block');
+    const lvClass = {block:'cf-block', warn:'cf-warnrow', ok:'cf-okrow', info:'cf-inforow'};
+    const alt = checks.find(c=>c.alt);
+    const dose = checks.find(c=>c.dose);
+    const times = USAGE_TIMES[S.rxUsage];
+    const total = times!=null ? `計 ${(S.rxDoseN*times*S.rxDays)%1?(S.rxDoseN*times*S.rxDays).toFixed(1):S.rxDoseN*times*S.rxDays}${S.rxUnit==='C'?'カプセル':'錠'}`
+                              : `${S.rxDays}回分`;
+    const shortName = d.n.split('「')[0].split('（')[0];
+    return head('処方の内容') + `
+    <div class="comp-body"><div class="rxf">
+      <div class="rxf-name">${d.n}</div>
+      <div class="rxf-sub">${d.cls} · ${d.sub}</div>
+      <div class="rx-preview num">${shortName} ${S.rxDoseN}${S.rxUnit} · ${S.rxUsage} · ${times!=null?S.rxDays+'日分':'頓用 '+S.rxDays+'回分'}<span class="tot">${total}</span></div>
+      <div class="rx-row"><span class="rx-lab">1回量</span><span class="cf-chips">${[0.5,1,2,3].map(n=>`<button class="tscope ${S.rxDoseN===n?'active':''}" data-rxn="${n}">${n}${S.rxUnit}</button>`).join('')}</span></div>
+      <div class="rx-row"><span class="rx-lab">用法</span><span class="cf-chips">${USAGES.map(u=>`<button class="tscope ${S.rxUsage===u?'active':''}" data-rx-usage="${u}">${u}</button>`).join('')}</span></div>
+      <div class="rx-row"><span class="rx-lab">${times!=null?'日数':'回数'}</span><span class="cf-chips">${DAYS.map(dd=>`<button class="tscope ${S.rxDays===dd?'active':''}" data-rx-days="${dd}">${dd}${times!=null?'日':'回'}</button>`).join('')}</span></div>
+      ${dose?`<div class="rx-row"><span class="rx-lab">提案</span><span><button class="tscope" data-rx-suggest="${dose.dose}">腎機能に合わせる: ${dose.dose}</button></span></div>`:''}
+      <div class="cf-checks">${checks.map(c=>`<div class="${lvClass[c.lv]||'cf-inforow'}">${c.lv==='block'?'⛔':c.lv==='warn'?'⚠':c.lv==='ok'?'✓':'ℹ'} ${c.t}</div>`).join('')}</div>
+      <div class="cf-safe">☑ 対応病名 — あり（この患者のプロブレムと照合済み · デモ）</div>
+    </div></div>
+    <div class="rx-actions">
+      <button class="btn primary" id="comp-add" ${blocked?'disabled':''}>${blocked?'処方できません（禁忌）':'処方して閉じる'} ${blocked?'':'<span class="kbd">⏎</span>'}</button>
+      <button class="btn" id="comp-add-more" ${blocked?'disabled':''}>続けて処方</button>
+      ${S.compWide?`<button class="btn" id="comp-cart-add" ${blocked?'disabled':''}>カートに追加</button>`:''}
+      ${alt?`<button class="btn" id="comp-alt" data-alt-name="${alt.alt}">代替: ${alt.alt.split('（')[0]}</button>`:''}
+    </div>`;
+  }
+  return head('オーダーの内容') + `
+    <div class="comp-body"><div class="rxf">
+      <div class="rxf-name">${o.n}</div>
+      <div class="rxf-sub">${o.sub}${o.hint?' · '+o.hint:''}</div>
+      <div class="rx-preview">${o.n}<span class="tot">${o.cat}</span></div>
+      <div class="cf-checks"><div class="cf-okrow">✓ 実施条件・重複 問題なし（デモ）</div></div>
+      <div class="cf-safe">☑ 対応病名 — あり · 追加は不要</div>
+    </div></div>
+    <div class="rx-actions">
+      <button class="btn primary" id="comp-add">追加して閉じる <span class="kbd">⏎</span></button>
+      <button class="btn" id="comp-add-more">続けて追加</button>
+    </div>`;
+}
+function addOrder(k, i, close){
+  const o=COMP_LIST[i], p=PATIENTS[k];
+  if(!o) return;
+  if(o.drug && drugSafetyFor(k,o.drug).some(c=>c.lv==='block')){ toast('禁忌のため処方できません — 代替候補を検討してください'); return; }
+  if(!p.today.written){
+    toast('本日の記載がまだありません — 記載を始めると行為列に着地します（モックの制約）');
+    return;
+  }
+  const times = USAGE_TIMES[S.rxUsage];
+  const a2 = o.drug ? `${S.rxDoseN}${S.rxUnit} · ${S.rxUsage} · ${times!=null?S.rxDays+'日分':S.rxDays+'回分'} — いま追加 · 未送信`
+                    : `${o.sub} — いま追加 · 未送信`;
+  (p.today.acts = p.today.acts || []).push({a1:o.n, a2, wait:true});
+  if(close){ S.composer=false; S.compView='list'; }
+  else { S.compView='list'; S.compSelIdx=null; S.compFormFor=null; }
+  renderKarte(k);
+  toast(`「${o.n}」を${o.drug?'処方':'行為列'}に追加しました — 概算点数は再計算（発行は確定操作で）`);
+}
+
+/* ================= 検査結果レポート（原本ビュー） ================= */
+const REPORTS = {
+  'yam-bcx': { title:'血液培養 2セット — 最終報告', patient:'山本 清 · 0004120388', kind:'微生物検査',
+    chain:[
+      ['7/10 21:40','依頼 — 田中 太郎（医師）· 発熱精査'],
+      ['7/10 22:05','採取 — 佐々木（看護）· 右肘/左肘 各1セット'],
+      ['7/10 22:31','検体受付 — 検体番号 B26-08812'],
+      ['7/12 09:15','中間報告 — 48時間 発育なし（技師 岡本）'],
+      ['7/13 09:02','最終報告 確定 — 実施: 岡本 / 確認: 主任技師 西村']
+    ],
+    body:'好気・嫌気ボトル 各2本 — 5日間の培養で菌の発育を認めず。<b>最終報告: 陰性</b>。',
+    note:'報告確定済み · 改訂履歴なし · 装置: 自動血液培養装置' },
+  'yam-lab713': { title:'採血（CRP · 血算 · 生化学）— 確定報告', patient:'山本 清 · 0004120388', kind:'検体検査',
+    chain:[
+      ['7/13 06:02','採取 — 病棟 定時採血'],
+      ['7/13 06:40','受付 — 検体番号 C26-11302'],
+      ['7/13 07:55','測定完了 — 生化学自動分析装置'],
+      ['7/13 08:10','技師確認（デルタチェック通過）— 報告確定 · 医師へ通知']
+    ],
+    body:'CRP <b>3.2 mg/dL ↑</b>（前回 8.9）· WBC 8,200 · ほか基準内 — 改善傾向。詳細は検査レンズの表ビューへ。',
+    note:'確定済み · パニック値なし' },
+  'yam-xr710': { title:'胸部X線 2方向 — 読影レポート', patient:'山本 清 · 0004120388', kind:'画像診断',
+    chain:[
+      ['7/10 20:55','撮影 — 放射線科'],
+      ['7/10 21:20','一次読影 — 当直医'],
+      ['7/11 09:30','確定読影 — 高木（放射線科医）· レポート確定']
+    ],
+    body:'右下肺野に浸潤影。心拡大・胸水なし。<b>所見: 右下葉肺炎に矛盾しない</b>。2025/9 と比較し新規出現。',
+    note:'レポート確定済み · キー画像 2枚（ビューアは React 実装対象）' },
+  'sato-lab416': { title:'採血（BNP · トロポニン · 脂質 ほか）— 確定報告', patient:'佐藤 次郎 · 0007712301', kind:'検体検査',
+    chain:[
+      ['4/16 09:20','採取 — 外来処置室'],
+      ['4/16 09:41','受付 — 検体番号 C26-04188'],
+      ['4/16 10:47','測定完了'],
+      ['4/16 11:02','技師確認 — 報告確定 · 医師へ通知']
+    ],
+    body:'BNP <b>46 pg/mL ↑</b> · トロポニン I 0.011 · LDL-C <b>136 ↑</b> · ほか 21項目 基準内。',
+    note:'確定済み' }
+};
+function reportPane(key){
+  const r = REPORTS[key]; if(!r) return '';
+  return `<aside id="report" aria-label="検査結果レポート">
+    <div class="comp-head"><span style="font-weight:700; font-size:13px">検査結果レポート — 原本</span>
+      <button class="aid-close" id="rep-close" style="margin-left:auto">✕</button></div>
+    <div class="comp-body"><div class="rxf">
+      <div class="rxf-name">${r.title}</div>
+      <div class="rxf-sub">${r.patient} · ${r.kind}</div>
+      <div class="rx-preview" style="font-weight:400; font-size:13px; line-height:1.8">${r.body}</div>
+      <div class="rep-chain">${r.chain.map(([t,x],i)=>`
+        <div class="rep-step ${i===r.chain.length-1?'last':''}"><span class="rep-t num">${t}</span><span class="rep-x">${x}</span></div>`).join('')}
+      </div>
+      <div class="cf-checks"><div class="cf-okrow">✓ ${r.note}</div></div>
+    </div></div>
+    <div class="rx-actions">
+      <button class="btn" data-toast="帳票PDF（原本控え）は React 実装対象">PDF で開く</button>
+      <button class="btn" data-toast="タイムラインの該当ブロックへスクロール（モック）">カルテの該当ブロックへ</button>
+    </div>
+  </aside>`;
+}
+
+/* ================= messages (連絡) ================= */
+const THREADS = [
+  { key:'sato-billing', kind:'患者スレッド', title:'佐藤 次郎 — 疑義照会（病名）', who:'医事 山口 · あなた', unread:2,
+    patient:'sato' },
+  { key:'inoue-ward', kind:'患者スレッド', title:'井上 幸子 — 退院前確認', who:'3西 佐々木 · あなた', unread:0, patient:null },
+  { key:'ch-gairai', kind:'チャンネル', title:'# 外来', who:'12名', unread:0, patient:null },
+  { key:'ch-3west', kind:'チャンネル', title:'# 3西病棟', who:'9名', unread:0, patient:null }
+];
+
+/* ================= state ================= */
+const S = { ws:'outpatient', role:'doctor', patient:null, aidOpen:true, aiOpen:false, writing:false,
+            lens:'すべて', calOpen:false, openYears:{}, openAdm:{}, billingResolved:false, wardBed:'yamamoto',
+            thread:'sato-billing', msgUnread:2, resultArrived:false,
+            vitalsOpen:true, composer:false, compSel:null, compQ:'', labStarOnly:false, orderCat:'すべて',
+            labCols:'主要', trendOpen:{}, compCat:null, compFormFor:null, compView:'list', report:null,
+            compWide:false, rxCart:[], rxStart:'本日', mySets:[], savingSet:false,
+            rxDoseN:1, rxUnit:'T', rxUsage:'', rxDays:28 };
+
+const $ = (sel) => document.querySelector(sel);
+const app = $('#app'), rail = $('#rail'), context = $('#context'), main = $('#main'), aid = $('#aid');
+let toastTimer;
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2600); }
+
+/* ================= rail ================= */
+function renderRail(){
+  const spaces = [...ROLES[S.role].spaces];
+  if(!spaces.includes(S.ws) && S.ws!=='settings') spaces.push(S.ws); // 横断ジャンプ時は現在地を仮表示
+  rail.innerHTML = `
+    <div class="mark" title="Manta"><img src="../../brand/manta-mark.svg" alt="Manta"></div>
+    ${spaces.map(k=>`
+      <button class="rail-btn ${S.ws===k?'active':''}" data-ws="${k}" aria-label="${WS_LABEL[k]}">${ICONS[k]}<span>${WS_LABEL[k]}</span>
+        ${k==='messages'&&S.msgUnread>0?`<span class="rail-badge num">${S.msgUnread}</span>`:''}
+      </button>`).join('')}
+    <div class="rail-bottom">
+      <button class="rail-btn ${S.ws==='settings'?'active':''}" data-ws="settings" aria-label="設定">${ICONS.settings}<span>設定</span></button>
+      <div class="rail-avatar" title="${ROLES[S.role].label} · 田中 太郎">田</div>
+    </div>`;
+  rail.querySelectorAll('[data-ws]').forEach(b=>b.onclick=()=>switchWs(b.dataset.ws));
+}
+
+/* ================= context ================= */
+function renderContext(){
+  if(S.ws==='outpatient'){
+    const rows = ORDER.map(k=>{
+      const p=PATIENTS[k];
+      const scls = p.status==='done' ? 'done quiet'
+        : p.stateKind==='accent' ? 'accent'
+        : p.stateKind==='attention' ? 'att' : '';
+      return `<button class="prow ${S.patient===k?'active':''} ${p.status==='done'?'done':''}" data-open="${k}">
+        <span class="pavatar">${p.ini}</span>
+        <span>
+          <span class="pname">${p.name}</span>
+          <span class="pmeta">${p.age} · ${p.dept}</span>
+          <span class="pstate ${scls}" ${p.stateDetail?`title="${p.stateDetail}"`:''}><span class="sdot"></span>${p.stateText}</span>
+        </span>
+        <span class="ptime num">${p.time}</span>
+      </button>`;}).join('');
+    context.innerHTML = `
+      <div class="ctx-head">
+        <div class="eyebrow">外来ワークスペース</div>
+        <div class="ctx-title">今日の患者</div>
+        <button class="ctx-search">⌕ 患者・ID・診療内容<span class="kbd">⌘K</span></button>
+      </div>
+      <div class="ctx-body">
+        <div class="ctx-section"><div class="ctx-label">予約時刻順 · 5名</div>${rows}</div>
+        <div class="ctx-section"><div class="ctx-label">最近開いたカルテ</div>
+          <button class="prow" id="recent-other"><span class="pavatar">渡</span>
+            <span><span class="pname">渡辺 学</span><span class="pmeta">先週 金曜 · 整形外科</span></span></button>
+        </div>
+      </div>
+      <div class="ctx-foot">終了 ${ORDER.filter(k=>PATIENTS[k].status==='done').length} / 5 名 · 12:00 更新</div>`;
+    const ro=$('#recent-other'); if(ro) ro.onclick=()=>toast('本日の 5名以外のカルテはモック対象外です');
+  }
+  if(S.ws==='ward'){
+    const pool = wardPool();
+    if(!pool.some(b=>b.key===S.wardBed)) S.wardBed = pool[0].key;
+    const row = b => `
+      <button class="brow ${S.wardBed===b.key?'active':''}" data-bed="${b.key}">
+        <span class="l1"><span class="room num">${S.role==='nurse'?b.room:`${b.ward} ${b.room}`}</span>${b.name}</span>
+        <span class="l2">${b.dx} · ${b.day}${S.role==='nurse'&&b.attending!=='田中'?` · 主治医 ${b.attending}`:''}</span>
+        <span class="l2">${b.att?`<b>${b.note}</b>`:b.note}</span>
+      </button>`;
+    if(S.role==='nurse'){
+      context.innerHTML = `
+        <div class="ctx-head">
+          <div class="eyebrow">病棟ワークスペース — 看護</div>
+          <div class="ctx-title">3西病棟 · ${pool.length}床</div>
+          <button class="ctx-search">⌕ 病床・患者を検索<span class="kbd">⌘K</span></button>
+        </div>
+        <div class="ctx-body"><div class="ctx-section"><div class="ctx-label">部屋順 · 担当医に関係なく全床</div>
+          ${pool.slice().sort((a,b)=>a.room<b.room?-1:1).map(row).join('')}
+        </div></div>
+        <div class="ctx-foot">病床 15/18 使用 · 本日入院 1 · 退院予定 1</div>`;
+    } else {
+      const wards = ['3西','5東','ICU'];
+      context.innerHTML = `
+        <div class="ctx-head">
+          <div class="eyebrow">病棟ワークスペース — 医師</div>
+          <div class="ctx-title">入院担当患者 · ${pool.length}名</div>
+          <button class="ctx-search">⌕ 患者・病棟を検索<span class="kbd">⌘K</span></button>
+        </div>
+        <div class="ctx-body">
+          ${wards.map(w=>{
+            const ps = pool.filter(b=>b.ward===w);
+            return ps.length?`<div class="ctx-section"><div class="ctx-label">${w==='ICU'?'ICU':w+'病棟'} · ${ps.length}名</div>${ps.map(row).join('')}</div>`:'';
+          }).join('')}
+        </div>
+        <div class="ctx-foot">3病棟に ${pool.length}名 · 退院予定 1 · 転棟予定 1</div>`;
+    }
+    context.querySelectorAll('[data-bed]').forEach(b=>b.onclick=()=>{S.wardBed=b.dataset.bed; renderContext(); renderMain(); renderAid();});
+  }
+  if(S.ws==='billing'){
+    context.innerHTML = `
+      <div class="ctx-head">
+        <div class="eyebrow">医事ワークスペース</div>
+        <div class="ctx-title">点検キュー</div>
+        <button class="ctx-search">⌕ 患者・請求を検索<span class="kbd">⌘K</span></button>
+      </div>
+      <div class="ctx-body">
+        <div class="ctx-section"><div class="ctx-label">要修正 · 1件</div>
+          <button class="brow active"><span class="l1">佐藤 次郎</span>
+          <span class="l2"><span class="att">${S.billingResolved?'解決済み — 再点検待ち':'心電図に対応する病名なし'}</span> · 外来 7/14</span></button>
+        </div>
+        <div class="ctx-section"><div class="ctx-label">会計待ち · 2件</div>
+          <button class="brow"><span class="l1">小林 絵美</span><span class="l2">外来 · <b class="num">135点</b> · 3割</span></button>
+          <button class="brow"><span class="l1">田村 恵</span><span class="l2">外来 · 画像結果待ち</span></button>
+        </div>
+        <div class="ctx-section"><div class="ctx-label">返戻・査定 · 1件</div>
+          <button class="brow"><span class="l1">高橋 一郎</span><span class="l2">6月分 · 検査の摘要コメント不足</span></button>
+        </div>
+      </div>
+      <div class="ctx-foot">6月分 レセプト：クローズ済み（7/10 送信）</div>`;
+  }
+  if(S.ws==='lab'){
+    context.innerHTML = `
+      <div class="ctx-head">
+        <div class="eyebrow">検査室ワークスペース — 技師</div>
+        <div class="ctx-title">本日の検体</div>
+        <button class="ctx-search">⌕ 検体番号・患者を検索</button>
+      </div>
+      <div class="ctx-body">
+        <div class="ctx-section"><div class="ctx-label">確認待ち · ${S.resultArrived?1:2}</div>
+          ${S.resultArrived?'':`<button class="brow active"><span class="l1">高橋 一郎<span class="when num">C26-11421</span></span><span class="l2">腎機能 · 電解質 — 測定完了 · <b>技師確認待ち</b></span></button>`}
+          <button class="brow ${S.resultArrived?'active':''}"><span class="l1">山本 清<span class="when num">B26-08812</span></span><span class="l2">喀痰培養 — 最終同定の入力待ち</span></button>
+        </div>
+        <div class="ctx-section"><div class="ctx-label">測定中 · 3</div>
+          <button class="brow"><span class="l1">外来 3検体</span><span class="l2">生化学 2 · 血算 1 — 装置内</span></button>
+        </div>
+        <div class="ctx-section"><div class="ctx-label">受付済 · 7</div>
+          <button class="brow"><span class="l1">午後の定時採血</span><span class="l2">病棟 7検体 — 採取待ち</span></button>
+        </div>
+      </div>
+      <div class="ctx-foot">パニック値 本日 0件 · 精度管理 08:00 合格</div>`;
+  }
+  if(S.ws==='messages'){
+    context.innerHTML = `
+      <div class="ctx-head">
+        <div class="eyebrow">連絡 — 院内のみ · PHI は外に出ません</div>
+        <div class="ctx-title">スレッド</div>
+        <button class="ctx-search">⌕ スレッド・患者を検索</button>
+      </div>
+      <div class="ctx-body">
+        <div class="ctx-section"><div class="ctx-label">患者スレッド</div>
+          ${THREADS.filter(t=>t.kind==='患者スレッド').map(t=>`
+            <button class="brow ${S.thread===t.key?'active':''}" data-thread="${t.key}">
+              <span class="l1">${t.title}${t.unread&&S.msgUnread>0?`<span class="unread num">${t.unread}</span>`:''}</span>
+              <span class="l2">${t.who}</span>
+            </button>`).join('')}
+        </div>
+        <div class="ctx-section"><div class="ctx-label">チャンネル</div>
+          ${THREADS.filter(t=>t.kind==='チャンネル').map(t=>`
+            <button class="brow ${S.thread===t.key?'active':''}" data-thread="${t.key}">
+              <span class="l1">${t.title}</span><span class="l2">${t.who}</span>
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="ctx-foot">通知: 結果到着・照会・署名依頼はここに届きます</div>`;
+    context.querySelectorAll('[data-thread]').forEach(b=>b.onclick=()=>{S.thread=b.dataset.thread; renderContext(); renderMain();});
+  }
+  if(S.ws==='settings'){
+    context.innerHTML = `
+      <div class="ctx-head">
+        <div class="eyebrow">設定</div>
+        <div class="ctx-title">管理</div>
+        <button class="ctx-search">⌕ 設定を検索</button>
+      </div>
+      <div class="ctx-body"><div class="ctx-section">
+        ${[['利用者と権限','24名'],['処方セット','12件'],['検査セット','8件'],['予約枠','外来 6診'],['カルテテンプレート','6件'],['施設ルール','8件'],['外部接続','ORCA · FHIR'],['監査ログ','']].map(([t,d],i)=>`
+          <button class="brow ${i===0?'active':''}"><span class="l1">${t}</span>${d?`<span class="l2">${d}</span>`:''}</button>`).join('')}
+      </div></div>`;
+  }
+  context.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openPatient(b.dataset.open));
+}
+
+/* ================= main: shared ================= */
+function topbar(crumbs){
+  const aidBtn = (!S.aidOpen && S.ws!=='settings' && S.ws!=='messages')
+    ? `<button class="btn sm" id="aid-open">補助情報</button>` : '';
+  return `<div id="topbar">
+    <div class="crumbs">${crumbs}</div>
+    <button class="top-search">⌕ 患者・アクションを検索<span class="kbd">⌘K</span></button>
+    <div class="top-actions">${aidBtn}<button class="ghost-ai" id="agent-btn"><span class="s">✦</span>エージェント <span class="num">2</span></button></div>
+  </div>`;
+}
+function crumb(parts){
+  return parts.map((p,i)=>{
+    const last = i===parts.length-1;
+    if(p.act) return `<button data-crumb="${p.act}">${p.t}</button>${last?'':'<span class="sep">/</span>'}`;
+    return `<span class="${last?'here':''}">${p.t}</span>${last?'':'<span class="sep">/</span>'}`;
+  }).join('');
+}
+function bindCommon(){
+  const ab=$('#agent-btn'); if(ab) ab.onclick=()=>toast('エージェントトレイは React 実装対象（モック外）');
+  const ao=$('#aid-open'); if(ao) ao.onclick=()=>{S.aidOpen=true; syncAid(); renderMain(); renderAid();};
+  main.querySelectorAll('[data-crumb]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.crumb==='home'){ S.patient=null; renderAll(); }
+  });
+  main.querySelectorAll('.top-search, .ctx-search').forEach(b=>b.onclick=()=>toast('横断検索（⌘K）は React 実装対象（モック外）'));
+}
+
+/* ================= home ================= */
+function renderHome(){
+  main.innerHTML = topbar(crumb([{t:'外来'},{t:'今日の患者'}])) + `
+  <div id="content"><div class="view">
+    <h1>今日の外来</h1>
+    <div class="vlead">2026/07/14（火） · 内科 · 田中 太郎 — 予約 5名 · 終了 ${ORDER.filter(k=>PATIENTS[k].status==='done').length}名</div>
+    <div class="vsection">
+      <div class="vlabel">対応が必要</div>
+      <div class="vcard">
+        <div class="arow">
+          <span class="who">鈴木 花子</span>
+          <span class="what">検査が揃いました（1/1 · HbA1c <span class="num">7.2 %</span> ↑ を含む）— 診察できます</span>
+          <button class="btn sm act-btn" data-open-p="suzuki">診察を開始</button>
+        </div>
+        ${S.resultArrived?`
+        <div class="arow">
+          <span class="who">高橋 一郎</span>
+          <span class="what">検査が揃いました — eGFR <span class="num">42</span> ↓（前回 44）— 診察できます</span>
+          <button class="btn sm act-btn" data-open-p="takahashi">診察を開始</button>
+        </div>`:''}
+        <div class="arow">
+          <span class="who">田村 恵</span>
+          <span class="what">診察を一時中断中 — 胸部X線から戻り次第、再開</span>
+          <button class="btn sm act-btn" data-open-p="tamura">診察を再開</button>
+        </div>
+        <div class="arow safety-row">
+          <span class="mark-safe"></span>
+          <span class="who">鈴木 花子</span>
+          <span class="what">同姓同名が本日 2名 — ID・生年月日を照合してから開く</span>
+          <button class="btn sm act-btn" id="verify-dup">患者を照合</button>
+        </div>
+      </div>
+    </div>
+    <div class="vsection">
+      <div class="vlabel">本日の予約 · 時刻順</div>
+      <div class="vcard">
+        ${ORDER.map(k=>{const p=PATIENTS[k];
+          const st = p.status==='done' ? `<span class="st done">${p.stateText}</span>`
+            : p.stateKind==='attention' ? `<span class="st att">${p.stateText}</span>`
+            : p.stateKind==='accent' ? `<span class="st att" style="color:var(--accent)">${p.stateText}</span>`
+            : `<span class="st">${p.stateText}</span>`;
+          return `<button class="trow" data-open-p="${k}">
+            <span class="t num">${p.time}</span>
+            <span class="n">${p.name}<span class="sub">${p.age} · ${p.reason}</span></span>
+            ${st}
+            <span class="dept">${p.dept}</span>
+          </button>`;}).join('')}
+      </div>
+    </div>
+  </div></div>`;
+  main.querySelectorAll('[data-open-p]').forEach(b=>b.onclick=(e)=>{e.stopPropagation(); openPatient(b.dataset.openP);});
+  const vd=$('#verify-dup'); if(vd) vd.onclick=()=>toast('患者同定の照合ダイアログは React 実装対象（モック外）');
+  bindCommon();
+}
+
+/* ================= karte: block renderers ================= */
+function dayRows(rows){
+  return rows.map(r=>`<div class="krow"><span class="kkey">${r.k}</span><span class="ktext">${r.t}</span></div>`).join('');
+}
+function actsCol(t){
+  if(!t.acts) return '';
+  return `<div class="day-acts">
+    <div class="acts-label">行為・オーダー<button class="add" title="オーダーを追加（⌘O）">＋</button></div>
+    ${t.acts.map(a=>`<div class="act"><div class="a1">${a.a1}</div><div class="a2 ${a.done?'done':''}${a.wait?' wait':''}">${a.a2}</div></div>`).join('')}
+    ${t.points?`<div class="points" data-points>
+      <button class="total-line num">${t.points.total}<span style="font-weight:400">▸</span></button>
+      <div class="detail">${t.points.lines} — 内訳は医事の点検と同じ派生データ</div>
+    </div>`:''}
+  </div>`;
+}
+function gutterOf(b){
+  const kinds = {visit:'診察', lab:'検査', image:'画像', adm:'入院', vitals:'温度板'};
+  let gd = b.gd || '', gy = b.gy || '', gk = b.type==='event' ? (b.kind||'') : (kinds[b.type]||'');
+  if(!gd){
+    const m = /^(\d{4}) (\d+\/\d+)（(.)）$/.exec(b.date||'');
+    if(m){ gd = m[2]; gy = `${m[1]} · ${m[3]}`; }
+    else if(/^本日/.test(b.date||'')){ gd = '本日'; gy = (b.date||'').replace('本日','').trim(); }
+    else { gd = b.date || ''; }
+  }
+  return `<div class="gut"><span class="gd num">${gd}</span>${gy?`<span class="gy num">${gy}</span>`:''}${gk?`<span class="gk">${gk}</span>`:''}</div>`;
+}
+function todayGutter(sub){
+  return `<div class="gut"><span class="gd num">7/14</span><span class="gy">${sub}</span><span class="gk">本日</span></div>`;
+}
+function todayBlock(p){
+  const t = p.today;
+  if(t.written){
+    return `<div class="dayblock today" data-ym="2026-07" id="blk-today">
+      ${todayGutter(`火 · <span class="num">${t.at}</span>`)}
+      <div class="bd">
+      <div class="day-h"><span class="date">${t.title}</span><span>${p.dept} · ${p.doctor} · ${t.ver}</span>
+        <span class="dots">⋯</span></div>
+      <div class="day-grid"><div class="day-main">${dayRows(t.rows)}</div>${actsCol(t)}</div>
+      <div class="addline"><span class="slash">／</span>追記・オーダー・病名・文書 — ／ か <span class="kbd">⌘O</span> で呼び出し</div>
+      </div>
+    </div>`;
+  }
+  if(S.writing && t.draft){
+    return `<div class="dayblock today" data-ym="2026-07" id="blk-today">
+      ${todayGutter('火 · 編集中')}
+      <div class="bd">
+      <div class="day-h"><span class="date">${t.draft.title}</span>
+        <span>編集中 — 自動保存 3秒</span><span class="dots">⋯</span></div>
+      <div class="day-grid">
+        <div class="day-main">
+          ${['S','O','A','P'].map(k=>`<div class="krow"><span class="kkey">${k}</span><span class="ktext kplaceholder">${k} を入力…（／でコマンド · @で検査値・画像を差込）</span></div>`).join('')}
+        </div>
+        <div class="day-acts"><div class="acts-label">行為・オーダー<button class="add">＋</button></div>
+          <div class="act"><div class="a2">まだありません — ／ か ⌘O で追加</div></div></div>
+      </div>
+      <div class="addline"><span class="slash">／</span>モックでは「書き終える」でデモ下書き（@差込チップ入り）が確定します</div>
+      </div>
+    </div>`;
+  }
+  return `<div class="dayblock today" data-ym="2026-07" id="blk-today">
+    ${todayGutter('火')}
+    <div class="bd">
+    <div class="day-h"><span class="date">${p.reason}</span></div>
+    <div class="compose">
+      <div><div class="c1">本日の記載はまだありません</div>
+      <div class="c2">所見を記載し、必要なオーダーを追加します。記載を始めるまでカルテは読み取りのままです。</div></div>
+      <button class="btn" id="start-write">＋ 本日の記載 <span class="kbd">E</span></button>
+    </div>
+    </div>
+  </div>`;
+}
+function nurseTasksBlock(p){
+  const isSato = p===PATIENTS.sato;
+  return `<div class="dayblock today" data-ym="2026-07">
+    <div class="gut"><span class="gd">本日</span><span class="gy">指示・実施</span><span class="gk">看護</span></div>
+    <div class="bd">
+      <div class="day-h"><span class="date">本日の指示・実施</span><span>外来 · ${p.name}</span></div>
+      <div class="past-sum">
+        <div class="taskrow"><span>診察前 血圧測定</span><span class="tdone">実施済 09:15 ✓</span></div>
+        ${isSato?`<div class="taskrow"><span>心電図 12誘導</span><span class="tdone">実施済 09:48 ✓（あなた）</span></div>
+        <div class="taskrow"><span>次回 7/28 心エコー — 前処置の説明</span><button class="btn sm act-btn" data-toast="実施を記録（モック） — 実施者・時刻が指示に残ります">実施を記録</button></div>`
+        :`<div class="taskrow"><span style="color:var(--muted)">未実施の指示はありません</span></div>`}
+      </div>
+    </div>
+  </div>`;
+}
+function renderBlock(b, key){
+  const anchor = `id="blk-${key}" data-ym="${b.ym}"`;
+  if(b.type==='lab'){
+    return `<div class="dayblock" ${anchor}>${gutterOf(b)}<div class="bd">
+      <div class="day-h"><span>${b.sub}</span></div>
+      <div class="labgrid">
+        ${b.labs.map(l=>`<div class="labrow"><span class="ln">${l.n}</span>
+          <span class="lv num ${l.flag||''}">${l.v}<span class="u">${l.u}</span>${l.flag==='high'?' ↑':l.flag==='low'?' ↓':''}${l.ref?`<span class="ref">${l.ref}</span>`:''}</span></div>`).join('')}
+        ${b.more?`<button class="fold-btn" data-labmore="${key}">▸ ${b.more}</button>
+        <div data-labmore-body="${key}" style="display:none; gap:2px;">
+          ${(b.moreGroups||[]).map(g=>`<div class="labcat">${g.g}</div>
+            <div class="labmini">${g.items.map(([n,v,u,ref])=>`<div class="labmini-row"><span class="mn">${n}</span><span class="mv num">${v}<i> ${u}</i></span><span class="mr num">${ref}</span></div>`).join('')}</div>`).join('')}
+        </div>`:''}
+      </div>
+    </div></div>`;
+  }
+  if(b.type==='event'){
+    return `<div class="dayblock" ${anchor}>${gutterOf(b)}<div class="bd">
+      <div class="evrow" style="padding-top:14px"><span class="ev-text">${b.text}</span>
+        ${b.link?`<button class="ev-link" data-toast="原本ビューアは React 実装対象">${b.link} ›</button>`:''}</div>
+    </div></div>`;
+  }
+  if(b.type==='image'){
+    return `<div class="dayblock" ${anchor}>${gutterOf(b)}<div class="bd">
+      <div class="day-h"><span>${b.sub}</span></div>
+      <div class="imgblock"><span class="thumb">▨</span>
+        <div class="finding">${b.finding}<span class="rep">${b.report} · <button class="ev-link" data-toast="画像ビューアは React 実装対象" style="font-size:11px">画像を開く ›</button></span></div>
+      </div>
+    </div></div>`;
+  }
+  if(b.type==='adm'){
+    const open = S.openAdm[key];
+    return `<div class="dayblock adm t-adm" ${anchor}>${gutterOf(b)}<div class="bd">
+      <div class="day-h"><span class="date">${b.dx}</span>
+        <span>${b.date} · ${b.days} · ${b.place}</span><span class="dots">⋯</span></div>
+      <div class="adm-body">${b.summary}<br>
+        <button class="adm-link" data-adm="${key}">${open?'▾ 入院中の記録を閉じる':`▸ 入院中の記録を開く（${(b.blocks||[]).length}件 — 外来と同じ時系列）`}</button></div>
+    </div></div>
+    ${open ? (b.blocks||[]).map((x,j)=>renderBlock(x, key+'-adm-'+j).replace('class="dayblock','class="dayblock in-adm')).join('') : ''}`;
+  }
+  if(b.type==='vitals'){
+    return `<div class="dayblock" ${anchor}>${gutterOf(b)}<div class="bd">
+      <div class="day-h"><span class="date">温度板</span><span>${b.sub||''}</span></div>
+      <div style="padding:4px 0 12px">${miniVitals(b.temp, b.pulse, b.bps)}
+        <div style="display:flex; gap:14px; font-size:10.5px; color:var(--muted); padding-top:4px;">
+          <span><b style="color:#1d4ed8">—</b> 体温 ℃</span><span><b style="color:#d70015">—</b> 脈拍 /分</span><span><b style="color:#5e8468">∨∧</b> 血圧</span>
+          <span style="margin-left:auto">標準配色 · 3日/7日/14日/全期間の切替は React 実装対象</span>
+        </div>
+      </div>
+    </div></div>`;
+  }
+  if(b.type==='yearfold'){
+    const open = S.openYears[b.year];
+    return `<button class="yearfold" data-year="${b.year}" ${anchor}>
+      <span class="y">${open?'▾':'▸'} ${b.year}</span><span class="cnt">${b.counts}</span>
+      <span class="arr">${open?'閉じる':'展開'}</span></button>
+      ${open ? b.blocks.map((x,j)=>renderBlock(x, key+'-'+j)).join('') : ''}`;
+  }
+  /* visit */
+  return `<div class="dayblock" ${anchor}>${gutterOf(b)}<div class="bd">
+    <div class="day-h"><span class="date">${(b.sub||'').split(' · ')[0]}</span><span>${(b.sub||'').split(' · ').slice(1).join(' · ')}</span><span class="dots">⋯</span></div>
+    <div class="past-sum">
+      <div class="krow"><span class="kkey">A</span><span class="ktext">${b.a}</span></div>
+      <div class="krow"><span></span><span>
+        <button class="fold-btn" data-fold="${key}">▸ ${b.fold}</button>
+        <div data-fold-body="${key}" style="display:none; margin-top:8px;"></div>
+      </span></div>
+    </div>
+  </div></div>`;
+}
+
+/* ================= karte: lens views ================= */
+function matrixView(p){
+  if(!p.labSeries) return `<div class="lensview"><div class="lv-head"><span class="lv-title">検査 — 表ビュー</span></div><div class="lv-note">この患者の検査データはまだありません。</div></div>`;
+  const s=p.labSeries;
+  return `<div class="lensview">
+    <div class="lv-head"><span class="lv-title">検査 — 表ビュー（基本）</span>
+      <span class="lv-sub">行=項目 × 列=時系列（左→右 = 古→新 · <b>右端が最新</b>）· <b>行クリックで推移を展開</b></span>
+      <div class="lv-nav">${s.cols.length>6?`<button class="chip" id="lab-cols">列: ${S.labCols==='主要'?'主要 ✓':'すべて ✓'}</button>`:''}<button class="chip" id="lab-star">${S.labStarOnly?'★のみ ✓':'★のみ'}</button><button class="chip" data-toast="さらに過去の列を読み込み（モック）">‹ 前の期間</button><button class="chip" data-toast="選択した項目を本日の O 欄へスナップショットチップで差込 — Write 中のみ有効（React 実装対象）">選択 → O欄へ差込</button></div>
+    </div>
+    ${(()=>{
+      const useAll = S.labCols!=='主要' || s.cols.length<=6 || !s.cols.some(c=>c.key);
+      const idx = s.cols.map((c,i)=>useAll||c.key?i:null).filter(i=>i!=null);
+      const cols = idx.map(i=>s.cols[i]);
+      return `<div class="matrix-wrap"><table class="matrix">
+      <thead><tr><th style="text-align:left">項目</th><th class="refcol">基準値</th><th class="sparkhead">推移</th>${cols.slice().reverse().map(c=>`<th><span class="yy">${c.y}</span>${c.d}${c.tag?`<span class="ctag">${c.tag}</span>`:''}</th>`).join('')}</tr></thead>
+      <tbody>${s.groups.map(g=>{
+        const rows=g.rows.filter(r=>!S.labStarOnly || r.n.includes('★'));
+        if(!rows.length) return '';
+        return `<tr class="gr"><th colspan="${3+cols.length}">${g.g}</th></tr>`+
+        rows.map(r=>{
+          const cells = idx.map(i=>r.v[i]).slice().reverse();
+          const open = S.trendOpen[r.n];
+          return `<tr data-trend="${r.n}" class="${open?'trend-on':''}"><th>${r.n}${r.u?`<span class="uu"> ${r.u}</span>`:''}</th><td class="refcol num">${r.ref}</td><td class="sparkcell">${spark(r.v)}</td>${cells.map(([v,f])=>`<td class="${f}">${v}${f==='high'?' ↑':f==='low'?' ↓':''}</td>`).join('')}</tr>`+
+          (open?`<tr class="trendrow"><td colspan="${3+cols.length}">${trendChart(r, s.cols)}</td></tr>`:'');
+        }).join('');
+      }).join('')}</tbody>
+    </table></div>`;
+    })()}
+    <div class="lv-note">表がこのレンズの基本形。★=フォロー項目 — 出どころは ①プロブレム既定セット ②医師のピン（行頭 ★ をクリック） ③<b>新規異常・前回比悪化</b>（デルタチェック。慢性の既知異常は騒がずプロブレム枠で定点観測、自動浮上は上限3件）。ストリーム側は「★3〜5項目＋ほか n項目 折畳」に圧縮されます。</div>
+  </div>`;
+}
+function rxView(p){
+  const act = p.activeMeds||[];
+  const hist = p.rxTimeline||[];
+  return `<div class="lensview">
+    <div class="lv-head"><span class="lv-title">処方 — いま飲んでいる薬と履歴</span><span class="lv-sub">Do は1クリック · 新規は PMDA チェック付き</span>
+      <div class="lv-nav">${act.length?`<button class="chip" data-do-all>まとめて前回 Do（${act.length}剤）</button>`:''}<button class="chip" data-new-rx>＋ 新規処方 <span class="kbd">⌘O</span></button></div>
+    </div>
+    ${act.length?`<div class="tl-sec"><span class="secdot dm-med"></span>現在の処方（継続中） · ${act.length}</div>
+    <div class="tl">${act.map((m,i)=>`
+      <div class="tlrow"><span class="d num">${m.since}</span>
+        <span class="w"><span class="ocat-chip dm-med">内服</span>${m.n}<span class="sub">${m.u} — ${m.rest}</span></span>
+        <span class="st"><button class="btn sm" data-do-med="${i}">前回 Do</button></span></div>`).join('')}
+    </div>`:`<div class="lv-note">継続中の処方はありません。</div>`}
+    ${hist.length?`<div class="tl-sec">開始・変更・Do の履歴</div>
+    <div class="tl">${hist.map(r=>`
+      <div class="tlrow ${r.ghost?'ghost':''}"><span class="d num">${r.d}</span>
+        <span class="w">${r.drug}${r.tag?`<span class="tag">${r.tag}</span>`:''}${r.sub?`<span class="sub">${r.sub}</span>`:''}</span>
+        <span class="st"></span></div>`).join('')}
+    </div>`:''}
+    <div class="lv-note">新規処方は薬剤マスタからサジェスト（カナ検索）し、<b>PMDA 添付文書ベースの禁忌・相互作用・腎機能・重複チェック</b>を発行前に同じ画面で通します。</div>
+  </div>`;
+}
+function dmClass(cat){
+  return {内服:'dm-med', 注射:'dm-med', 処方:'dm-med', 検査:'dm-test', 画像:'dm-img',
+          処置:'dm-proc', 治療:'dm-proc', リハビリ:'dm-reha'}[cat]||'';
+}
+function orderView(p){
+  const rows = p.orderTimeline||[];
+  const CATS = [
+    {label:'すべて', match:null},
+    {label:'薬剤', match:['内服','注射']},
+    {label:'検査・画像', match:['検査','画像']},
+    {label:'治療・処置', match:['処置','治療']},
+    {label:'リハビリ', match:['リハビリ']},
+    {label:'食事・指示', match:['食事','指示']}
+  ];
+  const active = CATS.find(c=>c.label===S.orderCat) || CATS[0];
+  const visible = rows.filter(o=>!active.match || active.match.includes(o.cat));
+  const SECTIONS = [
+    ['薬剤（内服・注射）',['内服','注射'],'dm-med'],
+    ['検査・画像',['検査','画像'],'dm-test'],
+    ['治療・処置',['処置','治療'],'dm-proc'],
+    ['リハビリ',['リハビリ'],'dm-reha'],
+    ['食事・指示',['食事','指示'],'']
+  ];
+  const secHtml = SECTIONS.map(([title,cats,dm])=>{
+    const rs = visible.filter(o=>cats.includes(o.cat));
+    if(!rs.length) return '';
+    return `<div class="tl-sec"><span class="secdot ${dm}"></span>${title} · ${rs.length}</div>
+    <div class="tl">${rs.map(o=>`
+      <div class="tlrow ${o.report?'has-rep':''}" ${o.report?`data-report="${o.report}"`:''}><span class="d num">${o.d}</span>
+        <span class="w"><span class="ocat-chip ${dmClass(o.cat)}">${o.cat}</span>${o.w}${o.course?`<span class="tag num">${o.course}</span>`:''}<span class="sub">${o.sub}</span></span>
+        <span class="st ${o.k}">${o.st}${o.report?' ›':''}</span></div>`).join('')}
+    </div>`;
+  }).join('');
+  return `<div class="lensview">
+    <div class="lv-head"><span class="lv-title">オーダー — 発行 → 実施 → 結果</span><span class="lv-sub">継続中のものは終了予定つき</span>
+      <div class="lv-nav"><button class="chip" data-open-comp-lens>＋ 新規オーダー <span class="kbd">⌘O</span></button></div></div>
+    <div class="ocat-row">${CATS.map(c=>`<button class="ocat ${c.label===active.label?'active':''}" data-ocat="${c.label}">${c.label}</button>`).join('')}</div>
+    ${secHtml || `<div class="lv-note">該当するオーダーはありません。</div>`}
+    <div class="lv-note">結果の到着は<b>キューと連絡に通知</b>されます — 開いて確認しに行く必要はありません。継続オーダー（点滴・リハ・食事・安静度）は<b>終了予定と day n/m</b> を常に表示します。</div>
+  </div>`;
+}
+
+/* ================= karte: calendar index ================= */
+function buildCalIndex(p){
+  const entries = [{ym:'2026-07', anchor:'blk-today'}];
+  (p.blocks||[]).forEach((b,i)=>{
+    if(b.type==='yearfold'){
+      /* まとめ年も月単位でインデックス化 — クリック時に自動展開する */
+      (b.blocks||[]).forEach((x,j)=>entries.push({ym:x.ym, anchor:`blk-${i}-${j}`, expandYear:b.year}));
+    } else {
+      entries.push({ym:b.ym, anchor:`blk-${i}`});
+    }
+  });
+  const years = {};
+  entries.forEach(e=>{
+    const [y,m]=e.ym.split('-');
+    years[y] = years[y] || [];
+    if(!years[y].some(x=>x.m===+m)) years[y].push({m:+m, anchor:e.anchor, expandYear:e.expandYear});
+  });
+  return Object.entries(years).sort((a,b)=>b[0]-a[0]);
+}
+function calPopover(p){
+  if(!S.calOpen) return '';
+  const years = buildCalIndex(p);
+  return `<div id="calpop">
+    <div class="cp-head">カレンダー — 受診月へジャンプ<button class="x" id="cal-close">✕</button></div>
+    ${years.map(([y,ms])=>`<div class="cp-year"><span class="cp-y num">${y}</span>
+      <span class="cp-months">${ms.sort((a,b)=>b.m-a.m).map(m=>`
+        <button class="cp-m ${m.expandYear?'fold':''}" data-anchor="${m.anchor}" ${m.expandYear?`data-expand-year="${m.expandYear}"`:''}>${m.m}月</button>`).join('')}</span></div>`).join('')}
+    <div class="cp-note">月をクリックでその位置へ。グレーの月は年ダイジェスト内 — 自動で展開してからジャンプします。</div>
+  </div>`;
+}
+
+/* ================= karte ================= */
+const LENSES = ['すべて','診察','検査','処方','オーダー','画像・文書'];
+function streamBlocks(p, lens){
+  const bs = p.blocks||[];
+  if(lens==='診察') return bs.filter(b=>['visit','adm','yearfold'].includes(b.type));
+  if(lens==='画像・文書') return bs.filter(b=>b.type==='image'||(b.type==='event'&&b.cat==='doc'));
+  return bs;
+}
+function renderKarte(k){
+  const p = PATIENTS[k];
+  const lens = S.lens;
+  const saveLabel = S.role==='clerk' ? '閲覧モード（医事） — 記載・オーダーは医師のみ'
+    : (S.writing ? '自動保存 · 編集中' : p.save);
+  const writeCta = S.role==='clerk' ? ''
+    : S.role==='nurse'
+    ? `<button class="btn" data-toast="看護記録の記載は React 実装対象 — 外来メモとしてストリームに残ります">＋ 看護記録</button>`
+    : S.writing
+    ? `<button class="btn primary" id="finish-write">書き終える <span class="kbd">⌘⏎</span></button>`
+    : `<button class="btn" id="start-write2">＋ 本日の記載 <span class="kbd">E</span></button>
+       <button class="btn primary" id="end-visit">診察を終了</button>`;
+  const orderBtn = S.role==='doctor' ? `<button class="btn" id="open-comp">＋ オーダー <span class="kbd">⌘O</span></button>` : '';
+  let body='', showFloat=false, endnote='';
+  if(lens==='検査') body = matrixView(p);
+  else if(lens==='処方') body = rxView(p);
+  else if(lens==='オーダー') body = orderView(p);
+  else {
+    const bs = streamBlocks(p, lens);
+    const streamHtml = bs.map((b,i)=>renderBlock(b, p.blocks.indexOf(b))).join('');
+    const todayHtml = (lens==='すべて'||lens==='診察') ? todayBlock(p) : '';
+    const nurseHtml = (S.role==='nurse' && (lens==='すべて'||lens==='診察')) ? nurseTasksBlock(p) : '';
+    body = nurseHtml + todayHtml + streamHtml;
+    if(lens==='画像・文書' && !bs.length) body = `<div class="lensview"><div class="lv-note">画像・文書はまだありません。</div></div>`;
+    showFloat = lens==='すべて';
+    endnote = `<div class="stream-end">${k==='tamura'?'本日が初診です':`初診 2021/8/24 まで表示 · 全 ${p.blocks.length+1+14} 件（デモは代表ブロックのみ）`}</div>`;
+    if(k!=='sato') endnote = `<div class="stream-end">${k==='tamura'?'本日が初診です':'↓ 初診まで続く'}</div>`;
+  }
+  const crumbs = S.ws==='ward'
+    ? [{t:'病棟'},{t:S.role==='nurse'?'3西病棟':'入院担当患者'},{t:p.name}]
+    : [{t:'外来',act:'home'},{t:'今日の患者',act:'home'},{t:p.name}];
+  main.innerHTML =
+    topbar(crumb(crumbs)) + `
+    <div id="patientbar">
+      <span class="pb-name">${p.name}</span><span class="pb-kana">${p.kana}</span>
+      <span class="pb-meta">${p.age} · <span class="num">${p.pid}</span></span>
+      ${p.inpatient?`<span class="today-tag">入院中 · ${p.inpatient.ward} ${p.inpatient.room} · ${p.inpatient.day}</span>`:''}
+      ${p.safety.map(s=>`<span class="safety-label" title="${s.desc}">${s.label}</span>`).join('')}
+      <span class="pb-problems">${p.problems}</span>
+      <div class="pb-right"><span class="pb-save">${saveLabel}</span>${orderBtn}${writeCta}</div>
+    </div>
+    <div id="aistrip">
+      <span class="ai-mark">✦</span>
+      ${S.aiOpen
+        ? '<span class="ai-line" style="color:var(--muted)">全文と根拠を表示中 — 畳むと 1行サマリーに戻ります</span>'
+        : `<span class="ai-line">${p.oneLiner}</span><button class="ai-link" id="ai-expand">全文と根拠 ›</button>`}
+      <span class="ai-meta">AIサマリー · 09:12</span>
+    </div>
+    ${(p.inpatient && p.vitals) ? vitalsBar(p) : ''}
+    <div id="lensbar">
+      ${LENSES.map(l=>`<button class="lens ${l===lens?'active':''}" data-lens="${l}">${l}</button>`).join('')}
+      <div class="lens-right">
+        <span class="chip" style="pointer-events:none; color:var(--muted)">ビュー: ${S.role==='doctor'?'医師標準':S.role==='nurse'?'看護標準':'医事閲覧'}</span>
+        <button class="chip" id="cal-toggle">カレンダー</button>
+        <button class="chip" id="lab-table">検査を表で <span class="kbd">⌘L</span></button>
+      </div>
+      ${calPopover(p)}
+    </div>
+    <div id="content"><div class="sheet-wrap">
+      ${showFloat?'<div class="month-float" id="month-float">2026年7月</div>':''}
+      <div class="sheet">
+      ${(lens==='すべて')?(S.aiOpen?aiCard(p):''):''}
+      ${body}
+    </div>${endnote}</div></div>${S.composer?composerHtml(p,k):''}${S.report?reportPane(S.report):''}`;
+
+  /* folds */
+  main.querySelectorAll('[data-fold]').forEach(btn=>{
+    btn.onclick=()=>{
+      const key=btn.dataset.fold, bodyEl=main.querySelector(`[data-fold-body="${key}"]`);
+      const blk = p.blocks[key] || findFoldBlock(p, key);
+      const open = bodyEl.style.display!=='none';
+      if(open){ bodyEl.style.display='none'; btn.textContent='▸ '+blk.fold; }
+      else { bodyEl.innerHTML = `<div style="display:grid; gap:8px;">${dayRows(blk.rows)}</div>`;
+        bodyEl.style.display='block'; btn.textContent='▾ 閉じる'; }
+    };
+  });
+  function findFoldBlock(p, key){
+    /* 入れ子ブロック: key = "<idx>-<j>" or "<idx>-adm-<j>" */
+    const parts = String(key).split('-');
+    const i = parts[0], j = parts[parts.length-1];
+    return p.blocks[i] && p.blocks[i].blocks ? p.blocks[i].blocks[j] : p.blocks[i];
+  }
+  /* 入院ブロックの展開 */
+  main.querySelectorAll('[data-adm]').forEach(b=>b.onclick=()=>{
+    S.openAdm[b.dataset.adm]=!S.openAdm[b.dataset.adm]; renderKarte(k);
+  });
+  /* yearfold */
+  main.querySelectorAll('.yearfold').forEach(b=>b.onclick=()=>{
+    S.openYears[b.dataset.year]=!S.openYears[b.dataset.year]; renderKarte(k);
+  });
+  /* lab more fold */
+  main.querySelectorAll('[data-labmore]').forEach(btn=>{
+    btn.onclick=()=>{
+      const bodyEl=main.querySelector(`[data-labmore-body="${btn.dataset.labmore}"]`);
+      const open=bodyEl.style.display!=='none';
+      bodyEl.style.display=open?'none':'grid';
+      btn.textContent=(open?'▸ ':'▾ ')+btn.textContent.slice(2);
+    };
+  });
+  /* ai */
+  const x1=$('#ai-expand'); if(x1) x1.onclick=()=>{S.aiOpen=true; S.lens='すべて'; renderKarte(k);};
+  const xf=$('#ai-fold'); if(xf) xf.onclick=()=>{S.aiOpen=false; renderKarte(k);};
+  /* write / end */
+  const sw=$('#start-write')||$('#start-write2');
+  if(sw) sw.onclick=()=>startWrite(k);
+  const fw=$('#finish-write'); if(fw) fw.onclick=()=>finishWrite(k);
+  const ev=$('#end-visit'); if(ev) ev.onclick=()=>endVisit(k);
+  /* lenses */
+  main.querySelectorAll('.lens').forEach(l=>l.onclick=()=>{
+    S.lens=l.dataset.lens; S.calOpen=false; renderKarte(k);
+  });
+  const ct=$('#cal-toggle'); if(ct) ct.onclick=()=>{S.calOpen=!S.calOpen; if(S.lens!=='すべて'){S.lens='すべて';} renderKarte(k);};
+  const cc=$('#cal-close'); if(cc) cc.onclick=()=>{S.calOpen=false; renderKarte(k);};
+  main.querySelectorAll('.cp-m').forEach(b=>b.onclick=()=>{
+    if(b.dataset.expandYear) S.openYears[b.dataset.expandYear]=true;
+    S.calOpen=false; renderKarte(k);
+    const el=document.getElementById(b.dataset.anchor);
+    if(el){ el.scrollIntoView({behavior:'smooth', block:'start'}); }
+  });
+  const lt=$('#lab-table'); if(lt) lt.onclick=()=>{S.lens='検査'; renderKarte(k);};
+  /* points */
+  main.querySelectorAll('[data-points] .total-line').forEach(b=>b.onclick=()=>b.closest('.points').classList.toggle('open'));
+  /* misc */
+  main.querySelectorAll('[data-toast]').forEach(b=>b.onclick=(e)=>{e.stopPropagation(); toast(b.dataset.toast);});
+  main.querySelectorAll('.ai-ev').forEach(b=>b.onclick=()=>toast('該当ブロックへスクロールジャンプ（モック）'));
+  main.querySelectorAll('.acts-label .add').forEach(b=>b.onclick=()=>{S.composer=true; renderKarte(k);});
+  main.querySelectorAll('.addline').forEach(a=>{a.style.cursor='pointer'; a.onclick=()=>{S.composer=true; renderKarte(k);};});
+  const oc=$('#open-comp'); if(oc) oc.onclick=()=>{S.composer=true; S.compSelIdx=null; renderKarte(k);};
+  const vt=$('#vitals-toggle'); if(vt) vt.onclick=()=>{S.vitalsOpen=!S.vitalsOpen; renderKarte(k);};
+  const ls=$('#lab-star'); if(ls) ls.onclick=()=>{S.labStarOnly=!S.labStarOnly; renderKarte(k);};
+  const lc=$('#lab-cols'); if(lc) lc.onclick=()=>{S.labCols=S.labCols==='主要'?'すべて':'主要'; renderKarte(k);};
+  main.querySelectorAll('[data-trend]').forEach(tr=>tr.onclick=()=>{
+    S.trendOpen[tr.dataset.trend]=!S.trendOpen[tr.dataset.trend]; renderKarte(k);
+  });
+  main.querySelectorAll('[data-tscope]').forEach(b=>b.onclick=(e)=>{
+    e.stopPropagation(); S.trendScope=b.dataset.tscope; renderKarte(k);
+  });
+  const mw=main.querySelector('.matrix-wrap'); if(mw) mw.scrollLeft = mw.scrollWidth; /* 右端=最新を初期表示 */
+  main.querySelectorAll('[data-ocat]').forEach(b=>b.onclick=()=>{S.orderCat=b.dataset.ocat; renderKarte(k);});
+  main.querySelectorAll('[data-open-comp-lens]').forEach(b=>b.onclick=()=>{S.composer=true; renderKarte(k);});
+  if(S.composer){
+    const cc=$('#comp-close'); if(cc) cc.onclick=()=>{S.composer=false; S.compCat=null; S.compView='list'; renderKarte(k);};
+    const cw=$('#comp-wide'); if(cw) cw.onclick=()=>{S.compWide=!S.compWide; renderKarte(k);};
+    main.querySelectorAll('[data-rxset]').forEach(bt=>bt.onclick=()=>{
+      const st=RX_SETS[+bt.dataset.rxset];
+      let added=0;
+      st.items.forEach(([di,days])=>{
+        const d=DRUG_DB[di];
+        if(drugSafetyFor(k,d).some(c=>c.lv==='block')){ toast(`「${d.n}」は禁忌のためセットから除外しました`); return; }
+        S.rxCart.push({n:d.n, line:`${d.usage} · ${days}${/頓用/.test(d.usage)?'回分':'日分'}`, days}); added++;
+      });
+      if(added) toast(`セット「${st.name}」から ${added}剤 をカートに追加`);
+      renderKarte(k);
+    });
+    main.querySelectorAll('[data-cart-rm]').forEach(bt=>bt.onclick=()=>{S.rxCart.splice(+bt.dataset.cartRm,1); renderKarte(k);});
+    main.querySelectorAll('[data-rx-start]').forEach(bt=>bt.onclick=()=>{S.rxStart=bt.dataset.rxStart; renderKarte(k);});
+    const ss=main.querySelector('[data-save-set]'); if(ss && !ss.disabled) ss.onclick=()=>{S.savingSet=true; renderKarte(k); const inp=$('#set-name'); if(inp) inp.focus();};
+    const sc=$('#set-cancel'); if(sc) sc.onclick=()=>{S.savingSet=false; renderKarte(k);};
+    const doSave=()=>{
+      const inp=$('#set-name'); const name=(inp&&inp.value.trim())||'';
+      if(!name){ toast('セット名を入力してください'); return; }
+      S.mySets.unshift({name, desc:`${S.rxCart.length}剤 · いま保存 · 自分用`, cart:S.rxCart.map(c=>({...c}))});
+      S.savingSet=false; renderKarte(k);
+      toast(`セット「${name}」を保存しました — 次からワンクリックで展開できます`);
+    };
+    const sv=$('#set-save'); if(sv) sv.onclick=doSave;
+    const sn=$('#set-name'); if(sn) sn.addEventListener('keydown',(ev)=>{ if(ev.key==='Enter') doSave(); if(ev.key==='Escape'){S.savingSet=false; renderKarte(k);} ev.stopPropagation(); });
+    main.querySelectorAll('[data-myset]').forEach(bt=>bt.onclick=()=>{
+      const st=S.mySets[+bt.dataset.myset];
+      st.cart.forEach(c=>S.rxCart.push({...c}));
+      renderKarte(k); toast(`セット「${st.name}」をカートに展開（${st.cart.length}剤）`);
+    });
+    main.querySelectorAll('[data-myset-rm]').forEach(bt=>bt.onclick=()=>{
+      const st=S.mySets[+bt.dataset.mysetRm];
+      S.mySets.splice(+bt.dataset.mysetRm,1); renderKarte(k); toast(`セット「${st.name}」を削除しました`);
+    });
+    const cb=main.querySelector('[data-cart-commit]'); if(cb && !cb.disabled) cb.onclick=()=>{
+      const p2=PATIENTS[k];
+      if(!p2.today.written){ toast('本日の記載がまだありません — 記載を始めるとカートが行為列に着地します'); return; }
+      S.rxCart.forEach(c=>(p2.today.acts=p2.today.acts||[]).push({a1:c.n, a2:`${c.line}${S.rxStart!=='本日'?' · 開始 '+S.rxStart:''} — カート処方 · 未送信`, wait:true}));
+      const n=S.rxCart.length;
+      S.rxCart=[]; S.composer=false; S.compView='list';
+      renderKarte(k);
+      toast(`カートの ${n}剤 をまとめて処方しました — 行為列に着地（未送信 · 発行は確定操作で）`);
+    };
+    const ca=$('#comp-cart-add'); if(ca && !ca.disabled) ca.onclick=()=>{
+      const o=COMP_LIST[S.compSelIdx];
+      if(o&&o.drug){
+        const times=USAGE_TIMES[S.rxUsage];
+        S.rxCart.push({n:o.drug.n, line:`${S.rxDoseN}${S.rxUnit} · ${S.rxUsage} · ${times!=null?S.rxDays+'日分':S.rxDays+'回分'}`, days:times!=null?S.rxDays:null});
+        S.compView='list'; S.compSelIdx=null; S.compFormFor=null;
+        renderKarte(k); toast(`「${o.drug.n}」をカートに追加 — まとめて処方できます`);
+      }
+    };
+    if(S.compView==='form'){
+      const bb=$('#comp-back'); if(bb) bb.onclick=()=>{S.compView='list'; renderKarte(k);};
+      main.querySelectorAll('[data-rxn]').forEach(b=>b.onclick=()=>{S.rxDoseN=parseFloat(b.dataset.rxn); renderKarte(k);});
+      main.querySelectorAll('[data-rx-usage]').forEach(b=>b.onclick=()=>{S.rxUsage=b.dataset.rxUsage; renderKarte(k);});
+      main.querySelectorAll('[data-rx-days]').forEach(b=>b.onclick=()=>{S.rxDays=+b.dataset.rxDays; renderKarte(k);});
+      const sg=main.querySelector('[data-rx-suggest]'); if(sg) sg.onclick=()=>{
+        const t=sg.dataset.rxSuggest; const m=/^([\d.]+)([A-Za-z]+)/.exec(t)||[null,'2','T'];
+        S.rxDoseN=parseFloat(m[1])||2; S.rxUsage='分2 朝夕食後'; renderKarte(k);
+        toast('添付文書の腎機能条項に合わせて用量を調整しました');
+      };
+      const ab=$('#comp-alt'); if(ab) ab.onclick=()=>{
+        const nm=ab.dataset.altName||'';
+        const idx=COMP_LIST.findIndex(x=>x.drug && nm.includes(x.drug.n.split('錠')[0].split('カプセル')[0]));
+        if(idx>=0){ S.compSelIdx=idx; S.compFormFor=null; renderKarte(k); toast('代替候補に切り替えました'); }
+      };
+      const ad=$('#comp-add'); if(ad && !ad.disabled) ad.onclick=()=>addOrder(k, S.compSelIdx, true);
+      const am=$('#comp-add-more'); if(am && !am.disabled) am.onclick=()=>addOrder(k, S.compSelIdx, false);
+    } else {
+      const rows=[...main.querySelectorAll('.comp-row')].filter(r=>!r.closest('.comp-side'));
+      rows.forEach(r=>r.onclick=()=>{S.compSelIdx=+r.dataset.i; S.compView='form'; S.compFormFor=null; renderKarte(k);});
+      const q=$('#comp-q');
+      if(q){
+        q.focus();
+        q.oninput=()=>{const v=q.value.trim(); rows.forEach(r=>{r.style.display=(!v||r.dataset.txt.includes(v))?'':'none';});};
+        q.addEventListener('keydown',(ev)=>{
+          if(ev.key==='Enter'){ const first=rows.find(r=>r.style.display!=='none'); if(first) first.click(); }
+          if(ev.key==='Escape'){ S.composer=false; S.compView='list'; renderKarte(k); }
+          ev.stopPropagation();
+        });
+      }
+      const ccl=$('#comp-cat-clear'); if(ccl) ccl.onclick=()=>{S.compCat=null; renderKarte(k);};
+    }
+  }
+  main.querySelectorAll('[data-new-rx]').forEach(b=>b.onclick=()=>{S.composer=true; S.compCat='処方'; S.compSelIdx=null; S.report=null; renderKarte(k);});
+  main.querySelectorAll('[data-report]').forEach(b=>b.onclick=()=>{S.report=b.dataset.report; S.composer=false; renderKarte(k);});
+  const rc=$('#rep-close'); if(rc) rc.onclick=()=>{S.report=null; renderKarte(k);};
+  main.querySelectorAll('[data-do-med]').forEach(b=>b.onclick=()=>{
+    const p=PATIENTS[k], m=(p.activeMeds||[])[+b.dataset.doMed];
+    if(!m) return;
+    if(!p.today.written){ toast('本日の記載がまだありません — 記載を始めると Do が行為列に着地します'); return; }
+    (p.today.acts=p.today.acts||[]).push({a1:m.n, a2:`${m.u} · 28日分 — 前回 Do · 未送信`, wait:true});
+    renderKarte(k); toast(`「${m.n}」を前回 Do — PMDA チェック済み（変更なしのため差分なし）`);
+  });
+  main.querySelectorAll('[data-do-all]').forEach(b=>b.onclick=()=>{
+    const p=PATIENTS[k];
+    if(!p.today.written){ toast('本日の記載がまだありません — 記載を始めると Do が行為列に着地します'); return; }
+    (p.activeMeds||[]).forEach(m=>(p.today.acts=p.today.acts||[]).push({a1:m.n, a2:`${m.u} · 28日分 — 前回 Do · 未送信`, wait:true}));
+    renderKarte(k); toast(`${(p.activeMeds||[]).length}剤を前回 Do しました — 行為列に着地（未送信）`);
+  });
+  /* month float */
+  const mf=$('#month-float');
+  if(mf){
+    const content=$('#content');
+    content.onscroll=()=>{
+      const blocks=[...content.querySelectorAll('[data-ym]')];
+      let label='2026-07';
+      for(const b of blocks){ if(b.offsetTop <= content.scrollTop+150) label=b.dataset.ym; }
+      const [y,m]=label.split('-');
+      mf.textContent=`${y}年${+m}月`;
+    };
+  }
+  bindCommon();
+}
+function aiCard(p){
+  return `<div class="ai-card">
+    <div class="ai-card-head"><span class="ai-mark">✦</span>AIサマリー
+      <span class="meta">直近${p.aiEv.length}件の診察・検査から · 09:12 生成 · ルール</span>
+      <button class="fold" id="ai-fold">畳む ↑</button></div>
+    <div class="ai-card-grid">
+      <div class="ai-card-body">${p.aiParas.map(t=>`<p>${t}</p>`).join('')}</div>
+      <div><div class="ai-ev-label">根拠 — クリックで原本へ</div>
+        ${p.aiEv.map(e=>`<button class="ai-ev"><span class="d num">${e.d}</span><span class="t">${e.t}</span></button>`).join('')}
+      </div>
+    </div>
+    <div class="ai-card-foot">AIによる要約です。診療上の判断は原本を確認してください。
+      <button class="ask">この患者について質問 <span class="kbd">⌘J</span></button></div>
+  </div>`;
+}
+/* 入院中の患者に固定される温度板バンド — AIサマリーと同格の「患者に付く」情報 */
+function vitalsBar(p){
+  const v=p.vitals;
+  const lt=v.temp[v.temp.length-1], lp=v.pulse[v.pulse.length-1];
+  const lbp=(v.bps&&v.bps.length)?v.bps[v.bps.length-1]:null;
+  return `<div id="vitalsbar">
+    <div class="vb-head">
+      <b>温度板</b><span class="vb-meta">${p.inpatient.ward} ${p.inpatient.room} · ${p.inpatient.day} · 進行中 — 患者に固定</span>
+      ${S.vitalsOpen?'':`<span class="vb-now num">体温 ${lt.toFixed(1)} ℃ · 脈拍 ${lp} · 血圧 ${lbp?lbp[0]+'/'+lbp[1]:'—'}</span>`}
+      <button class="fold-btn" id="vitals-toggle" ${S.vitalsOpen?'style="margin-left:auto"':'style="margin-left:12px"'}>${S.vitalsOpen?'畳む ↑':'展開 ▾'}</button>
+    </div>
+    ${S.vitalsOpen?`<div class="vb-chart">${miniVitals(v.temp, v.pulse, v.bps)}
+      <div class="vb-legend"><span><b style="color:#1d4ed8">—</b> 体温 ℃</span><span><b style="color:#d70015">—</b> 脈拍 /分</span><span><b style="color:#5e8468">∨∧</b> 血圧</span><span style="margin-left:auto">3日/7日/14日/全期間 · 下段グリッドは React 実装対象</span></div></div>`:''}
+  </div>`;
+}
+
+/* write flow */
+function startWrite(k){
+  const p=PATIENTS[k];
+  if(S.role!=='doctor'){ toast('診療記載は医師ロールのみ — 看護は看護記録、医事は閲覧'); return; }
+  if(p.today.written){ toast('本日の記載は確定済みです（追記は ／ から）'); return; }
+  if(!p.today.draft){ toast('このモックでは 鈴木 花子 で記載フローを試せます'); return; }
+  S.writing=true; S.lens='すべて'; renderKarte(k);
+  toast('本日の記載を開始 — 画面遷移せず、その場で書きます');
+}
+function finishWrite(k){
+  const p=PATIENTS[k];
+  Object.assign(p.today, p.today.draft, {written:true});
+  p.save=`保存済み ${p.today.ver} · ${p.today.at}`;
+  S.writing=false;
+  p.stateText='診察中'; p.stateKind='accent';
+  renderAll();
+  toast('書き終えました — 版を確定（v1）。O 欄の検査値は @差込チップです');
+}
+function endVisit(k){
+  const p=PATIENTS[k];
+  if(p.inpatient){ toast('入院中は「診察を終了」ではなく退院処理で完了します — 回診記録は書き終えるだけでOK'); return; }
+  p.status='done'; p.stateText='診察終了 · 会計待ち'; p.stateKind='done';
+  const next = ORDER.map(x=>PATIENTS[x]).filter(x=>x.status!=='done' && x!==p)
+    .sort((a,b)=>a.time<b.time?-1:1)[0];
+  if(next){
+    const nk = Object.keys(PATIENTS).find(x=>PATIENTS[x]===next);
+    openPatient(nk);
+    toast(`${p.name} の診察を終了 — 次: ${next.name}（${next.stateText}）`);
+  } else {
+    S.patient=null; renderAll(); toast(`${p.name} の診察を終了 — 本日の外来は全員終了です`);
+  }
+}
+
+/* ================= ward ================= */
+function renderWard(){
+  const pool = wardPool();
+  if(!pool.some(b=>b.key===S.wardBed)) S.wardBed = pool[0].key;
+  const bed = WARD_BEDS.find(b=>b.key===S.wardBed);
+  const isNurse = S.role==='nurse';
+  main.innerHTML = topbar(crumb([{t:'病棟'},{t:isNurse?'3西病棟':'入院担当患者'},{t:bed.name}])) + `
+  <div id="content"><div class="view">
+    <div style="display:flex; align-items:flex-start; gap:14px;">
+      <div style="min-width:0">
+        <h1>${bed.name} <span style="font-weight:400; font-size:13px; color:var(--muted)">${bed.age}</span></h1>
+        <div class="vlead">${bed.ward} ${bed.room} · ${bed.dx} · ${bed.day} · 主治医 ${bed.attending} — ${bed.att?`<b style="color:var(--ink2)">${bed.note}</b>`:bed.note}</div>
+      </div>
+      <button class="btn" style="margin-left:auto; flex:none" data-openchart="${bed.key}">カルテを開く</button>
+    </div>
+    <div class="vsection">
+      <div class="vlabel">温度板（直近${bed.temp.length}日）</div>
+      <div class="vcard" style="padding:12px 16px 6px">
+        ${miniVitals(bed.temp, bed.pulse, bed.bps)}
+        <div style="display:flex; gap:14px; font-size:10.5px; color:var(--muted); padding:6px 2px 6px;">
+          <span><b style="color:#1d4ed8">—</b> 体温 ℃（左軸）</span>
+          <span><b style="color:#d70015">—</b> 脈拍 /分</span>
+          <span><b style="color:#5e8468">∨∧</b> 血圧</span>
+          <span style="margin-left:auto">標準配色 · カルテを開くと温度板が既定表示（karte-b 文法）</span>
+        </div>
+      </div>
+    </div>
+    <div class="vsection">
+      <div class="vlabel">指示・文書 — ${bed.name}</div>
+      <div class="vcard">
+        ${bed.items.length?bed.items.map(i=>`
+          <div class="wrow"><div class="wmain">
+            <div class="w1">${i.x}</div><div class="w2">${i.t} · 3西病棟</div></div>
+            <button class="btn sm act-btn" data-do="${i.x}">${i.act}</button>
+          </div>`).join(''):`<div class="wrow"><div class="w2">本日の未実施はありません。</div></div>`}
+      </div>
+    </div>
+  </div></div>`;
+  main.querySelectorAll('[data-openchart]').forEach(b=>b.onclick=()=>{
+    toast('入院も外来と同じタイムライン文法 — 佐藤 次郎の 2023年 入院ブロックを展開すると同じ見た目で見られます');
+  });
+  main.querySelectorAll('[data-do]').forEach(b=>b.onclick=()=>toast(`「${b.dataset.do}」を実施として記録（モック）`));
+  bindCommon();
+}
+
+/* ================= billing ================= */
+function renderBilling(){
+  const resolved = S.billingResolved;
+  main.innerHTML = topbar(crumb([{t:'医事'},{t:'請求ドラフト点検'}])) + `
+  <div id="content"><div class="view">
+    <h1>請求ドラフト点検 — 佐藤 次郎</h1>
+    <div class="vlead">外来 2026/07/14 · 循環器内科 · 担当医 田中 太郎 — カルテから自動生成した派生データ</div>
+    <div class="vsection">
+      <div class="vlabel">明細</div>
+      <div class="vcard bill-lines">
+        ${[['再診料','75'],['特定疾患療養管理料','225'],['心電図検査（12誘導）','130'],['処方箋料','60']].map(([n,pt])=>`
+          <div class="bline"><span>${n}</span><span class="pt num">${pt}点</span></div>`).join('')}
+        <div class="bline total"><span>合計</span><span class="pt num">490点</span></div>
+      </div>
+    </div>
+    <div class="vsection">
+      <div class="vlabel">点検 — ${resolved?'未解決 0件':'未解決 1件'}</div>
+      <div class="vcard">
+        <div class="issue ${resolved?'resolved':''}">
+          <span class="imark"></span>
+          <div>
+            <div class="i1">心電図検査に対応する病名がありません</div>
+            <div class="i2">${resolved
+              ?'<span class="solved">解決済み — 病名「労作性狭心症の疑い」を追加しました（確定者: あなた）</span>'
+              :'カルテの A 欄より候補: <span class="cand">労作性狭心症の疑い</span> — 医師へ照会するか、権限があれば直接追加します'}</div>
+          </div>
+          ${resolved?'':`<div class="iact">
+            <button class="btn sm" id="see-chart">カルテで確認</button>
+            <button class="btn sm" id="ask-doctor">医師へ照会</button>
+            <button class="btn sm primary" id="adopt">候補を採用</button>
+          </div>`}
+        </div>
+      </div>
+    </div>
+    <div class="vsection">
+      <div class="vcard">
+      <div class="bill-foot">
+        点検 ${resolved?'OK · 未解決 0件':'未解決 1件'} — 送信の確定は人が行います（AI・自動化は候補の提示まで）
+        <span class="spacer"></span>
+        <button class="btn ${resolved?'primary':''}" id="send-orca" ${resolved?'':'disabled'}>ORCA へ送信</button>
+      </div>
+      </div>
+    </div>
+  </div></div>`;
+  const ad=$('#adopt'); if(ad) ad.onclick=()=>{S.billingResolved=true; renderContext(); renderBilling(); toast('病名「労作性狭心症の疑い」を追加 — 点検が解決しました');};
+  const sc=$('#see-chart'); if(sc) sc.onclick=()=>{S.ws='outpatient'; openPatient('sato'); toast('医事から 佐藤 次郎 のカルテを開きました（閲覧） — 根拠は本日の A 欄');};
+  const askd=$('#ask-doctor'); if(askd) askd.onclick=()=>{S.ws='messages'; S.thread='sato-billing'; renderAll(); toast('患者スレッドで医師へ照会 — 連絡ワークスペースに切替えました');};
+  const so=$('#send-orca'); if(so) so.onclick=()=>toast('送信しました（モック） — 送信履歴と監査ログに記録');
+  bindCommon();
+}
+
+/* ================= messages ================= */
+function renderMessages(){
+  const t = THREADS.find(x=>x.key===S.thread) || THREADS[0];
+  let body='';
+  if(t.key==='sato-billing'){
+    body = `
+    <div class="msg-day">今日 — 佐藤 次郎（0007712301）についてのスレッド · 参加: 医事 山口 / 田中 太郎</div>
+    <div class="msg"><span class="mava">山</span><div>
+      <div class="mh"><b>山口 誠</b><span class="role">医事</span><span class="tm">11:32</span></div>
+      <div class="mb">本日の外来分です。心電図検査に対応する病名がありません。カルテのA欄から「労作性狭心症の疑い」が候補に見えますが、追加してよいですか？
+        <div class="msg-quote"><div class="q1">心電図検査（12誘導） · 130点</div>
+          <div class="q2">請求ドラフト 2026/07/14 · 点検 issue #241</div>
+          <button class="qlink" data-open-sato>カルテで該当箇所を開く ›</button></div>
+      </div></div></div>
+    <div class="msg"><span class="mava">田</span><div>
+      <div class="mh"><b>田中 太郎</b><span class="role">医師 · あなた</span><span class="tm">11:38</span></div>
+      <div class="mb">確認しました。「労作性狭心症の疑い」で追加してください。次回心エコーで確定評価の予定です。</div></div></div>
+    <div class="msg-actions">
+      <button class="btn sm primary" data-approve>承認して病名を追加</button>
+      <button class="btn sm" data-open-sato>カルテを確認</button>
+    </div>
+    ${S.billingResolved?'<div class="msg-sys"><span class="okmark">✓</span> 病名「労作性狭心症の疑い」を追加しました — 請求ドラフトの点検が解決（11:40 · 操作: 山口）</div>':''}
+    <div class="composer">メッセージを入力…（このスレッドは患者カルテに紐づいています）<span class="kbd">⏎</span></div>
+    <div class="msg-note">院内完結 — PHI を外部のチャットアプリに出さないための仕組みです。結果到着・照会・署名依頼の通知もここに届きます。</div>`;
+  } else if(t.key==='inoue-ward'){
+    body = `
+    <div class="msg-day">今日 — 井上 幸子（3西 305）についてのスレッド</div>
+    <div class="msg"><span class="mava">佐</span><div>
+      <div class="mh"><b>佐々木 舞</b><span class="role">看護 · 3西</span><span class="tm">10:05</span></div>
+      <div class="mb">井上さん、明後日の退院に向けて退院療養計画書の署名をお願いします。ご家族は明日 14時 に来院予定です。</div></div></div>
+    <div class="msg-actions"><button class="btn sm" data-toast="文書ビューは React 実装対象">文書を開いて署名</button></div>
+    <div class="composer">メッセージを入力…<span class="kbd">⏎</span></div>`;
+  } else {
+    body = `
+    <div class="msg-day">${t.title} — 部署チャンネル</div>
+    <div class="msg"><span class="mava">受</span><div>
+      <div class="mh"><b>受付</b><span class="tm">09:02</span></div>
+      <div class="mb">本日、鈴木 花子 様が 2名いらっしゃいます。お呼び出し時はフルネーム＋生年月日でお願いします。</div></div></div>
+    ${S.resultArrived&&t.key==='ch-gairai'?`<div class="msg-sys">🔔 高橋 一郎 — 採血結果が到着（eGFR 42 ↓）· 12:00</div>`:''}
+    <div class="composer">メッセージを入力…<span class="kbd">⏎</span></div>`;
+  }
+  main.innerHTML = topbar(crumb([{t:'連絡'},{t:t.title}])) + `
+    <div id="content"><div class="view" style="max-width:760px">${body}</div></div>`;
+  main.querySelectorAll('[data-open-sato]').forEach(b=>b.onclick=()=>{S.ws='outpatient'; openPatient('sato'); toast('スレッドから佐藤 次郎のカルテを開きました');});
+  main.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>{S.billingResolved=true; renderMessages(); toast('承認 — 病名を追加し、医事の点検が解決しました');});
+  main.querySelectorAll('[data-toast]').forEach(b=>b.onclick=()=>toast(b.dataset.toast));
+  bindCommon();
+}
+
+/* ================= lab (検査室 — 技師) ================= */
+function renderLabWs(){
+  main.innerHTML = topbar(crumb([{t:'検査室'},{t:'本日の検体'}])) + `
+  <div id="content"><div class="view">
+    <h1>検査室 — 本日の検体</h1>
+    <div class="vlead">受付 12 · 測定中 3 · 確認待ち ${S.resultArrived?1:2} · パニック値 0 — 確定した報告は担当医のキューと連絡に自動通知されます</div>
+    <div class="vsection">
+      <div class="vlabel">技師確認待ち（デルタチェック・パニック値の最終関門）</div>
+      <div class="vcard">
+        ${S.resultArrived?`
+        <div class="wrow"><div class="wmain">
+          <div class="w1">高橋 一郎 — 採血（腎機能 · 電解質）<span style="font-weight:400;font-size:11.5px;color:var(--muted)">検体 C26-11421</span></div>
+          <div class="w2"><b style="color:var(--ok)">報告確定済み 12:00</b> — 担当医に通知 · 外来キューは「診察可」に昇格</div></div>
+        </div>`:`
+        <div class="wrow"><div class="wmain">
+          <div class="w1">高橋 一郎 — 採血（腎機能 · 電解質）<span style="font-weight:400;font-size:11.5px;color:var(--muted)">検体 C26-11421</span></div>
+          <div class="w2">測定完了 11:52 — <b>デルタチェック: eGFR 44→42（許容内）</b> · パニック値なし</div></div>
+          <button class="btn sm primary act-btn" id="lab-confirm">確認して報告確定</button>
+        </div>`}
+        <div class="wrow"><div class="wmain">
+          <div class="w1">山本 清 — 喀痰培養<span style="font-weight:400;font-size:11.5px;color:var(--muted)">検体 B26-08812</span></div>
+          <div class="w2">中間報告済（常在菌叢）— 最終同定・感受性の入力待ち</div></div>
+          <button class="btn sm act-btn" data-toast="同定・感受性の入力フォームは React 実装対象">入力</button>
+        </div>
+      </div>
+    </div>
+    <div class="vsection">
+      <div class="vlabel">パニック値の手順</div>
+      <div class="vcard"><div class="wrow"><div class="wmain">
+        <div class="w2">該当時は<b>装置が即フラグ → 技師が直ちに担当医へ電話 ＋ 連絡に強制通知（赤）</b>。本日 0件。</div></div></div></div>
+    </div>
+  </div></div>`;
+  const lc=$('#lab-confirm'); if(lc) lc.onclick=()=>{
+    deliverTakahashiResult();
+    renderAll();
+    toast('報告を確定しました — 担当医に通知 · 外来キューが「診察可」に昇格（結果の非同期の輪が閉じました）');
+  };
+  bindCommon();
+}
+
+/* ================= settings ================= */
+function renderSettings(){
+  main.innerHTML = topbar(crumb([{t:'設定'},{t:'利用者と権限'}])) + `
+  <div id="content"><div class="view">
+    <h1>利用者と権限</h1>
+    <div class="vlead">有効な利用者 24名 · 最終更新 7/11</div>
+    <div class="vsection"><div class="vcard">
+      ${[['田中 太郎','医師 · 内科','有効'],['石川 圭介','医師 · 循環器内科','有効'],['佐々木 舞','看護師 · 3西病棟','有効'],['山口 誠','医事 · 請求担当','有効'],['admin.sato','管理者','パスワード期限 7/21']].map(([n,r,s])=>`
+        <div class="wrow"><div class="wmain">
+          <div class="w1">${n}</div><div class="w2">${r}</div></div>
+          <span style="margin-left:auto;font-size:12px;color:${s.includes('期限')?'var(--safe)':'var(--muted)'}">${s}</span>
+        </div>`).join('')}
+    </div></div>
+    <div class="vsection"><div class="vlabel">最近の設定変更（監査ログ）</div><div class="vcard">
+      ${[['7/13 16:40','処方セット「かぜセット」を更新','admin.sato'],['7/11 09:15','予約枠 8月分を公開','admin.sato'],['7/08 18:02','施設ルール「特定疾患 病名必須」を有効化','admin.sato']].map(([d,x,u])=>`
+        <div class="wrow"><div class="wmain"><div class="w1" style="font-weight:500">${x}</div>
+        <div class="w2"><span class="num">${d}</span> · ${u}</div></div></div>`).join('')}
+    </div></div>
+  </div></div>`;
+  bindCommon();
+}
+
+/* ================= aid ================= */
+function renderAid(){
+  const karteK = S.ws==='outpatient' ? S.patient : (S.ws==='ward' ? S.wardBed : null);
+  if(karteK){
+    const p=PATIENTS[karteK];
+    const wardExtra = S.ws==='ward' ? `
+      <div class="aid-sec"><div class="aid-sec-title">担当全体<span class="m">${S.role==='nurse'?'3西病棟':'病棟横断'}</span></div>
+        <div class="aid-row"><div class="r1">未実施の指示 <span class="v num">2</span></div><div class="r2">山本 清（3西）— 点滴 14:00 / 嚥下評価</div></div>
+        <div class="aid-row"><div class="r1">未署名の文書 <span class="v num">1</span></div><div class="r2">井上 幸子（3西）— 退院療養計画書</div></div>
+        <div class="aid-row"><div class="r1">転棟 <span class="v num">14:00</span></div><div class="r2">岡田 実 — ICU → 3西 306</div></div></div>` : '';
+    aid.innerHTML = `
+      <div class="aid-head"><h2>補助情報</h2><button class="aid-close" id="aid-close" aria-label="閉じる">✕</button></div>
+      <div class="aid-sec"><div class="aid-sec-title">アレルギー・注意</div>
+        ${p.safety.length?p.safety.map(s=>`<div class="aid-row"><div class="r1 safe-ink">${s.label}</div><div class="r2">${s.desc}</div></div>`).join('')
+          :'<div class="aid-empty">登録なし</div>'}
+      </div>
+      ${p.standing?`<div class="aid-sec"><div class="aid-sec-title">入院時指示（頓用・コール基準）<span class="m">v2 · 医師のみ改訂</span></div>
+        ${p.standing.map(s=>`<div class="aid-row"><div class="r1">${s.t}</div><div class="r2">${s.d}</div></div>`).join('')}
+      </div>`:''}
+      <div class="aid-sec"><div class="aid-sec-title">フォロー中の検査 ★<span class="m">プロブレム＋ピン＋新規異常</span></div>
+        ${p.aid.labs.length?p.aid.labs.map(l=>`<div class="aid-row"><div class="r1">${l.n}
+          <span class="v num ${l.flag||''}">${l.v}<span class="u"> ${l.u}</span>${l.flag==='high'?' ↑':l.flag==='low'?' ↓':''}</span></div>
+          <div class="r2">${l.d}</div></div>`).join('')
+          :'<div class="aid-empty">直近の検査はありません</div>'}
+      </div>
+      <div class="aid-sec"><div class="aid-sec-title">既往・プロブレム</div>
+        ${p.aid.history.map(h=>`<div class="aid-row"><div class="r1">${h.t}</div><div class="r2">${h.d}</div></div>`).join('')}
+      </div>
+      <div class="aid-sec"><div class="aid-sec-title">患者情報</div>
+        ${p.aid.basics.map(b=>`<div class="aid-row"><div class="r1 ${b.safe?'safe-ink':''}">${b.t}</div><div class="r2">${b.d}</div></div>`).join('')}
+      </div>${wardExtra}`;
+  } else if(S.ws==='outpatient'){
+    aid.innerHTML = `
+      <div class="aid-head"><h2>外来の状態</h2><button class="aid-close" id="aid-close">✕</button></div>
+      <div class="aid-sec"><div class="aid-sec-title">患者安全</div>
+        <div class="aid-row"><div class="r1 safe-ink">同姓同名 2名</div><div class="r2">鈴木 花子 — 開く前に ID を照合</div></div></div>
+      <div class="aid-sec"><div class="aid-sec-title">検査</div>
+        <div class="aid-row"><div class="r1">診察可 ${S.resultArrived?2:1}名</div><div class="r2">鈴木 花子 · 結果 1/1（HbA1c 7.2 ↑）${S.resultArrived?'<br>高橋 一郎 · 結果 1/1（eGFR 42 ↓）':''}</div></div>
+        <div class="aid-row"><div class="r1">検査中 ${S.resultArrived?0:1}名</div><div class="r2">${S.resultArrived?'—':'高橋 一郎 · 結果 0/1（採血 処理中）'}</div></div></div>
+      <div class="aid-sec"><div class="aid-sec-title">進行中</div>
+        <div class="aid-row"><div class="r1">診察一時中断 1件</div><div class="r2">田村 恵 · X線撮影中</div></div></div>`;
+  } else if(S.ws==='lab'){
+    aid.innerHTML = `
+      <div class="aid-head"><h2>検査室の状態</h2><button class="aid-close" id="aid-close">✕</button></div>
+      <div class="aid-sec"><div class="aid-sec-title">装置</div>
+        <div class="aid-row"><div class="r1">生化学自動分析 <span class="v" style="color:var(--ok)">稼働中</span></div><div class="r2">試薬残 OK · 次回キャリブレーション 7/18</div></div>
+        <div class="aid-row"><div class="r1">血算 <span class="v" style="color:var(--ok)">稼働中</span></div><div class="r2">QC 08:00 合格</div></div>
+        <div class="aid-row"><div class="r1">血液培養 <span class="v num">4</span></div><div class="r2">ボトル培養中 · 陽転アラームなし</div></div></div>
+      <div class="aid-sec"><div class="aid-sec-title">本日の精度管理</div>
+        <div class="aid-row"><div class="r1">内部精度管理</div><div class="r2">全項目 合格（08:00 · 岡本）</div></div></div>`;
+  } else if(S.ws==='billing'){
+    aid.innerHTML = `
+      <div class="aid-head"><h2>医事の補助情報</h2><button class="aid-close" id="aid-close">✕</button></div>
+      <div class="aid-sec"><div class="aid-sec-title">AI 候補<span class="m">確定は人</span></div>
+        <div class="aid-row"><div class="r1">病名の候補 <span class="v num">${S.billingResolved?0:1}</span></div>
+        <div class="r2">${S.billingResolved?'未処理の候補はありません':'佐藤 次郎 — 労作性狭心症の疑い'}</div></div></div>
+      <div class="aid-sec"><div class="aid-sec-title">本日の進捗</div>
+        <div class="aid-row"><div class="r1">会計 完了 <span class="v num">12/16</span></div><div class="r2">外来 · 12:00 時点</div></div>
+        <div class="aid-row"><div class="r1">返戻・査定 <span class="v num">1</span></div><div class="r2">高橋 一郎 · 6月分 — 摘要コメント不足</div></div></div>`;
+  } else if(S.ws==='messages'){
+    aid.innerHTML = `
+      <div class="aid-head"><h2>スレッド情報</h2><button class="aid-close" id="aid-close">✕</button></div>
+      <div class="aid-sec"><div class="aid-sec-title">紐づく患者</div>
+        <div class="aid-row"><div class="r1">佐藤 次郎</div><div class="r2">0007712301 · 循環器内科 — スレッドはカルテと請求ドラフトに紐づく</div></div></div>
+      <div class="aid-sec"><div class="aid-sec-title">関連</div>
+        <div class="aid-row"><div class="r1">請求ドラフト 7/14</div><div class="r2">点検 issue #241 ${S.billingResolved?'· 解決済み':'· 未解決'}</div></div></div>`;
+  } else {
+    aid.innerHTML = `
+      <div class="aid-head"><h2>管理情報</h2><button class="aid-close" id="aid-close">✕</button></div>
+      <div class="aid-sec"><div class="aid-sec-title">注意</div>
+        <div class="aid-row"><div class="r1 safe-ink">パスワード期限 1名</div><div class="r2">admin.sato · 7/21 まで</div></div></div>
+      <div class="aid-sec"><div class="aid-sec-title">接続</div>
+        <div class="aid-row"><div class="r1">ORCA <span class="v" style="color:var(--ok)">正常</span></div><div class="r2">最終同期 11:58</div></div>
+        <div class="aid-row"><div class="r1">FHIR <span class="v" style="color:var(--ok)">正常</span></div><div class="r2">9 リソース公開中</div></div></div>`;
+  }
+  const c=$('#aid-close'); if(c) c.onclick=()=>{S.aidOpen=false; syncAid(); renderMain();
+    toast('補助情報を閉じました — 安全情報は患者ヘッダーに残ります');};
+}
+function syncAid(){ app.classList.toggle('aid-closed', !S.aidOpen); }
+
+/* ================= orchestration ================= */
+function renderMain(){
+  if(S.ws==='outpatient'){ S.patient ? renderKarte(S.patient) : renderHome(); }
+  else if(S.ws==='ward'){
+    /* 外来と同じフロー: キューの患者を直接カルテで開く（中間画面なし） */
+    const pool=wardPool(); if(!pool.some(b=>b.key===S.wardBed)) S.wardBed=pool[0].key;
+    renderKarte(S.wardBed);
+  }
+  else if(S.ws==='billing') renderBilling();
+  else if(S.ws==='lab') renderLabWs();
+  else if(S.ws==='messages') renderMessages();
+  else renderSettings();
+}
+function renderAll(){ renderRail(); renderContext(); renderMain(); renderAid(); syncAid(); }
+function switchWs(ws){
+  if(S.ws===ws && ws==='outpatient'){ S.patient=null; }
+  S.ws=ws; S.writing=false; S.calOpen=false;
+  if(ws==='messages'){ S.msgUnread=0; }
+  renderAll();
+}
+function openPatient(k){
+  S.ws='outpatient'; S.patient=k; S.writing=false; S.aiOpen=false; S.lens='すべて'; S.calOpen=false;
+  S.composer=false; S.trendOpen={}; S.orderCat='すべて'; S.compCat=null; S.compFormFor=null; S.compView='list'; S.report=null;
+  renderAll();
+}
+
+/* keyboard */
+document.addEventListener('keydown',(e)=>{
+  const activeK = S.ws==='outpatient' ? S.patient : (S.ws==='ward' ? S.wardBed : null);
+  const inField = e.target && /INPUT|TEXTAREA/.test(e.target.tagName);
+  if((e.metaKey||e.ctrlKey) && (e.key==='o'||e.key==='O')){
+    if(activeK){ e.preventDefault(); S.composer=!S.composer; S.compSelIdx=null; renderKarte(activeK); }
+    return;
+  }
+  if((e.metaKey||e.ctrlKey) && (e.key==='l'||e.key==='L')){
+    if(activeK){ e.preventDefault(); S.composer=false; S.lens='検査'; renderKarte(activeK); }
+    return;
+  }
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(inField) return;
+  if(S.composer && ['1','2','3'].includes(e.key) && activeK){
+    const r=[...main.querySelectorAll('.comp-row')].filter(x=>!x.closest('.comp-side'))[+e.key-1];
+    if(r){ r.click(); } return;
+  }
+  if(e.key==='Escape' && S.composer){ S.composer=false; if(activeK) renderKarte(activeK); return; }
+  if(S.ws!=='outpatient' && S.ws!=='ward') return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    if(S.ws==='outpatient'){
+      const i = S.patient?ORDER.indexOf(S.patient):-1;
+      const ni = e.key==='ArrowDown' ? Math.min(ORDER.length-1,i+1) : Math.max(0,i-1);
+      openPatient(ORDER[ni]);
+    } else {
+      const keys = wardPool().map(b=>b.key);
+      const i = keys.indexOf(S.wardBed);
+      S.wardBed = keys[e.key==='ArrowDown' ? Math.min(keys.length-1,i+1) : Math.max(0,i-1)];
+      renderAll();
+    }
+  }
+  if(e.key==='Escape'){ if(S.calOpen){S.calOpen=false; renderMain();} else if(S.aiOpen){ S.aiOpen=false; renderMain(); } }
+  if((e.key==='e'||e.key==='E') && activeK && !S.writing){ startWrite(activeK); }
+});
+
+/* switches */
+function bindSwitch(id, fn){ $(id).onclick=fn; }
+bindSwitch('#sw-pal-muted',()=>{document.body.classList.add('pal-muted');document.body.classList.remove('pal-apple');
+  $('#sw-pal-muted').classList.add('on');$('#sw-pal-apple').classList.remove('on');});
+bindSwitch('#sw-pal-apple',()=>{document.body.classList.add('pal-apple');document.body.classList.remove('pal-muted');
+  $('#sw-pal-apple').classList.add('on');$('#sw-pal-muted').classList.remove('on');});
+bindSwitch('#sw-font-sans',()=>{document.body.classList.add('font-sans');document.body.classList.remove('font-mono');
+  $('#sw-font-sans').classList.add('on');$('#sw-font-mono').classList.remove('on');});
+bindSwitch('#sw-font-mono',()=>{document.body.classList.add('font-mono');document.body.classList.remove('font-sans');
+  $('#sw-font-mono').classList.add('on');$('#sw-font-sans').classList.remove('on');});
+function setRole(r){
+  S.role=r;
+  ['doctor','nurse','clerk','tech'].forEach(x=>$('#sw-role-'+x).classList.toggle('on', x===r));
+  if(S.ws==='outpatient' && S.patient){
+    S.writing=false;
+    renderAll();
+    toast(`職種ビュー: ${ROLES[r].label} — 同じカルテを「${r==='doctor'?'医師標準':r==='nurse'?'看護標準':'医事閲覧'}」で表示`);
+  } else {
+    switchWs(ROLES[r].home);
+    toast(`職種ビュー: ${ROLES[r].label} — レールが ${ROLES[r].spaces.map(s=>WS_LABEL[s]).join('・')}・設定 に剪定されます`);
+  }
+}
+bindSwitch('#sw-role-doctor',()=>setRole('doctor'));
+bindSwitch('#sw-role-nurse',()=>setRole('nurse'));
+bindSwitch('#sw-role-clerk',()=>setRole('clerk'));
+bindSwitch('#sw-role-tech',()=>setRole('tech'));
+
+/* ================= async result demo =================
+   20秒後: 高橋の採血結果が到着 → キュー状態が変わり、連絡バッジ+1、トースト通知。
+   カルテを開いて「まだ無かった」を繰り返す必要がない、の実演 */
+function deliverTakahashiResult(){
+  if(S.resultArrived) return;
+  S.resultArrived = true;
+  const p = PATIENTS.takahashi;
+  p.stateText='診察可 · 結果 1/1'; p.stateKind='attention';
+  p.stateDetail='採血 10:20 → 結果 12:00 ✓ — eGFR 42 ↓（前回 44）';
+  p.oneLiner='#1 CKD G3b。本日の採血が到着: eGFR 42 ↓（前回 44）· Cr 1.31 ↑。診察前に推移を確認。';
+  p.aiEv[2]={d:'本日 12:00', t:'検査 eGFR 42 ↓ · Cr 1.31 ↑（到着）'};
+  p.blocks.unshift({type:'lab', ym:'2026-07', date:'本日 12:00', sub:'検査結果 · 院内採血（いま到着）',
+    labs:[
+      {n:'eGFR', v:'42', u:'mL/min/1.73m²', flag:'low', ref:'前回 44'},
+      {n:'クレアチニン', v:'1.31', u:'mg/dL', flag:'high', ref:'基準 1.07 以下'},
+      {n:'カリウム', v:'4.7', u:'mEq/L', ref:'基準 3.6–4.8'}
+    ]});
+  p.labSeries.cols.unshift({y:'2026', d:'7/14'});
+  const rs = p.labSeries.groups.flatMap(g=>g.rows);
+  rs[0].v.unshift(['42','low']);
+  rs[1].v.unshift(['1.31','high']);
+  rs[2].v.unshift(['4.7','']);
+  p.orderTimeline[0]={cat:'検査', d:'本日 10:20 → 12:00', w:'採血（腎機能 · 電解質）', sub:'院内検査室', st:'結果到着', k:'done'};
+  S.msgUnread += 1;
+  renderRail(); if(S.ws==='outpatient'){ renderContext(); if(S.patient==='takahashi') renderMain(); renderAid(); }
+  toast('🔔 高橋 一郎 — 結果が揃い「診察可」に昇格（eGFR 42 ↓）。通知はこの昇格とパニック値だけです');
+}
+setTimeout(deliverTakahashiResult, 20000);
+
+/* boot */
+openPatient('sato');
+</script>
+</body>
+</html>

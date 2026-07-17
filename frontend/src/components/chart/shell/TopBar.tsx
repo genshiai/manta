@@ -1,4 +1,4 @@
-import { ChevronLeft, Search, Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Kbd } from '../primitives/Kbd';
 
 type TopBarProps = {
@@ -23,27 +23,26 @@ export function TopBar({
 }: TopBarProps) {
   return (
     <>
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-text-tertiary transition-colors hover:text-text-secondary"
-      >
-        <ChevronLeft size={14} strokeWidth={1.7} />
-        {crumbRoot}
-      </button>
-      <span className="text-[12.5px] text-text-tertiary">/</span>
-      <span className="whitespace-nowrap text-[12.5px] font-semibold text-text-primary">{patientName}</span>
-      {crumbTail ? (
-        <>
-          <span className="text-[12.5px] text-text-tertiary">/</span>
-          <span className="whitespace-nowrap text-[12.5px] text-text-tertiary">{crumbTail}</span>
-        </>
-      ) : null}
+      <div className="flex min-w-0 items-center gap-[7px] whitespace-nowrap text-[12px] text-text-tertiary">
+        <button type="button" onClick={onBack} className="hover:text-text-secondary hover:underline">
+          {crumbRoot}
+        </button>
+        <span className="text-border-strong">/</span>
+        {crumbTail ? (
+          <>
+            <span>{patientName}</span>
+            <span className="text-border-strong">/</span>
+            <span className="font-semibold text-text-primary">{crumbTail}</span>
+          </>
+        ) : (
+          <span className="font-semibold text-text-primary">{patientName}</span>
+        )}
+      </div>
 
       <button
         type="button"
         onClick={onOpenSearch}
-        className="mx-auto flex h-8 w-full max-w-[400px] items-center gap-2 rounded-lg border border-border bg-surface-subtle px-2.5 text-[12.5px] text-text-tertiary transition-colors hover:border-border-strong"
+        className="mx-auto flex h-8 w-full max-w-[400px] items-center gap-[7px] rounded-lg border border-border bg-surface-page px-2.5 text-[12px] text-text-tertiary transition-colors hover:border-border-strong"
       >
         <Search size={14} strokeWidth={1.7} />
         患者・アクションを検索
@@ -55,15 +54,10 @@ export function TopBar({
       <button
         type="button"
         onClick={onOpenAgent}
-        className="flex h-[30px] items-center gap-1.5 rounded-[7px] bg-brand-tint px-2.5 text-[12.5px] font-semibold text-brand"
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-strong px-2.5 py-[5.5px] text-[12px] font-semibold text-text-secondary hover:bg-surface-page"
       >
-        <Sparkles size={14} strokeWidth={1.7} />
-        エージェント
-        {agentCount > 0 ? (
-          <span className="grid h-[17px] min-w-[17px] place-items-center rounded-[9px] bg-brand px-1.5 text-[10px] font-bold text-white tabular-nums">
-            {agentCount}
-          </span>
-        ) : null}
+        <span className="text-brand">✦</span>
+        エージェント {agentCount > 0 ? <span className="tabular-nums">{agentCount}</span> : null}
       </button>
     </>
   );

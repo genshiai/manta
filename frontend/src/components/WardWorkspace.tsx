@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { PointerEvent } from 'react';
 import {
   Activity,
+  ArrowLeft,
   BadgeCheck,
   Bed,
   CheckCircle2,
@@ -11,9 +12,7 @@ import {
   ClipboardList,
   Copy,
   Download,
-  FilePenLine,
   FileSignature,
-  FileText,
   FlaskConical,
   HeartPulse,
   Hospital,
@@ -32,6 +31,7 @@ import {
   createInpatientPathway,
   createInpatientSummaryReview,
   createNursingNote,
+  assignInpatientToMe,
   getInpatientPathway,
   getInpatientClaimDraft,
   getInpatientDischargePlan,
@@ -44,6 +44,7 @@ import {
   listInpatientDocuments,
   listInpatientEvents,
   listInpatientInstructions,
+  listMyInpatientCareAssignments,
   listInpatientPathwayMasters,
   listNursingNotes,
   listInpatientSummaryReviews,
@@ -60,12 +61,14 @@ import {
   updateInpatientInstruction,
   updateInpatientInstructionStatus,
   updateInpatientPathwayTask,
+  unassignInpatientFromMe,
 } from '../lib/api';
 import { cn } from '../lib/cn';
 import type {
   InpatientAdmission,
   InpatientAiSummaryReview,
   InpatientBed,
+  InpatientCareAssignment,
   ClaimDraft,
   ClaimDraftLine,
   ClaimLineAdjustment,
@@ -81,7 +84,9 @@ import type {
   InpatientSummaryDraft,
   NursingNote,
   ReceiptCodeCandidate,
+  UserSession,
 } from '../types/workflow';
+import { WardOverview } from './ward/WardOverview';
 import { Button } from './ui/button';
 import { Drawer } from './ui/drawer';
 import { Input } from './ui/input';
@@ -89,6 +94,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 type WardWorkspaceProps = {
   admissions: InpatientAdmission[];
+  currentUser: UserSession;
   onAuthExpired: () => void;
   onOpenChart: (patientId: string) => void;
   onRefreshAdmissions: (admissions: InpatientAdmission[]) => void;
@@ -254,11 +260,12 @@ const downloadTextFile = (filename: string, content: string, mimeType: string) =
 
 export const WardWorkspace = ({
   admissions,
+  currentUser,
   onAuthExpired,
   onOpenChart,
   onRefreshAdmissions,
 }: WardWorkspaceProps) => {
-  const [selectedAdmissionId, setSelectedAdmissionId] = useState<number | null>(admissions[0]?.id ?? null);
+  const [selectedAdmissionId, setSelectedAdmissionId] = useState<number | null>(null);
   const [instructions, setInstructions] = useState<InpatientInstruction[]>([]);
   const [nursingNotes, setNursingNotes] = useState<NursingNote[]>([]);
   const [documents, setDocuments] = useState<InpatientDocument[]>([]);
@@ -269,7 +276,7 @@ export const WardWorkspace = ({
   const [pathwayMasters, setPathwayMasters] = useState<InpatientPathwayMaster[]>([]);
   const [selectedPathwayMasterId, setSelectedPathwayMasterId] = useState('');
   const [pathwayRoleFilter, setPathwayRoleFilter] = useState('all');
-  const [summaryReviews, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
+  const [, setSummaryReviews] = useState<InpatientAiSummaryReview[]>([]);
   const [dischargePlan, setDischargePlan] = useState<InpatientDischargePlan | null>(null);
   const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
   const [editingClaimLineId, setEditingClaimLineId] = useState<number | null>(null);
@@ -278,6 +285,8 @@ export const WardWorkspace = ({
   const [orcaPreviewPayload, setOrcaPreviewPayload] = useState<Record<string, unknown> | null>(null);
   const [isLoadingReceiptCandidates, setIsLoadingReceiptCandidates] = useState(false);
   const [beds, setBeds] = useState<InpatientBed[]>([]);
+  const [careAssignments, setCareAssignments] = useState<InpatientCareAssignment[]>([]);
+  const [isAssigningAdmissionId, setIsAssigningAdmissionId] = useState<number | null>(null);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [instructionForm, setInstructionForm] = useState(emptyInstructionForm);
   const [isInstructionFormOpen, setIsInstructionFormOpen] = useState(false);
@@ -305,10 +314,10 @@ export const WardWorkspace = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedAdmissionId !== null && admissions.some((admission) => admission.id === selectedAdmissionId)) {
+    if (selectedAdmissionId === null || admissions.some((admission) => admission.id === selectedAdmissionId)) {
       return;
     }
-    setSelectedAdmissionId(admissions[0]?.id ?? null);
+    setSelectedAdmissionId(null);
   }, [admissions, selectedAdmissionId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies(selectedAdmissionId): 入院の切替をトリガーに選択・編集状態をリセットする
@@ -322,7 +331,7 @@ export const WardWorkspace = ({
   }, [selectedAdmissionId]);
 
   const selectedAdmission = useMemo(
-    () => admissions.find((admission) => admission.id === selectedAdmissionId) ?? admissions[0] ?? null,
+    () => selectedAdmissionId === null ? null : admissions.find((admission) => admission.id === selectedAdmissionId) ?? null,
     [admissions, selectedAdmissionId],
   );
 
@@ -429,9 +438,13 @@ export const WardWorkspace = ({
 
     const loadBeds = async () => {
       try {
-        const nextBeds = await listInpatientBeds();
+        const [nextBeds, nextCareAssignments] = await Promise.all([
+          listInpatientBeds(),
+          listMyInpatientCareAssignments(),
+        ]);
         if (!cancelled) {
           setBeds(nextBeds);
+          setCareAssignments(nextCareAssignments);
         }
       } catch (error) {
         if (cancelled) {
@@ -454,10 +467,10 @@ export const WardWorkspace = ({
 
   const refreshAdmissions = async () => {
     const [nextAdmissions, nextBeds] = await Promise.all([
-      listInpatientAdmissions({ status: 'active' }),
+      listInpatientAdmissions({ status: 'all' }),
       listInpatientBeds(),
     ]);
-    onRefreshAdmissions(nextAdmissions);
+    onRefreshAdmissions(nextAdmissions.filter((item) => item.status === 'active' || item.status === 'discharge_permitted'));
     setBeds(nextBeds);
   };
 
@@ -1219,9 +1232,10 @@ export const WardWorkspace = ({
       beds: wardBeds,
     }));
   }, [beds]);
+  const occupiedBedIds = new Set(admissions.map((admission) => admission.bedId).filter(Boolean));
   const bedCounts = beds.reduce(
     (counts, bed) => {
-      counts[bed.status] += 1;
+      counts[occupiedBedIds.has(bed.id) ? 'occupied' : bed.status] += 1;
       return counts;
     },
     { available: 0, occupied: 0, cleaning: 0, blocked: 0 } as Record<InpatientBed['status'], number>,
@@ -1268,14 +1282,36 @@ export const WardWorkspace = ({
     }
   };
 
+  const handleCareAssignment = async (admission: InpatientAdmission) => {
+    if (isAssigningAdmissionId !== null) return;
+    setIsAssigningAdmissionId(admission.id);
+    setErrorMessage(null);
+    try {
+      const current = careAssignments.find((item) => item.admissionId === admission.id);
+      if (current) {
+        await unassignInpatientFromMe(admission.id);
+        setCareAssignments((items) => items.filter((item) => item.admissionId !== admission.id));
+      } else {
+        const assignment = await assignInpatientToMe(admission.id);
+        setCareAssignments((items) => [...items, assignment]);
+      }
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        onAuthExpired();
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : '担当患者の更新に失敗しました。');
+    } finally {
+      setIsAssigningAdmissionId(null);
+    }
+  };
+
   return (
     <main className='mx-auto w-full max-w-[1440px] space-y-4 px-4 py-5 lg:px-6'>
       <section className='flex flex-wrap items-end justify-between gap-4'>
         <div>
-          <h1 className='text-[28px] font-bold leading-tight text-text-primary'>病棟ワークスペース</h1>
-          <p className='mt-1 text-[14px] text-text-tertiary'>
-            状況判断、実施、退院・会計レビューを切り替えて確認します。
-          </p>
+          <h1 className='text-[28px] font-bold leading-tight text-text-primary'>病棟</h1>
+          <p className='mt-1 text-[14px] text-text-tertiary'>病床・入退転棟・担当患者</p>
         </div>
         <div className='flex flex-wrap items-center gap-2 text-[12px] text-text-secondary'>
           <span className='rounded-full border border-border bg-card px-3 py-1'>入院中 {admissions.length}</span>
@@ -1293,7 +1329,19 @@ export const WardWorkspace = ({
         </section>
       ) : null}
 
-      <section className='sticky top-0 z-20 rounded-8 border border-border bg-card shadow-sm'>
+      <WardOverview
+        admissions={admissions}
+        assignments={careAssignments}
+        beds={beds}
+        currentUser={currentUser}
+        isAssigning={isAssigningAdmissionId}
+        onAssign={handleCareAssignment}
+        onBedStatus={handleBedStatus}
+        onOpenChart={onOpenChart}
+        onSelect={(admissionId) => setSelectedAdmissionId(admissionId)}
+      />
+
+      {selectedAdmission ? <section className='sticky top-0 z-20 rounded-8 border border-border bg-card shadow-sm'>
         <div className='flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3'>
           <div className='flex min-w-0 items-center gap-3'>
             <Users size={18} className='text-brand' />
@@ -1309,6 +1357,9 @@ export const WardWorkspace = ({
           <Button onClick={() => setIsPatientListOpen((current) => !current)} size='xs' type='button' variant='outline'>
             {isPatientListOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             患者を選ぶ
+          </Button>
+          <Button onClick={() => setSelectedAdmissionId(null)} size='xs' type='button' variant='ghost'>
+            <ArrowLeft size={14} />全体へ戻る
           </Button>
         </div>
         {isPatientListOpen ? (
@@ -1407,7 +1458,7 @@ export const WardWorkspace = ({
             </div>
           </div>
         ) : null}
-      </section>
+      </section> : null}
 
       {selectedAdmission ? (
         <Tabs className='gap-4' onValueChange={setActiveTab} value={activeTab}>
@@ -2371,11 +2422,7 @@ export const WardWorkspace = ({
           </section>
           </TabsContent>
         </Tabs>
-      ) : (
-        <section className='rounded-8 border border-border bg-card p-6 text-[14px] text-text-secondary'>
-          入院中の患者がいません。
-        </section>
-      )}
+      ) : null}
 
       <Drawer
         isOpen={drawerPanel !== null}

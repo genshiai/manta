@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>支援者 | Mantaに協力してくれている人 | Manta</title>
+  <meta name="description" content="Mantaに協力してくれている人を紹介するページです。顔にカーソルを合わせる（スマホは押す）と、肩書と所属が出ます。" />
+  <link rel="canonical" href="https://mantajp.com/committers" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Manta" />
+  <meta property="og:title" content="Mantaに協力してくれている人" />
+  <meta property="og:description" content="Mantaに協力してくれている人を紹介しています。医師、医療従事者、医療事務、エンジニア、投資家など。" />
+  <meta property="og:url" content="https://mantajp.com/committers" />
+  <meta property="og:image" content="https://mantajp.com/assets/img/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#fbfbfd" />
+  <link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" />
+  <link rel="icon" href="assets/brand/manta-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/brand/manta-icon-180.png" />
+  <link rel="icon" href="favicon.ico" sizes="48x48" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="preload" href="assets/fonts/plemoljp35-regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/plemoljp35-semibold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/site.css" />
+
+  <!-- ===== 支援者 page-scoped styles（確定後 site.css へ移設） ===== -->
+  <style>
+    /* 役割チップ（人が増えたら表示） */
+    .roles-filter { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:clamp(28px,4vw,40px); }
+    .roles-filter .fchip {
+      appearance:none; cursor:pointer; font:inherit; font-size:13px; line-height:1;
+      padding:9px 15px; border-radius:999px; border:1px solid var(--line);
+      background:var(--card); color:var(--muted); transition:all .25s var(--ease);
+      display:inline-flex; align-items:center; gap:7px;
+    }
+    .roles-filter .fchip:hover { border-color:var(--line-strong); color:var(--ink); }
+    .roles-filter .fchip[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:#fff; }
+    .roles-filter .fchip .dot { width:8px; height:8px; border-radius:999px; background:currentColor; opacity:.55; }
+
+    /* 役割の意味色（原色を避けたミュート版） */
+    .r-doctor   { --role:#0071e3; }   /* 医師（別格）= ブランドブルー */
+    .r-clinical { --role:#0e7c86; }   /* 医療従事者 = ティール */
+    .r-clerk    { --role:#248a3d; }   /* 医療事務 = グリーン */
+    .r-eng      { --role:#6b6b8f; }   /* エンジニア = スレート */
+    .r-partner  { --role:#b25000; }   /* 投資家・パートナー = アンバー */
+
+    /* 顔の一覧 */
+    .face-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:clamp(20px,2.4vw,30px) 12px; }
+    .face-grid.featured { grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); }
+
+    .face-card {
+      appearance:none; background:none; border:0; padding:8px 6px; margin:0; font:inherit; cursor:pointer;
+      display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px;
+      border-radius:var(--radius); transition:background .3s var(--ease);
+    }
+    .face-card:hover { background:color-mix(in srgb, var(--role, var(--brand)) 5%, transparent); }
+    .face-card:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+
+    .face-photo {
+      width:clamp(88px,12vw,108px); aspect-ratio:1; border-radius:999px; object-fit:cover; display:block;
+      box-shadow:0 0 0 1px var(--line), var(--shadow-sm);
+      transition:transform .45s var(--ease), box-shadow .45s var(--ease);
+    }
+    .featured .face-photo { width:clamp(120px,16vw,148px); }
+    .face-card:hover .face-photo,
+    .face-card:focus-visible .face-photo,
+    .face-card.is-open .face-photo {
+      transform:translateY(-5px) scale(1.03);
+      box-shadow:0 0 0 2.5px var(--role, var(--brand)), var(--shadow-md);
+    }
+    /* プレースホルダー（本番は透過切り抜き写真に差し替え） */
+    .face-photo.ph {
+      display:flex; align-items:center; justify-content:center; font-weight:600;
+      font-size:clamp(24px,4vw,30px); color:var(--role, var(--brand-ink));
+      background:
+        radial-gradient(120% 120% at 50% 18%, color-mix(in srgb, var(--role) 22%, #fff) 0%, color-mix(in srgb, var(--role) 8%, #fff) 100%);
+    }
+    .featured .face-photo.ph { font-size:clamp(30px,5vw,40px); }
+
+    .face-name { font-weight:600; font-size:14.5px; color:var(--ink); line-height:1.4; }
+    .featured .face-name { font-size:16px; }
+
+    /* 肩書・所属：既定は隠し、ホバー/フォーカス/タップで開く（高さ確保でリフローなし） */
+    .face-meta {
+      display:grid; gap:3px; min-height:2.9em; align-content:start;
+      opacity:0; transform:translateY(-4px);
+      transition:opacity .35s var(--ease), transform .35s var(--ease);
+    }
+    .face-card:hover .face-meta,
+    .face-card:focus-visible .face-meta,
+    .face-card.is-open .face-meta { opacity:1; transform:none; }
+    .face-role { font-size:12.5px; color:var(--ink-2); line-height:1.5; }
+    .face-org  { font-size:12px; color:var(--faint); line-height:1.5; }
+    .face-tag {
+      justify-self:center; margin-top:2px; font-size:10.5px; letter-spacing:.02em;
+      padding:2px 9px; border-radius:999px; line-height:1.6;
+      color:var(--role); background:color-mix(in srgb, var(--role) 12%, transparent);
+    }
+    @media (hover:none) {
+      .face-meta { min-height:0; }                 /* タッチ端末は開いた時だけ高さを取る */
+      .face-card .face-meta { height:0; overflow:hidden; }
+      .face-card.is-open .face-meta { height:auto; margin-top:2px; }
+    }
+
+    /* 同意についての注記 */
+    .consent-note {
+      margin-top:clamp(20px,3vw,28px); padding:18px 22px; border:1px solid var(--line-soft); border-radius:var(--radius);
+      background:var(--bg-soft); color:var(--muted); font-size:13px; line-height:1.9;
+    }
+    .consent-note b { color:var(--ink); }
+  </style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="logo" href="index.html" aria-label="Manta ホーム"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+    <nav class="nav-links" id="navLinks" aria-label="サイト内">
+      <a href="about.html">ビジョン</a>
+      <a href="technology.html">技術</a>
+      <a href="community.html">コミュニティ</a>
+      <a href="committers.html" aria-current="page">支援者</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-secondary btn-sm" href="https://github.com/genshiai/manta" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="btn-gh-label">GitHub</span>
+      </a>
+      <button class="nav-burger" aria-expanded="false" aria-label="メニュー" aria-controls="navLinks"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- hero -->
+  <section class="hero" style="padding-bottom:clamp(48px,6vw,80px);">
+    <div class="hero-bg" aria-hidden="true"><span class="hero-wm"></span></div>
+    <div class="wrap">
+      <div class="feature-row">
+        <div class="fr-copy">
+          <p class="eyebrow rv on">Supporters</p>
+          <h1 class="h-display rv on" style="--d:.05s; font-size:clamp(28px,4.2vw,42px);">Mantaは、いろんな人が<br />協力して開発しています。</h1>
+          <p class="lede rv on" style="--d:.1s; margin-top:20px;">Manta はオープンソースで、開発の過程も公開しています。協力してくれる人にも、名前と顔を出してもらっています。<b style="color:var(--ink); font-weight:600;">顔にカーソルを合わせると（スマホは押すと）、肩書と所属が出ます。</b></p>
+        </div>
+        <div class="fr-media rv on" style="--d:.12s">
+          <div class="art-frame"><img src="assets/img/art-community.webp" alt="光る海面に向かって、大きさの違う5枚のマンタが一緒に泳いでいく" width="1024" height="688" fetchpriority="high" /></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 個人 -->
+  <section class="section section-soft" id="people">
+    <div class="wrap">
+      <div class="section-head rv">
+        <p class="eyebrow">People</p>
+        <h2 class="h-section">協力してくれている人</h2>
+        <p class="lede">顔にカーソルを合わせると（スマホは押すと）、肩書と所属が出ます。</p>
+      </div>
+
+      <!--
+        役割の分け方（人が増えたらフィルタとして表示する）:
+        医師 / 医療従事者 / 医療事務 / エンジニア / 投資家・パートナー
+        色は .r-doctor / .r-clinical / .r-clerk / .r-eng / .r-partner を使う。
+      -->
+
+      <div class="face-grid featured rv" data-stagger=".05">
+        <button class="face-card r-doctor is-open" data-role="doctor" type="button">
+          <img class="face-photo" src="assets/img/daichi.webp" alt="長嶋大地" width="148" height="148" />
+          <span class="face-name">長嶋大地</span>
+          <span class="face-meta"><span class="face-role">医師 / GENSHI AI 代表</span><span class="face-org">Manta をはじめた人</span><span class="face-tag">医師</span></span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!--
+    このあとに「医療機関」「協賛企業」のセクションと、役割フィルタが入る予定。
+    実在するものが出てくるまでは出さない（旧モックは git 履歴にあり）。
+  -->
+
+  <!-- 掲載について -->
+  <section class="section" id="about-listing">
+    <div class="wrap">
+      <div class="section-head rv">
+        <p class="eyebrow">About</p>
+        <h2 class="h-section">掲載について</h2>
+        <p class="lede">ここに載っているのは、実際に Manta に協力してくれている人です。掲載は本人の同意をもらってから行い、取り下げもいつでもできます。相談は GitHub の Discussions からどうぞ。</p>
+      </div>
+      <p class="consent-note rv"><b>掲載と同意について。</b>顔写真や名前、所属を載せるときは、必ずご本人（医療機関はご担当者）の同意をもらってから行います。医療機関のロゴや名称は、各機関から許可をもらった範囲で使います。掲載の取り下げはいつでも受け付けます。なお Manta はソフトウェア（OSS）で、このページは特定の医療サービスをすすめたり宣伝したりするものではありません。</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="index.html"><img class="logo-img" src="assets/brand/manta-lockup.svg" alt="Manta" width="88" height="27" /></a>
+        <p>AI エージェントが動く、次世代のオープンソース電子カルテ。医師が、OSS と AI の力でゼロから作り直す。</p>
+      </div>
+      <div class="foot-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="about.html">ビジョン</a></li>
+          <li><a href="technology.html">技術とアーキテクチャ</a></li>
+          <li><a href="community.html">コミュニティ</a></li>
+          <li><a href="committers.html">支援者</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Develop</h4>
+        <ul>
+          <li><a href="https://github.com/genshiai/manta" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/genshiai/manta/issues" rel="noopener">Issues</a></li>
+          <li><a href="https://github.com/genshiai/manta/discussions" rel="noopener">Discussions</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/docs/why-manta.md" rel="noopener">なぜ Manta を作るのか（why-manta）</a></li>
+          <li><a href="https://github.com/genshiai/manta/tree/main/docs/decisions" rel="noopener">ADR（意思決定の記録）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/CONTRIBUTING.md" rel="noopener">CONTRIBUTING</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://genshi.ai/" rel="noopener">GENSHI AI</a></li>
+          <li><a href="https://zenn.dev/p/genshi_ai" rel="noopener">Zenn</a></li>
+          <li><a href="https://note.com/ikora" rel="noopener">note</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/LICENSE" rel="noopener">ライセンス（Apache-2.0）</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/TRADEMARKS.md" rel="noopener">商標ポリシー</a></li>
+          <li><a href="https://github.com/genshiai/manta/blob/main/SECURITY.md" rel="noopener">脆弱性の報告</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-giant"><img src="assets/brand/manta-lockup.svg" alt="" loading="lazy" width="720" height="222" /></div>
+    <div class="foot-bottom">
+      <span>© 2026 GENSHI AI, Inc.</span>
+      <span>Apache License 2.0</span>
+      <span class="spacer"></span>
+      <span>Pre-Alpha · 実患者データは入れないでください</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+<script>
+  /* 顔をタップで肩書/所属を開閉（タッチ端末）。フィルタは表示時のみ動作 */
+  (function () {
+    var cards = Array.prototype.slice.call(document.querySelectorAll(".face-card"));
+    cards.forEach(function (card) {
+      card.addEventListener("click", function () {
+        var open = card.classList.contains("is-open");
+        cards.forEach(function (c) { if (c !== card) c.classList.remove("is-open"); });
+        card.classList.toggle("is-open", !open);
+      });
+    });
+
+    var chips = Array.prototype.slice.call(document.querySelectorAll(".fchip"));
+    chips.forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var role = chip.getAttribute("data-filter");
+        chips.forEach(function (c) { c.setAttribute("aria-pressed", String(c === chip)); });
+        cards.forEach(function (card) {
+          var show = role === "all" || card.getAttribute("data-role") === role;
+          card.style.display = show ? "" : "none";
+        });
+      });
+    });
+  })();
+</script>
+</body>
+</html>

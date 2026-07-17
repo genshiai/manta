@@ -69,6 +69,15 @@ Manta の設計ドキュメント・意思決定・計画の入口。**この索
 | [design-reference/apple-jp-design.md](design-reference/apple-jp-design.md) | apple.com/jp 実測値仕様（[ADR 0003](decisions/0003-color-system-apple-hig.md) の根拠） | 現役 |
 | [mock-html/karte-b.html](mock-html/karte-b.html) | カルテ UI のビジュアル正本 | 正本（視覚） |
 | [mock-html/color-palettes.html](mock-html/color-palettes.html) | 配色比較モック（ADR 0003 の根拠） | 現役 |
+| [WORKSPACE_UI_PROPOSAL.md](WORKSPACE_UI_PROPOSAL.md) | ワークスペース型アプリケーションシェルの再設計提案 | Proposal（検証中） |
+| [WORKSPACE_UI_FUNCTION_MAP.md](WORKSPACE_UI_FUNCTION_MAP.md) | 現機能を起点にしたワークスペース型 UI の導線・用語マップ | Proposal（検証中） |
+| [WORKSPACE_UI_EXECUTION_PLAN.md](WORKSPACE_UI_EXECUTION_PLAN.md) | モックから安全に実装へ移すための段階計画と受入条件 | Proposal（検証中） |
+| [mock-html/workspace-prototype.html](mock-html/workspace-prototype.html) | ワークスペース型 UI のクリック可能な検証モック | Proposal（検証中） |
+| [WORKSPACE_UI_GAP_REVIEW.md](WORKSPACE_UI_GAP_REVIEW.md) | workspace-prototype.html × React 実装の照合レビュー（問題・差分・直す順番） | スナップショット（2026-07-16 実施） |
+| [CLINICAL_MOCK_RESEARCH.md](CLINICAL_MOCK_RESEARCH.md) | 現行カルテの業務・状態を起点にした検証メモ（「要確認」を汎用タスク化しない） | 現役（検証用） |
+| [CLINICAL_CONTENT_SURFACES.md](CLINICAL_CONTENT_SURFACES.md) | 自由記述・処方・オーダー・正式文書を統一して読む／編集するための表示面ルール | Proposal（検証中） |
+| [mock-html/clinical-workflow-prototype.html](mock-html/clinical-workflow-prototype.html) | 現行カルテ文法を確認するクリック可能なモック | 現役（検証用） |
+| [mock-html/operations-workspace-prototype.html](mock-html/operations-workspace-prototype.html) | 外来・病棟・医事・設定を横断する業務シェルの検証モック | Proposal（検証中） |
 | [mock-html/](mock-html/) `index.html` / `style.css` | 旧試作（README が「⚠️反面教師・模写禁止」と明記） | 参考（模写禁止） |
 | [archive/](archive/) | 初期構想・完了した計画のスナップショット | 歴史 |
 

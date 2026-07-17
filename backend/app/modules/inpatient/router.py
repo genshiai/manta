@@ -17,6 +17,7 @@ from .models import (
     InpatientDocument,
     InpatientEvent,
     InpatientInstruction,
+    InpatientCareAssignment,
     InpatientPathwayAssignment,
     InpatientPathwayMaster,
     InpatientPathwayTask,
@@ -46,6 +47,8 @@ from .schemas import (
     InpatientInstructionCreateRequest,
     InpatientInstructionRead,
     InpatientInstructionUpdateRequest,
+    InpatientCareAssignmentCreateRequest,
+    InpatientCareAssignmentRead,
     InpatientPathwayCreateRequest,
     InpatientPathwayMasterRead,
     InpatientPathwayRead,
@@ -79,6 +82,105 @@ from .services import (
 
 
 router = APIRouter()
+
+
+def care_assignment_to_read(assignment: InpatientCareAssignment, user: User) -> InpatientCareAssignmentRead:
+    return InpatientCareAssignmentRead(
+        id=assignment.id,
+        admission_id=assignment.admission_id,
+        user_id=assignment.user_id,
+        user_display_name=user.display_name,
+        role=assignment.role,
+        assigned_by=assignment.assigned_by,
+        created_at=assignment.created_at,
+    )
+
+
+@router.get("/api/inpatient/care-assignments/mine", response_model=list[InpatientCareAssignmentRead])
+def list_my_inpatient_care_assignments(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[InpatientCareAssignmentRead]:
+    assignments = list(db.scalars(
+        select(InpatientCareAssignment)
+        .where(InpatientCareAssignment.user_id == current_user.id)
+        .order_by(InpatientCareAssignment.created_at)
+    ).all())
+    return [care_assignment_to_read(assignment, current_user) for assignment in assignments]
+
+
+@router.post(
+    "/api/inpatient/admissions/{admission_id}/care-assignments/me",
+    response_model=InpatientCareAssignmentRead,
+)
+def assign_inpatient_to_me(
+    admission_id: int,
+    payload: InpatientCareAssignmentCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InpatientCareAssignmentRead:
+    get_admission_or_404(db, admission_id)
+    assignment = db.scalar(select(InpatientCareAssignment).where(
+        InpatientCareAssignment.admission_id == admission_id,
+        InpatientCareAssignment.user_id == current_user.id,
+    ))
+    if assignment is None:
+        assignment = InpatientCareAssignment(
+            admission_id=admission_id,
+            user_id=current_user.id,
+            role=payload.role.strip() or "担当",
+            assigned_by=current_user.display_name,
+        )
+        db.add(assignment)
+        add_inpatient_event(
+            db,
+            admission_id=admission_id,
+            event_type="care_assignment_added",
+            title="担当患者に登録",
+            actor=current_user.display_name,
+            detail=f"{current_user.display_name} が自分の担当患者に登録しました。",
+        )
+        log_audit(
+            db,
+            actor=current_user.display_name,
+            action="担当患者登録",
+            scope="patient",
+            detail=f"入院ID {admission_id} を担当患者に登録しました。",
+        )
+        db.commit()
+        db.refresh(assignment)
+    return care_assignment_to_read(assignment, current_user)
+
+
+@router.delete("/api/inpatient/admissions/{admission_id}/care-assignments/me", status_code=status.HTTP_204_NO_CONTENT)
+def unassign_inpatient_from_me(
+    admission_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    assignment = db.scalar(select(InpatientCareAssignment).where(
+        InpatientCareAssignment.admission_id == admission_id,
+        InpatientCareAssignment.user_id == current_user.id,
+    ))
+    if assignment is None:
+        return
+    db.delete(assignment)
+    add_inpatient_event(
+        db,
+        admission_id=admission_id,
+        event_type="care_assignment_removed",
+        title="担当患者から解除",
+        actor=current_user.display_name,
+        detail=f"{current_user.display_name} が自分の担当患者から解除しました。",
+    )
+    log_audit(
+        db,
+        actor=current_user.display_name,
+        action="担当患者解除",
+        scope="patient",
+        detail=f"入院ID {admission_id} を担当患者から解除しました。",
+    )
+    db.commit()
 
 
 @router.get("/api/inpatient/beds", response_model=list[BedBoardItemRead])

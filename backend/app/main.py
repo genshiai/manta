@@ -10,6 +10,7 @@ from .db import SessionLocal
 from .migrations import run_migrations
 from .modules.admin.router import router as admin_router
 from .modules.auth.router import router as auth_router
+from .modules.communication.router import router as communication_router
 from .modules.gateway.fhir.router import router as fhir_router
 from .modules.gateway.orca.router import router as orca_router
 from .modules.inpatient.router import router as inpatient_router
@@ -46,6 +47,7 @@ app.add_middleware(
 
 app.include_router(fhir_router)
 app.include_router(auth_router)
+app.include_router(communication_router)
 app.include_router(master_data_router)
 app.include_router(karte_router)
 app.include_router(inpatient_router)

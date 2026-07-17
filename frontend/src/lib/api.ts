@@ -1,6 +1,5 @@
 import type {
   AlertColor,
-  AlertItem,
   DetailItem,
   LabProgress,
   PatientRecord,
@@ -38,12 +37,15 @@ import type {
   ChartHistoryEntry,
   ChartVersion,
   ChartWorkspaceData,
+  CommunicationMessage,
+  CommunicationThread,
   DiagnosisSearchResult,
   DrugCategory,
   ImagingOrderEntry,
   InpatientAdmission,
   InpatientAiSummaryReview,
   InpatientBed,
+  InpatientCareAssignment,
   InpatientDocument,
   InpatientDocumentType,
   InpatientDischargePlan,
@@ -125,7 +127,14 @@ type ApiPatient = {
   same_name_duplicate_count: number;
   comment: string;
   demographics: DetailItem[];
-  alerts: AlertItem[];
+  alerts: Array<{
+    label: string;
+    color: AlertColor;
+    source?: string | null;
+    note?: string | null;
+    recorded_by?: string | null;
+    recorded_at?: string | null;
+  }>;
 };
 
 type ApiChartNote = {
@@ -458,6 +467,16 @@ type ApiInpatientBed = {
   current_admission_id: number | null;
   current_patient: ApiPatient | null;
   stay_days: number | null;
+};
+
+type ApiInpatientCareAssignment = {
+  id: number;
+  admission_id: number;
+  user_id: string;
+  user_display_name: string;
+  role: string;
+  assigned_by: string;
+  created_at: string;
 };
 
 type ApiNursingNote = {
@@ -1104,8 +1123,12 @@ const mapPatient = (patient: ApiPatient): PatientRecord => ({
   comment: patient.comment,
   demographics: patient.demographics,
   alerts: patient.alerts.map((alert) => ({
-    ...alert,
+    label: alert.label,
     color: alert.color as AlertColor,
+    source: alert.source ?? undefined,
+    note: alert.note ?? undefined,
+    recordedBy: alert.recorded_by ?? undefined,
+    recordedAt: alert.recorded_at ? formatTimestamp(alert.recorded_at) : undefined,
   })),
 });
 
@@ -1499,6 +1522,16 @@ const mapInpatientBed = (item: ApiInpatientBed): InpatientBed => ({
   currentPatientId: item.current_patient?.id,
   currentPatientName: item.current_patient?.name,
   stayDays: item.stay_days ?? undefined,
+});
+
+const mapInpatientCareAssignment = (item: ApiInpatientCareAssignment): InpatientCareAssignment => ({
+  id: item.id,
+  admissionId: item.admission_id,
+  userId: item.user_id,
+  userDisplayName: item.user_display_name,
+  role: item.role,
+  assignedBy: item.assigned_by,
+  createdAt: formatTimestamp(item.created_at),
 });
 
 const mapNursingNote = (item: ApiNursingNote): NursingNote => ({
@@ -2182,6 +2215,23 @@ export const listInpatientBeds = async (params?: {
     `/api/inpatient/beds${searchParams.size > 0 ? `?${searchParams.toString()}` : ''}`,
   );
   return beds.map(mapInpatientBed);
+};
+
+export const listMyInpatientCareAssignments = async (): Promise<InpatientCareAssignment[]> => {
+  const assignments = await request<ApiInpatientCareAssignment[]>('/api/inpatient/care-assignments/mine');
+  return assignments.map(mapInpatientCareAssignment);
+};
+
+export const assignInpatientToMe = async (admissionId: number): Promise<InpatientCareAssignment> => {
+  const assignment = await request<ApiInpatientCareAssignment>(
+    `/api/inpatient/admissions/${admissionId}/care-assignments/me`,
+    { method: 'POST', body: JSON.stringify({ role: '担当' }) },
+  );
+  return mapInpatientCareAssignment(assignment);
+};
+
+export const unassignInpatientFromMe = async (admissionId: number): Promise<void> => {
+  await requestText(`/api/inpatient/admissions/${admissionId}/care-assignments/me`, { method: 'DELETE' });
 };
 
 export const updateInpatientBedStatus = async (
@@ -3876,6 +3926,27 @@ export const updatePatientStatus = async (
   return mapPatient(patient);
 };
 
+export const addPatientSafetyAlert = async (
+  patientId: string,
+  payload: { label: string; source: string; note?: string },
+): Promise<PatientRecord> => {
+  const patient = await request<ApiPatient>(`/api/patients/${patientId}/alerts`, {
+    method: 'POST',
+    body: JSON.stringify({
+      label: payload.label,
+      color: 'red',
+      source: payload.source,
+      note: payload.note ?? null,
+    }),
+  });
+  return mapPatient(patient);
+};
+
+export const removePatientSafetyAlert = async (patientId: string, alertIndex: number): Promise<PatientRecord> => {
+  const patient = await request<ApiPatient>(`/api/patients/${patientId}/alerts/${alertIndex}`, { method: 'DELETE' });
+  return mapPatient(patient);
+};
+
 export const listAuditLogs = async (
   limit = 20,
   options?: { scope?: AuditLogEntry['scope'] },
@@ -3887,4 +3958,68 @@ export const listAuditLogs = async (
   const logs = await request<ApiAuditLog[]>(`/api/audit-logs?${searchParams.toString()}`);
 
   return logs.map(mapAuditLog);
+};
+
+type ApiCommunicationThread = {
+  id: string;
+  kind: string;
+  title: string;
+  patient_id: string | null;
+  patient_name: string | null;
+  department: string | null;
+  participant_labels: string[];
+  unread_count: number;
+  last_message: string | null;
+  last_message_at: string | null;
+};
+
+type ApiCommunicationMessage = {
+  id: number;
+  thread_id: string;
+  author_user_id: string | null;
+  author_name: string;
+  author_role: string;
+  body: string;
+  is_system: boolean;
+  created_at: string;
+};
+
+const mapCommunicationThread = (thread: ApiCommunicationThread): CommunicationThread => ({
+  id: thread.id,
+  kind: thread.kind,
+  title: thread.title,
+  patientId: thread.patient_id ?? undefined,
+  patientName: thread.patient_name ?? undefined,
+  department: thread.department ?? undefined,
+  participantLabels: thread.participant_labels,
+  unreadCount: thread.unread_count,
+  lastMessage: thread.last_message ?? undefined,
+  lastMessageAt: thread.last_message_at ? formatTimestamp(thread.last_message_at) : undefined,
+});
+
+const mapCommunicationMessage = (message: ApiCommunicationMessage): CommunicationMessage => ({
+  id: message.id,
+  threadId: message.thread_id,
+  authorUserId: message.author_user_id ?? undefined,
+  authorName: message.author_name,
+  authorRole: message.author_role,
+  body: message.body,
+  isSystem: message.is_system,
+  createdAt: formatTimestamp(message.created_at),
+});
+
+export const listCommunicationThreads = async (): Promise<CommunicationThread[]> =>
+  (await request<ApiCommunicationThread[]>('/api/communications/threads')).map(mapCommunicationThread);
+
+export const listCommunicationMessages = async (threadId: string): Promise<CommunicationMessage[]> =>
+  (await request<ApiCommunicationMessage[]>(`/api/communications/threads/${threadId}/messages`)).map(mapCommunicationMessage);
+
+export const sendCommunicationMessage = async (threadId: string, body: string): Promise<CommunicationMessage> =>
+  mapCommunicationMessage(await request<ApiCommunicationMessage>(`/api/communications/threads/${threadId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  }));
+
+export const markCommunicationThreadRead = async (threadId: string): Promise<void> => {
+  await request(`/api/communications/threads/${threadId}/read`, { method: 'POST' });
 };

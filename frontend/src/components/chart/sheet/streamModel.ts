@@ -16,13 +16,14 @@ import type {
 } from '../../../types/workflow';
 import type { VitalDay } from './vitalsModel';
 
-export type Lens = 'all' | 'exam' | 'lab' | 'rx' | 'imaging';
+export type Lens = 'all' | 'exam' | 'lab' | 'rx' | 'order' | 'imaging';
 
 export const LENSES: Array<{ value: Lens; label: string }> = [
   { value: 'all', label: 'すべて' },
   { value: 'exam', label: '診察' },
   { value: 'lab', label: '検査' },
   { value: 'rx', label: '処方' },
+  { value: 'order', label: 'オーダー' },
   { value: 'imaging', label: '画像・文書' },
 ];
 
@@ -210,6 +211,7 @@ export function buildTodayBlock(args: BuildTodayArgs): TodayBlock {
   const categories: Lens[] = ['exam'];
   if (acts.some((a) => a.kind === 'rx')) categories.push('rx');
   if (acts.some((a) => a.kind === 'lab')) categories.push('lab');
+  if (acts.some((a) => a.kind === 'lab' || a.kind === 'imaging' || a.kind === 'procedure')) categories.push('order');
   if (acts.some((a) => a.kind === 'imaging' || a.kind === 'procedure')) categories.push('imaging');
 
   const metaParts = [args.reason || '本日の診察', args.patientDepartment, args.doctor, `v${args.version}`].filter(

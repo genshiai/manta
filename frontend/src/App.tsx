@@ -2,19 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from './components/AppShell';
 import { BillingWorkspace } from './components/BillingWorkspace';
 import { ChartWorkspace } from './components/ChartWorkspace';
+import { CommunicationWorkspace } from './components/CommunicationWorkspace';
 import { LoginScreen } from './components/LoginScreen';
-import { ReceptionBoard } from './components/ReceptionBoard';
+import { OutpatientWorkspace } from './components/OutpatientWorkspace';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { WardWorkspace } from './components/WardWorkspace';
+import type { SettingsSection } from './components/workspace/WorkspaceContextPane';
 import type { PatientRecord, ReceptionStatus } from './data/chartMock';
 import { demoUsers } from './data/workflowMock';
-import { getCurrentSession, isUnauthorizedError, listInpatientAdmissions, listPatients, login, updatePatientStatus } from './lib/api';
+import { getCurrentSession, isUnauthorizedError, listCommunicationThreads, listInpatientAdmissions, listPatients, login, updatePatientStatus } from './lib/api';
 import { type HomeSettings, readHomeSettings, writeHomeSettings } from './lib/homeSettings';
 import { removeStorage, readStorage, writeStorage } from './lib/storage';
-import type { ChartMeta, InpatientAdmission, UserSession } from './types/workflow';
+import type { ChartMeta, CommunicationThread, InpatientAdmission, UserSession } from './types/workflow';
 
-type Screen = 'login' | 'reception' | 'chart' | 'settings' | 'ward' | 'billing';
-type ChartReturnScreen = 'reception' | 'ward' | 'billing';
+type Screen = 'login' | 'reception' | 'chart' | 'settings' | 'ward' | 'billing' | 'messages';
+type ChartReturnScreen = 'reception' | 'ward' | 'billing' | 'messages';
 type StatusFilter = ReceptionStatus | 'all';
 type DepartmentFilter = string | 'all';
 type SortKey = 'receptionNumber' | 'reservationTime' | 'elapsed';
@@ -74,6 +76,9 @@ function App() {
   const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(readStoredSession()));
   const [patients, setPatients] = useState<PatientRecord[]>([]);
   const [inpatientAdmissions, setInpatientAdmissions] = useState<InpatientAdmission[]>([]);
+  const [communicationThreads, setCommunicationThreads] = useState<CommunicationThread[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string>();
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('users');
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [chartReturnScreen, setChartReturnScreen] = useState<ChartReturnScreen>('reception');
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +103,8 @@ function App() {
     setScreen('login');
     setPatients([]);
     setInpatientAdmissions([]);
+    setCommunicationThreads([]);
+    setActiveThreadId(undefined);
     setSelectedPatient(null);
     setLoginPassword('');
     setLoginAttempts(0);
@@ -142,7 +149,7 @@ function App() {
         }
 
         setSession(nextSession);
-        setScreen('reception');
+        setScreen(nextSession.role === '管理者' ? 'billing' : 'reception');
         setLoginError(null);
       } catch (error) {
         if (cancelled) {
@@ -170,6 +177,7 @@ function App() {
     if (!session || isRestoringSession) {
       setPatients([]);
       setInpatientAdmissions([]);
+      setCommunicationThreads([]);
       return;
     }
 
@@ -183,14 +191,15 @@ function App() {
       setPatientsError(null);
 
       try {
-        const [nextPatients, nextInpatientAdmissions] = await Promise.all([
+        const [nextPatients, nextInpatientAdmissions, nextCommunicationThreads] = await Promise.all([
           listPatients({
             searchQuery,
             statusFilter,
             departmentFilter,
             sortKey,
           }),
-          listInpatientAdmissions({ status: 'active', searchQuery }),
+          listInpatientAdmissions({ status: 'all', searchQuery }),
+          listCommunicationThreads(),
         ]);
 
         if (cancelled) {
@@ -198,7 +207,11 @@ function App() {
         }
 
         setPatients(nextPatients);
-        setInpatientAdmissions(nextInpatientAdmissions);
+        setInpatientAdmissions(nextInpatientAdmissions.filter(
+          (admission) => admission.status === 'active' || admission.status === 'discharge_permitted',
+        ));
+        setCommunicationThreads(nextCommunicationThreads);
+        setActiveThreadId((current) => current ?? nextCommunicationThreads[0]?.id);
         setLastRefreshedAt(formatTimestamp());
       } catch (error) {
         if (cancelled) {
@@ -242,6 +255,14 @@ function App() {
     setSearchQuery(value);
   };
 
+  const handleCommunicationChanged = useCallback(() => {
+    setRefreshToken((current) => current + 1);
+  }, []);
+
+  const handleAuthExpired = useCallback(() => {
+    resetClientSession(sessionExpiredMessage);
+  }, [resetClientSession]);
+
   const handleStatusFilterChange = (value: StatusFilter) => {
     setStatusFilter(value);
   };
@@ -265,7 +286,7 @@ function App() {
     try {
       const nextSession = await login(loginUserId.trim(), loginPassword);
       setSession(nextSession);
-      setScreen('reception');
+      setScreen(nextSession.role === '管理者' ? 'billing' : 'reception');
       setLoginAttempts(0);
       setLoginError(null);
       setLoginPassword('');
@@ -317,6 +338,19 @@ function App() {
     }
 
     handleOpenPatient(patient, returnTo);
+  };
+
+  const handleOpenWard = () => {
+    setSelectedPatient(null);
+    setScreen('ward');
+  };
+
+  const handleWorkspaceNavigate = (target: 'reception' | 'ward' | 'billing' | 'messages' | 'settings') => {
+    if (target === 'ward') {
+      handleOpenWard();
+      return;
+    }
+    setScreen(target);
   };
 
   const handlePatientStatusChange = async (
@@ -399,34 +433,54 @@ function App() {
     return (
       <div className="h-screen overflow-hidden bg-surface-page text-text-primary">
         <ChartWorkspace
+          availableAdmissions={inpatientAdmissions}
           availablePatients={patients}
           currentUser={session}
-          onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
+          unreadMessageCount={communicationThreads.reduce((sum, thread) => sum + thread.unreadCount, 0)}
+          onAuthExpired={handleAuthExpired}
           onDataChanged={() => setRefreshToken((current) => current + 1)}
           onMetaChange={setChartMeta}
-          onNavigate={setScreen}
-          onOpenPatient={handleOpenPatient}
+          onNavigate={handleWorkspaceNavigate}
+          onSwitchUser={handleSwitchUser}
+          onOpenPatient={(patient) => handleOpenPatient(patient, chartReturnScreen)}
           onPatientStatusChange={handlePatientStatusChange}
-          onReturnReception={() => setScreen(chartReturnScreen)}
+          onReturnReception={() => {
+            if (chartReturnScreen === 'ward') {
+              handleOpenWard();
+              return;
+            }
+            setScreen(chartReturnScreen);
+          }}
           patient={selectedPatient}
-          currentAdmission={inpatientAdmissions.find(
+          currentAdmission={chartReturnScreen === 'ward' ? inpatientAdmissions.find(
             (admission) => admission.patientId === selectedPatient.id && admission.status === 'active',
-          )}
+          ) : undefined}
           recentPatients={recentChartPatients}
         />
       </div>
     );
   }
 
-  const shellScreen: 'reception' | 'ward' | 'billing' | 'settings' =
-    screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : 'reception';
+  const shellScreen: 'reception' | 'ward' | 'billing' | 'messages' | 'settings' =
+    screen === 'settings' ? 'settings' : screen === 'ward' ? 'ward' : screen === 'billing' ? 'billing' : screen === 'messages' ? 'messages' : 'reception';
 
   return (
     <AppShell
+      admissions={inpatientAdmissions}
+      activeThreadId={activeThreadId}
+      communicationThreads={communicationThreads}
       currentUser={session}
-      onNavigate={setScreen}
+      onNavigate={handleWorkspaceNavigate}
+      onOpenChart={(patientId) => handleOpenChart(patientId, shellScreen === 'ward' ? 'ward' : shellScreen === 'billing' ? 'billing' : shellScreen === 'messages' ? 'messages' : 'reception')}
+      onOpenThread={(threadId) => {
+        setActiveThreadId(threadId);
+        setScreen('messages');
+      }}
       onSearchChange={handleSearchChange}
       onSwitchUser={handleSwitchUser}
+      settingsSection={settingsSection}
+      onSettingsSectionChange={setSettingsSection}
+      patients={patients}
       screen={shellScreen}
       searchQuery={searchQuery}
     >
@@ -436,10 +490,22 @@ function App() {
             homeSettings={homeSettings}
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
             onHomeSettingsChange={setHomeSettings}
+            section={settingsSection}
+          />
+        ) : screen === 'messages' ? (
+          <CommunicationWorkspace
+            activeThreadId={activeThreadId}
+            currentUser={session}
+            onActiveThreadChange={setActiveThreadId}
+            onAuthExpired={handleAuthExpired}
+            onOpenChart={(patientId) => handleOpenChart(patientId, 'messages')}
+            onThreadsChanged={handleCommunicationChanged}
+            threads={communicationThreads}
           />
         ) : screen === 'ward' ? (
           <WardWorkspace
             admissions={inpatientAdmissions}
+            currentUser={session}
             onAuthExpired={() => resetClientSession(sessionExpiredMessage)}
             onOpenChart={(patientId) => handleOpenChart(patientId, 'ward')}
             onRefreshAdmissions={setInpatientAdmissions}
@@ -454,22 +520,17 @@ function App() {
             searchQuery={searchQuery}
           />
         ) : screen === 'reception' ? (
-          <ReceptionBoard
+          <OutpatientWorkspace
             currentUser={session}
             departmentFilter={departmentFilter}
             errorMessage={patientsError}
-            homeSettings={homeSettings}
-            inpatientAdmissions={inpatientAdmissions}
             isLoading={patientsLoading}
             lastRefreshedAt={lastRefreshedAt}
             onDepartmentFilterChange={handleDepartmentFilterChange}
             onOpenChart={(patientId) => handleOpenChart(patientId, 'reception')}
-            onSearchChange={handleSearchChange}
             onSortChange={handleSortChange}
             onStatusFilterChange={handleStatusFilterChange}
             patients={patients}
-            recentPatients={recentChartPatients}
-            searchQuery={searchQuery}
             sortKey={sortKey}
             statusFilter={statusFilter}
           />

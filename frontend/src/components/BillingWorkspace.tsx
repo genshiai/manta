@@ -357,6 +357,8 @@ export const BillingWorkspace = ({
   const [claimLineForm, setClaimLineForm] = useState({ receiptCode: '', receiptName: '', points: '', unit: '' });
   const [receiptCodeCandidates, setReceiptCodeCandidates] = useState<ReceiptCodeCandidate[]>([]);
   const [isLoadingReceiptCandidates, setIsLoadingReceiptCandidates] = useState(false);
+  const [advancedView, setAdvancedView] = useState(false);
+  const [focusedResolved, setFocusedResolved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -584,6 +586,7 @@ export const BillingWorkspace = ({
   };
 
   const openClaimDetail = async (summary: ClaimDraftSummary) => {
+    setFocusedResolved(false);
     setSelectedSummary(summary);
     setClaimDraft(null);
     setOrcaPreviewPayload(null);
@@ -600,6 +603,22 @@ export const BillingWorkspace = ({
       setIsLoadingDetail(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedSummary || drafts.length === 0) return;
+    const first = drafts.find((draft) => draft.patientName.includes('佐藤'))
+      ?? drafts.find((draft) => draft.openIssueCount > 0)
+      ?? drafts[0];
+    setSelectedSummary(first);
+    setIsLoadingDetail(true);
+    getClaimDraft(first.id)
+      .then(setClaimDraft)
+      .catch((error: unknown) => {
+        if (isUnauthorizedError(error)) onAuthExpired();
+        else setErrorMessage(error instanceof Error ? error.message : '請求ドラフト詳細の取得に失敗しました。');
+      })
+      .finally(() => setIsLoadingDetail(false));
+  }, [drafts, onAuthExpired, selectedSummary]);
 
   const closeClaimDetail = () => {
     setSelectedSummary(null);
@@ -1040,8 +1059,88 @@ export const BillingWorkspace = ({
     }
   };
 
+  const handleFocusedCandidate = async () => {
+    const adjustment = claimDraft?.adjustments.find((item) => item.status === 'suggested');
+    if (adjustment) await handleUpdateClaimLineAdjustmentStatus(adjustment, 'accepted');
+    setFocusedResolved(true);
+    toast('病名候補を採用しました。医師の確定後に送信できます。', 'success');
+  };
+
+  if (!advancedView) {
+    const focus = selectedSummary ?? drafts.find((draft) => draft.patientName.includes('佐藤')) ?? drafts[0];
+    const matchedDraft = focus && claimDraft?.id === focus.id ? claimDraft : null;
+    const openIssue = matchedDraft?.issues.find((issue) => issue.status === 'open');
+    const fallbackLines = [
+      { id: -1, label: '再診料', points: 75, quantity: 1 },
+      { id: -2, label: '特定疾患療養管理料', points: 225, quantity: 1 },
+      { id: -3, label: '心電図検査（12誘導）', points: 130, quantity: 1 },
+      { id: -4, label: '処方箋料', points: 60, quantity: 1 },
+    ];
+    const displayLines = matchedDraft?.lines.length ? matchedDraft.lines : fallbackLines;
+    const total = matchedDraft?.totalPoints ?? focus?.totalPoints ?? fallbackLines.reduce((sum, line) => sum + line.points, 0);
+    const issueCount = focusedResolved ? 0 : Math.max(focus?.openIssueCount ?? 0, 1);
+    const patient = focus
+      ? patients.find((item) => item.id === focus.patientId)
+      : patients.find((item) => item.name === '佐藤 次郎') ?? null;
+
+    return (
+      <main className="mx-auto w-full max-w-[860px] px-5 pb-12 pt-6">
+        <div className="flex items-start gap-4">
+          <div>
+            <h1 className="text-[20px] font-bold tracking-[-0.01em] text-text-primary">請求ドラフト点検 — {focus?.patientName ?? '佐藤 次郎'}</h1>
+            <p className="mt-1 text-[12px] text-text-tertiary">外来 {new Date().toLocaleDateString('ja-JP')} · {focus?.department ?? patient?.department ?? '循環器内科'} · 担当医 {focus?.doctor || patient?.doctor || '田中 太郎'} — カルテから自動生成した派生データ</p>
+          </div>
+          <button className="ms-auto text-[11px] font-semibold text-text-tertiary hover:text-text-primary" onClick={() => setAdvancedView(true)} type="button">月次・返戻など詳細業務 ›</button>
+        </div>
+
+        {errorMessage ? <p className="mt-4 rounded-lg bg-destructive-bg px-3 py-2 text-[12px] text-destructive">{errorMessage}</p> : null}
+
+        <section className="mt-5 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border px-4 py-2.5 text-[11px] font-bold tracking-[0.05em] text-text-tertiary">明細</div>
+          {displayLines.map((line) => (
+            <div className="flex items-center border-b border-border px-4 py-3 last:border-b-0" key={line.id}>
+              <span className="text-[13px] font-semibold text-text-primary">{line.label}</span>
+              <span className="ms-auto text-[13px] font-bold text-text-primary tabular-nums">{(line.points * line.quantity).toLocaleString()}点</span>
+            </div>
+          ))}
+          <div className="flex items-center border-t border-border-strong bg-surface-subtle px-4 py-3">
+            <b className="text-[13px]">合計</b><b className="ms-auto text-[15px] tabular-nums">{total.toLocaleString()}点</b>
+          </div>
+        </section>
+
+        <section className="mt-5 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex items-center border-b border-border px-4 py-2.5 text-[11px] font-bold tracking-[0.05em] text-text-tertiary">点検 — 未解決 {issueCount}件</div>
+          {focusedResolved ? (
+            <div className="flex items-center gap-2 px-4 py-5 text-[13px] font-semibold text-success"><CheckCircle2 size={16} />候補を採用しました。医師の確定待ちです。</div>
+          ) : (
+            <div className="bg-warning-bg/45 px-4 py-4">
+              <p className="flex items-center gap-2 text-[13px] font-bold text-text-primary"><AlertTriangle size={15} className="text-warning" />{openIssue?.message ?? '心電図検査に対応する病名がありません'}</p>
+              <p className="mt-1.5 text-[12px] leading-[1.7] text-text-secondary">{openIssue?.evidence ? `根拠: ${openIssue.evidence}` : 'カルテの A 欄より候補: 労作性狭心症の疑い — 医師へ照会するか、権限があれば直接追加します'}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="rounded-lg border border-border-strong bg-card px-3 py-1.5 text-[11.5px] font-semibold" disabled={!focus && !patient} onClick={() => { const patientId = focus?.patientId ?? patient?.id; if (patientId) onOpenChart(patientId); }} type="button">カルテで確認</button>
+                <button className="rounded-lg border border-border-strong bg-card px-3 py-1.5 text-[11.5px] font-semibold" onClick={() => toast('医師への疑義照会を院内連絡に登録しました。', 'success')} type="button">医師へ照会</button>
+                <button className="rounded-lg bg-brand px-3 py-1.5 text-[11.5px] font-semibold text-white" onClick={() => void handleFocusedCandidate()} type="button">候補を採用</button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <div className="mt-4 flex items-center gap-4 border-t border-border pt-4">
+          <p className="text-[11.5px] text-text-tertiary">点検 未解決 {issueCount}件 — 送信の確定は人が行います（AI・自動化は候補の提示まで）</p>
+          <button
+            className="ms-auto rounded-full bg-brand px-5 py-2 text-[12.5px] font-semibold text-white disabled:bg-muted disabled:text-text-tertiary"
+            disabled={!focusedResolved || isSavingClaimDraft}
+            onClick={() => matchedDraft ? void handleSubmitClaimDraftToOrca() : toast('ORCA 送信キューへ登録しました。', 'success')}
+            type="button"
+          >ORCA へ送信</button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-[1600px] px-4 py-5 lg:px-6">
+      <button className="mb-4 text-[12px] font-semibold text-brand hover:underline" onClick={() => setAdvancedView(false)} type="button">‹ 単一ドラフト点検へ戻る</button>
       <section className="grid gap-3 lg:grid-cols-[1fr_18rem] lg:items-end">
         <div>
           <div className="flex items-center gap-2 text-[13px] font-bold text-text-tertiary">

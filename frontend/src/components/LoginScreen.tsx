@@ -1,5 +1,6 @@
 import { Button, Heading, HeadingTitle, Input } from '../vendor/dads';
 import type { UserAccount } from '../types/workflow';
+import mantaMark from '../assets/manta-mark.svg';
 
 type LoginScreenProps = {
   accounts: UserAccount[];
@@ -32,8 +33,8 @@ export const LoginScreen = ({
 }: LoginScreenProps) => (
   <main className='mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 px-4 py-10 lg:px-6'>
     <div className='flex items-center gap-3'>
-      <div className='grid h-10 w-10 place-items-center rounded-8 bg-blue-900 text-[18px] font-bold leading-snug text-white'>
-        M
+      <div className='grid h-10 w-10 place-items-center'>
+        <img alt='Manta' className='h-auto w-9' src={mantaMark} />
       </div>
       <div>
         <p className='text-[20px] font-bold leading-snug text-solid-gray-900'>Manta</p>

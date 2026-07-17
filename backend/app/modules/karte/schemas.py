@@ -16,6 +16,17 @@ class DetailItem(BaseModel):
 class AlertItem(BaseModel):
     label: str
     color: str
+    source: str | None = None
+    note: str | None = None
+    recorded_by: str | None = None
+    recorded_at: str | None = None
+
+
+class PatientAlertCreateRequest(BaseModel):
+    label: str
+    color: str = "red"
+    source: str
+    note: str | None = None
 
 
 class PatientProfileItem(BaseModel):
