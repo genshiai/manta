@@ -8,7 +8,7 @@ authors = [{ name = "GENSHI AI, Inc." }]
 requires-python = ">=3.9"
 dependencies = [
   "alembic>=1.16.5,<2.0.0",
-  "argon2-cffi>=23.1.0,<24.0.0",
+  "argon2-cffi>=23.1.0,<26.0.0",
   "fastapi>=0.116.0,<1.0.0",
   "fhir.resources>=8.0.0,<9.0.0",
   "httpx>=0.28.1,<1.0.0",
